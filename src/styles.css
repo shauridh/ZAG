@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Palet Sabana (lihat DESIGN.md): merah gerai + emas aksen + kertas hangat */
+:root {
+  --c-red: #e11b22; /* brand: header, strip, badge aktif (teks putih hanya utk teks besar/bold) */
+  --c-btn: #c4151b; /* tombol utama: putih di atasnya lolos AA */
+  --c-redtext: #a31217; /* teks merah di atas terang */
+  --c-gold: #f5a302; /* aksen tunggal: peringatan & sorotan terlaris */
+  --c-paper: #fff8f2;
+  --c-card: #ffffff;
+  --c-ink: #1a1512;
+  --c-muted: #6e6159; /* abu hangat, lolos AA di atas kertas */
+  --c-line: #e8d9cd;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-brand-paper text-brand-ink font-sans antialiased;
+  font-size: 15px;
+}
+
+/* Fokus selalu terlihat (R-32) */
+:focus-visible {
+  outline: 2px solid var(--c-btn);
+  outline-offset: 2px;
+}
+
+@layer components {
+  .card {
+    @apply rounded-card border-[1.5px] border-brand-line bg-brand-card;
+  }
+  /* Motif identitas: strip merah + garis emas di bawahnya (lihat DESIGN.md) */
+  .strip {
+    box-shadow: inset 0 6px 0 0 var(--c-red), inset 0 7px 0 0 var(--c-gold);
+  }
+  .btn {
+    @apply inline-flex min-h-[44px] select-none items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand-btn text-white shadow-pop hover:bg-brand-redtext active:translate-y-[1px] active:shadow-none;
+  }
+  .btn-ghost {
+    @apply btn border-[1.5px] border-brand-line bg-brand-card text-brand-ink hover:bg-brand-paper;
+  }
+  .btn-danger {
+    @apply btn border-[1.5px] border-brand-redtext bg-brand-card text-brand-redtext hover:bg-brand-paper;
+  }
+  .btn-gold {
+    @apply btn bg-brand-gold text-brand-ink hover:brightness-95;
+  }
+  .input {
+    @apply min-h-[44px] w-full rounded-lg border-[1.5px] border-brand-line bg-white px-3 text-[15px] text-brand-ink placeholder:text-brand-muted focus:border-brand-btn;
+  }
+  .lbl {
+    @apply mb-1 block text-[13px] font-semibold text-brand-muted;
+  }
+  .tbl {
+    @apply w-full border-collapse text-sm;
+  }
+  .tbl th {
+    @apply border-b-[1.5px] border-brand-line bg-brand-paper px-3 py-2 text-left font-bold;
+  }
+  .tbl td {
+    @apply border-b border-brand-line px-3 py-2 align-top;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-bold;
+  }
+}
+
+/* Badge pesanan baru: berdenyut sampai dikonfirmasi (punya fungsi alert, bukan tempelan) */
+@keyframes newpulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(225, 27, 34, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(225, 27, 34, 0);
+  }
+}
+.pulse-new {
+  animation: newpulse 1.4s ease-in-out infinite;
+}
+
+/* Peta Leaflet di modal */
+.leaflet-container {
+  z-index: 0;
+}

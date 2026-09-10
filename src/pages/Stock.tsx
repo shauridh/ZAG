@@ -1,0 +1,337 @@
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { loadCatalog, createPurchase, opname, logWaste, type Catalog } from '../lib/db'
+import { ErrorSummary } from '../components/ErrorSummary'
+import { fmtQty, parseNum } from '../lib/money'
+
+type Tab = 'pembelian' | 'opname' | 'waste'
+
+export default function StockPage(): ReactElement {
+  const [searchParams] = useSearchParams()
+  const [catalog, setCatalog] = useState<Catalog | null>(null)
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = searchParams.get('tab')
+    return t === 'opname' || t === 'waste' ? t : 'pembelian'
+  })
+  const [err, setErr] = useState('')
+  const [msg, setMsg] = useState('')
+
+  const reload = useCallback(async () => {
+    try {
+      setCatalog(await loadCatalog())
+    } catch (ex) {
+      setErr((ex as Error).message)
+    }
+  }, [])
+
+  useEffect(() => {
+    void reload()
+  }, [reload])
+
+  if (!catalog) return <div className="p-6 text-sm font-bold text-brand-muted">Memuat...</div>
+
+  return (
+    <div className="p-3 lg:p-4">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h1 className="mr-auto text-xl font-extrabold">Stok & Pembelian</h1>
+        <div className="flex gap-1" role="tablist" aria-label="Bagian stok">
+          {(
+            [
+              ['pembelian', 'Catat Pembelian'],
+              ['opname', 'Stok Opname'],
+              ['waste', 'Waste / Hangus']
+            ] as [Tab, string][]
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={tab === k}
+              className={`chip h-9 px-3 ${tab === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+              onClick={() => setTab(k)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {err && <ErrorSummary err={err} label="Pembelian/opname gagal" />}
+      {msg && <p role="status" className="mb-2 rounded-lg bg-brand-gold/25 px-3 py-2 text-sm font-bold">{msg}</p>}
+
+      {tab === 'pembelian' && <PurchaseForm catalog={catalog} reload={reload} setErr={setErr} setMsg={setMsg} />}
+      {tab === 'opname' && <OpnameForm catalog={catalog} reload={reload} setErr={setErr} setMsg={setMsg} />}
+      {tab === 'waste' && <WasteForm catalog={catalog} reload={reload} setErr={setErr} setMsg={setMsg} />}
+    </div>
+  )
+}
+
+function PurchaseForm({
+  catalog,
+  reload,
+  setErr,
+  setMsg
+}: {
+  catalog: Catalog
+  reload: () => Promise<void>
+  setErr: (s: string) => void
+  setMsg: (s: string) => void
+}): ReactElement {
+  const raws = useMemo(() => catalog.ingredients.filter((i) => i.kind === 'raw' && i.active), [catalog])
+  const [lines, setLines] = useState<{ ingredient_id: number; packs: string; unit_cost: string }[]>([{ ingredient_id: raws[0]?.id ?? 0, packs: '', unit_cost: '' }])
+  const [note, setNote] = useState('')
+  const ingById = useMemo(() => new Map(catalog.ingredients.map((i) => [i.id, i])), [catalog])
+
+  const total = lines.reduce((s, l) => s + parseNum(l.packs) * (parseInt(l.unit_cost, 10) || 0), 0)
+
+  // draft dari Insight Belanja (halaman Bahan): isi baris bahan + qty + harga terakhir
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('sabana-purchase-draft')
+      if (!raw) return
+      const draft = JSON.parse(raw) as { ingredient_id: number; packs: number }[]
+      if (Array.isArray(draft) && draft.length > 0) {
+        setLines(
+          draft.map((d) => {
+            const ing = catalog.ingredients.find((i) => i.id === d.ingredient_id)
+            return {
+              ingredient_id: d.ingredient_id,
+              packs: String(d.packs),
+              unit_cost: ing ? String(Math.round(ing.price * (ing.pack_content || 1))) : ''
+            }
+          })
+        )
+      }
+      sessionStorage.removeItem('sabana-purchase-draft')
+    } catch {
+      // draft rusak: abaikan
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <div className="max-w-2xl">
+      <p className="mb-2 text-sm text-brand-muted">
+        Catat pembelian bahan dari supplier. Stok masuk otomatis, dan harga terakhir menjadi harga bahan baru (HPP ikut terhitung ulang).
+      </p>
+      {lines.map((l, i) => {
+        const ing = ingById.get(l.ingredient_id)
+        return (
+          <div key={i} className="mb-2 grid grid-cols-[1fr_90px_110px_28px] gap-2">
+            <select
+              className="input !h-10"
+              value={l.ingredient_id}
+              onChange={(e) => setLines((ls) => ls.map((x, j) => (j === i ? { ...x, ingredient_id: parseInt(e.target.value, 10) } : x)))}
+              aria-label="Bahan"
+            >
+              {raws.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+            <input
+              className="input !h-10 text-right"
+              placeholder={`${ing ? ing.buy_unit : ''}`}
+              inputMode="decimal"
+              value={l.packs}
+              onChange={(e) => setLines((ls) => ls.map((x, j) => (j === i ? { ...x, packs: e.target.value } : x)))}
+              aria-label="Jumlah kemasan"
+            />
+            <input
+              className="input !h-10 text-right"
+              placeholder="Harga/unit"
+              inputMode="numeric"
+              value={l.unit_cost}
+              onChange={(e) => setLines((ls) => ls.map((x, j) => (j === i ? { ...x, unit_cost: e.target.value.replace(/\D/g, '') } : x)))}
+              aria-label="Harga per satuan beli"
+            />
+            <button type="button" className="font-extrabold text-brand-redtext" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} aria-label="Hapus baris">
+              ✕
+            </button>
+          </div>
+        )
+      })}
+      <button type="button" className="btn-ghost !min-h-0 !py-1.5 text-xs" onClick={() => setLines((ls) => [...ls, { ingredient_id: raws[0]?.id ?? 0, packs: '', unit_cost: '' }])}>
+        + Baris
+      </button>
+      <div className="mt-3">
+        <label className="lbl" htmlFor="pnote">
+          Catatan (supplier, no. nota)
+        </label>
+        <input id="pnote" className="input" value={note} onChange={(e) => setNote(e.target.value)} />
+      </div>
+      <p className="mt-2 text-lg font-extrabold">Total belanja: Rp{total.toLocaleString('id-ID')}</p>
+      <button
+        type="button"
+        className="btn-primary mt-2"
+        disabled={total <= 0}
+        onClick={async () => {
+          try {
+            await createPurchase(
+              lines.filter((l) => parseNum(l.packs) > 0).map((l) => ({ ingredient_id: l.ingredient_id, packs: parseNum(l.packs), unit_cost: parseInt(l.unit_cost, 10) || 0 })),
+              note
+            )
+            setLines([{ ingredient_id: raws[0]?.id ?? 0, packs: '', unit_cost: '' }])
+            setNote('')
+            await reload()
+            setMsg('Pembelian tercatat, stok & harga bahan diperbarui.')
+          } catch (ex) {
+            setErr((ex as Error).message)
+          }
+        }}
+      >
+        Simpan Pembelian
+      </button>
+    </div>
+  )
+}
+
+function OpnameForm({
+  catalog,
+  reload,
+  setErr,
+  setMsg
+}: {
+  catalog: Catalog
+  reload: () => Promise<void>
+  setErr: (s: string) => void
+  setMsg: (s: string) => void
+}): ReactElement {
+  const [ingId, setIngId] = useState(catalog.ingredients[0]?.id ?? 0)
+  const [qty, setQty] = useState('')
+  const ing = catalog.ingredients.find((i) => i.id === ingId)
+  return (
+    <div className="max-w-md">
+      <p className="mb-2 text-sm text-brand-muted">Samakan stok sistem dengan hitungan fisik (stok opname).</p>
+      <div className="mb-2">
+        <label className="lbl" htmlFor="oing">
+          Bahan
+        </label>
+        <select id="oing" className="input" value={ingId} onChange={(e) => setIngId(parseInt(e.target.value, 10))}>
+          {catalog.ingredients.map((i) => (
+            <option key={i.id} value={i.id}>
+              {i.name} (sistem: {fmtQty(i.stock)} {i.buy_unit})
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="mb-3">
+        <label className="lbl" htmlFor="oqty">
+          Hasil hitung fisik ({ing?.buy_unit ?? ''})
+        </label>
+        <input id="oqty" className="input" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d.,]/g, ''))} />
+      </div>
+      <button
+        type="button"
+        className="btn-primary"
+        onClick={async () => {
+          try {
+            await opname(ingId, parseNum(qty))
+            setQty('')
+            await reload()
+            setMsg('Stok disesuaikan.')
+          } catch (ex) {
+            setErr((ex as Error).message)
+          }
+        }}
+      >
+        Sesuaikan Stok
+      </button>
+    </div>
+  )
+}
+
+function WasteForm({
+  catalog,
+  reload,
+  setErr,
+  setMsg
+}: {
+  catalog: Catalog
+  reload: () => Promise<void>
+  setErr: (s: string) => void
+  setMsg: (s: string) => void
+}): ReactElement {
+  const [mode, setMode] = useState<'bahan' | 'produk'>('bahan')
+  const [ingId, setIngId] = useState(catalog.ingredients[0]?.id ?? 0)
+  const [prodId, setProdId] = useState(catalog.products[0]?.id ?? 0)
+  const [qty, setQty] = useState('')
+  const [note, setNote] = useState('')
+  return (
+    <div className="max-w-md">
+      <p className="mb-2 text-sm text-brand-muted">
+        Bahan terbuang/hangus dikurangi dari stok, jadi margin riil di laporan tetap jujur.
+      </p>
+      <div className="mb-2 flex gap-1" role="radiogroup" aria-label="Jenis waste">
+        {(
+          [
+            ['bahan', 'Bahan mentah'],
+            ['produk', 'Produk jadi']
+          ] as ['bahan' | 'produk', string][]
+        ).map(([k, label]) => (
+          <button key={k} type="button" role="radio" aria-checked={mode === k} className={`chip h-9 px-3 ${mode === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`} onClick={() => setMode(k)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {mode === 'bahan' ? (
+        <div className="mb-2">
+          <label className="lbl" htmlFor="wing">
+            Bahan
+          </label>
+          <select id="wing" className="input" value={ingId} onChange={(e) => setIngId(parseInt(e.target.value, 10))}>
+            {catalog.ingredients.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div className="mb-2">
+          <label className="lbl" htmlFor="wprod">
+            Produk jadi
+          </label>
+          <select id="wprod" className="input" value={prodId} onChange={(e) => setProdId(parseInt(e.target.value, 10))}>
+            {catalog.products.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="mb-2">
+        <label className="lbl" htmlFor="wqty">
+          Jumlah ({mode === 'bahan' ? catalog.ingredients.find((i) => i.id === ingId)?.buy_unit : 'porsi'})
+        </label>
+        <input id="wqty" className="input" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d.,]/g, ''))} />
+      </div>
+      <div className="mb-3">
+        <label className="lbl" htmlFor="wnote">
+          Penyebab
+        </label>
+        <input id="wnote" className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="hangus / jatuh / kadaluarsa" />
+      </div>
+      <button
+        type="button"
+        className="btn-primary"
+        onClick={async () => {
+          try {
+            const q = parseNum(qty)
+            if (q <= 0) return
+            await logWaste(mode === 'bahan' ? [{ ingredient_id: ingId, qty: q }] : [{ product_id: prodId, qty: q }], note || 'waste')
+            setQty('')
+            setNote('')
+            await reload()
+            setMsg('Waste tercatat.')
+          } catch (ex) {
+            setErr((ex as Error).message)
+          }
+        }}
+      >
+        Catat Waste
+      </button>
+    </div>
+  )
+}
