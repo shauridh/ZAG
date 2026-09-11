@@ -48,6 +48,9 @@ export default function ShiftPage(): ReactElement {
   const cashSales = (t: Shift): number =>
     (txs ?? []).filter((x) => x.shift_id === t.id).reduce((sum, x) => sum + (x.payments ?? []).filter((p) => p.method === 'cash').reduce((a, p) => a + p.amount, 0), 0)
 
+  // selisih kas hidup di modal tutup shift (modal hanya terbuka saat shift ada)
+  const closeDiff = shift ? closeCash - shift.opening_cash - cashSales(shift) : 0
+
   return (
     <div className="p-3 lg:p-4">
       <h1 className="mb-3 text-xl font-extrabold">Shift Kasir</h1>
@@ -151,8 +154,14 @@ export default function ShiftPage(): ReactElement {
                 <td>{s.closed_at ? fmtDateTime(s.closed_at) : '—'}</td>
                 <td className="text-right tabular-nums">{fmtRp(s.opening_cash)}</td>
                 <td className="text-right tabular-nums">{s.closing_cash !== null ? fmtRp(s.closing_cash) : '—'}</td>
-                <td className={`text-right font-bold tabular-nums ${s.cash_diff !== null && s.cash_diff < 0 ? 'text-brand-redtext' : ''}`}>
-                  {s.cash_diff !== null ? fmtRp(s.cash_diff) : '—'}
+                <td className={`text-right tabular-nums ${s.cash_diff !== null && s.cash_diff < 0 ? 'text-brand-redtext' : ''}`}>
+                  {s.cash_diff === null ? '—' : s.cash_diff === 0 ? (
+                    <span className="chip bg-emerald-700/10 text-emerald-800">Rp0</span>
+                  ) : s.cash_diff > 0 ? (
+                    <span className="chip bg-brand-gold/30">+{fmtRp(s.cash_diff)}</span>
+                  ) : (
+                    <span className="chip bg-brand-redtext/10 text-brand-redtext">{fmtRp(s.cash_diff)}</span>
+                  )}
                 </td>
                 <td className="text-xs">{s.note ?? ''}</td>
               </tr>
@@ -197,6 +206,24 @@ export default function ShiftPage(): ReactElement {
           Hitung uang fisik di drawer sekarang. Wajib menyisakan float kembalian {fmtRp(settings.shift.float_cash)}. Laporan otomatis dikirim ke email pemilik
           {settings.owner_email.email ? ` (${settings.owner_email.email})` : ' (atur email di Pengaturan)'}.
         </p>
+        {/* Selisih kas hidup: kasir lihat dulu hasil hitungannya sebelum menekan tombol */}
+        <div
+          className={`mb-3 rounded-lg border-[1.5px] p-3 text-center ${
+            closeDiff < 0
+              ? 'border-brand-redtext bg-brand-redtext/10'
+              : closeDiff > 0
+                ? 'border-brand-gold bg-brand-gold/15'
+                : 'border-emerald-700/40 bg-emerald-700/10'
+          }`}
+          role="status"
+        >
+          <p className="text-lg font-extrabold">
+            Selisih {fmtRp(closeDiff)}
+          </p>
+          <p className="text-xs font-bold text-brand-muted">
+            {closeDiff === 0 ? 'pas — bagus' : closeDiff > 0 ? 'lebih dari seharusnya' : 'kurang dari seharusnya'}
+          </p>
+        </div>
         <Numpad
           value={closeCash}
           onChange={setCloseCash}

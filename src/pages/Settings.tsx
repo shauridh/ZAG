@@ -7,7 +7,7 @@ import { MapPicker } from '../components/MapPicker'
 import { useToast } from '../components/Toast'
 import { bluetoothAvailable, getSavedPrinter, forgetPrinter, pickAndSavePrinter, printTextBluetooth, canReconnectSaved, type SavedPrinter } from '../lib/bluetooth-printer'
 
-type Tab = 'toko' | 'struk' | 'printer' | 'qris' | 'outlet' | 'biaya'
+type Tab = 'toko' | 'struk' | 'printer' | 'qris' | 'outlet' | 'tablet' | 'biaya'
 
 export default function SettingsPage(): ReactElement {
   const { toast } = useToast()
@@ -46,46 +46,48 @@ export default function SettingsPage(): ReactElement {
 
   return (
     <div className="p-3 lg:p-4">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h1 className="mr-auto text-xl font-extrabold">Pengaturan</h1>
-        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Bagian pengaturan">
-          {(
-            [
-              ['toko', 'Toko & Operasional'],
-              ['struk', 'Template Struk'],
-              ['printer', 'Printer'],
-              ['qris', 'Halaman QRIS'],
-              ['outlet', 'Outlet & Ongkir'],
-              ['biaya', 'Beban Tetap']
-            ] as [Tab, string][]
-          ).map(([k, label]) => (
-            <button
-              key={k}
-              type="button"
-              role="tab"
-              aria-selected={tab === k}
-              className={`chip h-9 px-3 ${tab === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
-              onClick={() => setTab(k)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <h1 className="mb-3 text-xl font-extrabold">Pengaturan</h1>
       {err && (
         <p className="mb-2 rounded-lg bg-brand-redtext/10 px-3 py-2 text-sm font-bold text-brand-redtext" role="alert">
           {err}
         </p>
       )}
 
-      {tab === 'toko' && (
-        <div className="grid max-w-3xl gap-3 lg:grid-cols-2">
-          <div className="card p-4">
-            <h2 className="mb-2 font-extrabold">Identitas toko</h2>
-            <StoreForm settings={settings} onSave={(v) => void upd('store', v)} />
-          </div>
-          <div className="card p-4">
-            <h2 className="mb-2 font-extrabold">Operasional</h2>
+      {/* Nav topik di kiri + satu panel di kanan: semua form tidak lagi menumpuk ke bawah */}
+      <div className="grid gap-3 lg:grid-cols-[190px_1fr]">
+        <nav className="card h-fit gap-1 p-2 max-lg:grid max-lg:grid-cols-2" aria-label="Topik pengaturan">
+          {(
+            [
+              ['toko', '🏪 Toko & Operasional'],
+              ['struk', '🧾 Template Struk'],
+              ['printer', '🖨️ Printer'],
+              ['qris', '📲 Halaman QRIS'],
+              ['outlet', '🛍️ Outlet & Ongkir'],
+              ['tablet', '📱 Tablet & Layar'],
+              ['biaya', '🏷️ Beban Tetap']
+            ] as [Tab, string][]
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              aria-current={tab === k ? 'true' : undefined}
+              className={`rounded-lg px-3 py-2.5 text-left text-sm font-bold ${tab === k ? 'bg-brand-btn text-white' : 'text-brand-ink hover:bg-brand-paper'}`}
+              onClick={() => setTab(k)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="min-w-0">
+          {tab === 'toko' && (
+            <div className="grid max-w-3xl gap-3 lg:grid-cols-2">
+              <div className="card p-4">
+                <h2 className="mb-2 font-extrabold">Identitas toko</h2>
+                <StoreForm settings={settings} onSave={(v) => void upd('store', v)} />
+              </div>
+              <div className="card p-4">
+                <h2 className="mb-2 font-extrabold">Operasional</h2>
             <div className="flex flex-col gap-3">
               <div>
                 <label className="lbl" htmlFor="float">
@@ -205,42 +207,43 @@ export default function SettingsPage(): ReactElement {
               </button>
             )}
           </div>
-          <div className="card p-4">
-            <h2 className="mb-2 font-extrabold">Tablet & Layar</h2>
-            <div className="flex flex-col gap-3">
-              <label className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 h-5 w-5"
-                  checked={settings.tablet?.keep_awake ?? true}
-                  onChange={(e) =>
-                    void upd('tablet', { ...(settings.tablet ?? { keep_awake: true, fullscreen: false }), keep_awake: e.target.checked })
-                  }
-                />
-                <span>
-                  <span className="block text-sm font-extrabold">Layar tetap menyala (wake lock)</span>
-                  <span className="block text-xs text-brand-muted">
-                    Cegah layar tablet mati saat jam jualan. Bisa juga diaktifkan kapan saja dari tombol ☀ di bilah atas.
-                  </span>
+          </div>
+      )}
+
+      {tab === 'tablet' && (
+        <div className="card max-w-xl p-4">
+          <h2 className="mb-2 font-extrabold">Tablet & Layar</h2>
+          <div className="flex flex-col gap-3">
+            <label className="flex items-start gap-3">
+              <Switch
+                checked={settings.tablet?.keep_awake ?? true}
+                onChange={(v) =>
+                  void upd('tablet', { ...(settings.tablet ?? { keep_awake: true, fullscreen: false }), keep_awake: v })
+                }
+                label="Layar tetap menyala (wake lock)"
+              />
+              <span>
+                <span className="block text-sm font-extrabold">Layar tetap menyala (wake lock)</span>
+                <span className="block text-xs text-brand-muted">
+                  Cegah layar tablet mati saat jam jualan. Bisa juga diaktifkan kapan saja dari tombol ☀ di bilah atas.
                 </span>
-              </label>
-              <label className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 h-5 w-5"
-                  checked={settings.tablet?.fullscreen ?? false}
-                  onChange={(e) =>
-                    void upd('tablet', { ...(settings.tablet ?? { keep_awake: true, fullscreen: false }), fullscreen: e.target.checked })
-                  }
-                />
-                <span>
-                  <span className="block text-sm font-extrabold">Mode layar penuh</span>
-                  <span className="block text-xs text-brand-muted">
-                    Sembunyikan bilah browser agar kasir fokus. Browser mewajibkan satu ketukan pengguna — banner konfirmasi akan muncul setelah login.
-                  </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3">
+              <Switch
+                checked={settings.tablet?.fullscreen ?? false}
+                onChange={(v) =>
+                  void upd('tablet', { ...(settings.tablet ?? { keep_awake: true, fullscreen: false }), fullscreen: v })
+                }
+                label="Mode layar penuh"
+              />
+              <span>
+                <span className="block text-sm font-extrabold">Mode layar penuh</span>
+                <span className="block text-xs text-brand-muted">
+                  Sembunyikan bilah browser agar kasir fokus. Browser mewajibkan satu ketukan pengguna — banner konfirmasi akan muncul setelah login.
                 </span>
-              </label>
-            </div>
+              </span>
+            </label>
           </div>
         </div>
       )}
@@ -282,11 +285,10 @@ export default function SettingsPage(): ReactElement {
           <div className="card p-4">
             <h2 className="mb-2 font-extrabold">Layanan pesan antar</h2>
             <label className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                className="mt-0.5 h-5 w-5"
+              <Switch
                 checked={settings.portal?.delivery_enabled ?? true}
-                onChange={(e) => void upd('portal', { ...settings.portal, delivery_enabled: e.target.checked })}
+                onChange={(v) => void upd('portal', { ...settings.portal, delivery_enabled: v })}
+                label="Terima pesanan diantar"
               />
               <span>
                 <span className="block text-sm font-extrabold">Terima pesanan diantar</span>
@@ -437,7 +439,28 @@ export default function SettingsPage(): ReactElement {
           </button>
         </div>
       )}
+        </div>
+      </div>
     </div>
+  )
+}
+
+/** Saklar on/off visual: status terbaca sekilas, bukan checkbox polos. */
+function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }): ReactElement {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`relative h-6 w-11 shrink-0 rounded-lg border-[1.5px] border-brand-line ${checked ? 'bg-brand-btn' : 'bg-brand-paper'}`}
+    >
+      <span
+        aria-hidden
+        className={`absolute top-[1px] h-[18px] w-[18px] rounded-md bg-brand-card shadow-pop ${checked ? 'left-[24px]' : 'left-[2px]'}`}
+      />
+    </button>
   )
 }
 

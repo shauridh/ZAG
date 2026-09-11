@@ -9,6 +9,7 @@ import { useToast } from '../components/Toast'
 
 const LS_TOKEN = 'sabana-portal-token'
 const LS_NAME = 'sabana-portal-name'
+const LS_MODE = 'sabana-portal-mode'
 
 type Screen = 'katalog' | 'checkout' | 'pesanan' | 'akun'
 
@@ -230,6 +231,13 @@ function PortalMain({
   const activeOrder = orders.find((o) => !['selesai', 'batal', 'ditolak'].includes(o.status))
   const catOf = (id: number): string => catalog.categories.find((c) => c.id === id)?.name ?? 'Lainnya'
 
+  // Mode pemesanan diingat antar kunjungan: pelanggan langganan tak perlu pilih ulang
+  const [mode, setModeState] = useState<'ambil' | 'antar'>(() => (localStorage.getItem(LS_MODE) === 'antar' ? 'antar' : 'ambil'))
+  const setMode = (m: 'ambil' | 'antar'): void => {
+    localStorage.setItem(LS_MODE, m)
+    setModeState(m)
+  }
+
   // Status antar = saklar manual DAN jadwal (kalau dipasang); dihitung ulang tiap menit lewat `now`.
   const schedule = normalizeSchedule(settings.portal.delivery_schedule ?? null)
   const schedInfo = schedule ? checkSchedule(schedule, now) : null
@@ -315,8 +323,40 @@ function PortalMain({
       )}
 
       <main className="min-h-0 flex-1 p-3 pb-28">
-        {screen === 'katalog' &&
-          byCat.map(([cid, prods]) => (
+        {screen === 'katalog' && (
+          <>
+            {/* Toggle ambil/diantar di atas katalog: keputusan utama pelanggan, bukan tersembunyi di form akhir */}
+            <div className="mb-3 flex items-center gap-1 rounded-lg border-[1.5px] border-brand-line bg-brand-card p-1" role="radiogroup" aria-label="Cara pesanan diterima">
+              {(
+                [
+                  ['ambil', 'Ambil di kasir'],
+                  ['antar', 'Diantar']
+                ] as ['ambil' | 'antar', string][]
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === k}
+                  disabled={k === 'antar' && !deliveryOn}
+                  className={`flex-1 rounded-md px-3 py-2 text-sm font-extrabold ${mode === k ? 'bg-brand-btn text-white' : 'text-brand-ink disabled:opacity-40'} ${mode !== k ? 'hover:bg-brand-paper' : ''}`}
+                  onClick={() => setMode(k)}
+                >
+                  {label}
+                </button>
+              ))}
+              <span className="pr-2 text-[11px] font-bold text-brand-muted">
+                {mode === 'antar'
+                  ? schedInfo?.range
+                    ? `Antar ${schedInfo.range}`
+                    : deliveryOn
+                      ? ''
+                      : 'antar sedang libur'
+                  : 'tanpa ongkir'}
+              </span>
+            </div>
+
+            {byCat.map(([cid, prods]) => (
             <section key={cid} className="mb-4">
               <h2 className="mb-2 text-sm font-extrabold uppercase tracking-wide text-brand-redtext">{catOf(cid)}</h2>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -343,9 +383,10 @@ function PortalMain({
                     </div>
                   )
                 })}
-              </div>
-            </section>
-          ))}
+              </div>              </section>
+            ))}
+          </>
+        )}
 
         {screen === 'checkout' && (
           <CheckoutScreen
@@ -355,6 +396,7 @@ function PortalMain({
             zones={zones}
             outlet={outlet}
             deliveryOn={deliveryOn}
+            preferDelivery={mode === 'antar'}
             busy={busy}
             setQty={setQty}
             onSaveAddress={async (id, label, addr, lat, lng) => {
@@ -406,9 +448,14 @@ function PortalMain({
 
       {cartCount > 0 && screen === 'katalog' && (
         <div className="fixed inset-x-0 bottom-16 z-20 mx-auto max-w-2xl px-3">
-          <button type="button" className="btn-primary w-full !py-3 shadow-lg" onClick={() => setScreen('checkout')}>
-            Checkout ({cartCount} item) · {fmtRp(subtotal)}
-          </button>
+          {/* Bar keranjang melekat: jumlah item & total selalu terlihat, satu ketuk menuju checkout */}
+          <div className="card flex items-center gap-2 p-2 pl-3 shadow-lg">
+            <span className="chip bg-brand-btn font-extrabold text-white">{cartCount} item</span>
+            <span className="ml-auto text-base font-extrabold tabular-nums">{fmtRp(subtotal)}</span>
+            <button type="button" className="btn-primary !min-h-0 !py-2.5" onClick={() => setScreen('checkout')}>
+              Lihat Keranjang
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -424,6 +471,7 @@ function CheckoutScreen({
   zones,
   outlet,
   deliveryOn,
+  preferDelivery,
   busy,
   setQty,
   onSaveAddress,
@@ -439,6 +487,8 @@ function CheckoutScreen({
   outlet: OutletSetting
   /** Status antar gabungan (saklar + jadwal) sudah dihitung di PortalMain. */
   deliveryOn: boolean
+  /** Pilihan toggle di katalog: menentukan alamat yang terpilih saat checkout dibuka. */
+  preferDelivery: boolean
   busy: boolean
   setQty: (id: number, qty: number) => void
   onSaveAddress: (id: number | null, label: string, addr: string, lat: number | null, lng: number | null) => Promise<number>
@@ -447,9 +497,15 @@ function CheckoutScreen({
   onSubmit: (addressId: number, note: string) => Promise<void>
   setErr: (s: string) => void
 }): ReactElement {
-  const [selected, setSelected] = useState<number | null>(
-    () => addresses.find((a) => deliveryOn || a.label === 'Ambil Sendiri')?.id ?? null
-  )
+  const [selected, setSelected] = useState<number | null>(() => {
+    const pickable0 = addresses.filter((a) => deliveryOn || a.label === 'Ambil Sendiri')
+    if (!deliveryOn) return pickable0.find((a) => a.label === 'Ambil Sendiri')?.id ?? null
+    if (preferDelivery) {
+      const firstShip = addresses.find((a) => a.label !== 'Ambil Sendiri')
+      if (firstShip) return firstShip.id
+    }
+    return pickable0.find((a) => a.label === 'Ambil Sendiri')?.id ?? addresses[0]?.id ?? null
+  })
   const [note, setNote] = useState('')
   const [addOpen, setAddOpen] = useState(addresses.length === 0)
   const [editId, setEditId] = useState<number | null>(null)

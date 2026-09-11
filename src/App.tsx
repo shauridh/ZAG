@@ -18,7 +18,6 @@ const Ingredients = lazy(() => import('./pages/Ingredients'))
 const Products = lazy(() => import('./pages/Products'))
 const StockPage = lazy(() => import('./pages/Stock'))
 const Finance = lazy(() => import('./pages/Finance'))
-const Reports = lazy(() => import('./pages/Reports'))
 const ShiftPage = lazy(() => import('./pages/Shift'))
 const HistoryPage = lazy(() => import('./pages/History'))
 const SettingsPage = lazy(() => import('./pages/Settings'))
@@ -57,11 +56,8 @@ const NAV_ADMIN: NavGroup[] = [
     ]
   },
   {
-    label: 'Catatan & Laporan',
-    items: [
-      { to: '/keuangan', label: 'Keuangan', icon: '💰' },
-      { to: '/laporan', label: 'Laporan', icon: '📈' }
-    ]
+    label: 'Keuangan',
+    items: [{ to: '/keuangan', label: 'Keuangan', icon: '💰' }]
   },
   {
     label: 'Sistem',
@@ -241,7 +237,6 @@ function Shell(): ReactElement {
                 <Route path="/menu" element={<Products />} />
                 <Route path="/stok" element={<StockPage />} />
                 <Route path="/keuangan" element={<Finance />} />
-                <Route path="/laporan" element={<Reports />} />
                 <Route path="/shift" element={<ShiftPage />} />
                 <Route path="/pengaturan" element={<SettingsPage />} />
               </Routes>

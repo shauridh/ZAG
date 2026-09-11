@@ -36,6 +36,9 @@ export default function Ingredients(): ReactElement {
 
   const list = catalog.ingredients.filter((i) => i.name.toLowerCase().includes(q.toLowerCase()))
   const dirtyCount = Object.keys(dirty).length
+  // ringkasan atas: nilai stok (stok × harga beli) & jumlah bahan di bawah minimum
+  const stockValue = catalog.ingredients.filter((i) => i.kind === 'raw').reduce((s, i) => s + i.stock * i.price, 0)
+  const lowCount = catalog.ingredients.filter((i) => i.active && i.stock <= i.min_stock).length
 
   const savePrices = async (): Promise<void> => {
     try {
@@ -65,6 +68,14 @@ export default function Ingredients(): ReactElement {
         </p>
       )}
 
+      {/* Bar ringkasan: keputusan belanja dibaca dari sini, bukan dari tiap baris */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="chip h-9 border-[1.5px] border-brand-line bg-brand-card px-3">Nilai stok {fmtRp(stockValue)}</span>
+        {lowCount > 0 && (
+          <span className="chip h-9 bg-brand-gold px-3">{lowCount} bahan di bawah minimum</span>
+        )}
+      </div>
+
       <BuyInsight catalog={catalog} setErr={setErr} />
 
       <div className="card overflow-x-auto">
@@ -77,17 +88,19 @@ export default function Ingredients(): ReactElement {
               <th className="text-right">Min</th>
               <th className="whitespace-nowrap">Satuan beli</th>
               <th className="whitespace-nowrap text-right">Harga beli</th>
+              <th>Status</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {list.map((i) => {
               const low = i.stock <= i.min_stock
+              const kritis = i.stock <= 0
               return (
                 <tr key={i.id}>
                   <td className="font-bold">
                     {i.name}
-                    {low && <span className="chip ml-1 bg-brand-gold">menipis</span>}
+                    {i.kind === 'prepared' && <span className="chip ml-1 border-[1.5px] border-brand-line bg-brand-paper">prepared</span>}
                   </td>
                   <td>{i.kind === 'prepared' ? 'Setengah jadi' : 'Mentah'}</td>
                   <td className="whitespace-nowrap text-right tabular-nums">
@@ -111,10 +124,15 @@ export default function Ingredients(): ReactElement {
                       />
                     )}
                   </td>
+                  <td>
+                    <span className={`chip ${kritis ? 'bg-brand-redtext text-white' : low ? 'bg-brand-gold' : 'bg-brand-gold/30'}`}>
+                      {kritis ? 'kritis' : low ? 'menipis' : 'aman'}
+                    </span>
+                  </td>
                   <td className="whitespace-nowrap">
                     {i.kind === 'prepared' && (
                       <button type="button" className="btn-ghost !min-h-0 !px-2 !py-1 text-xs" onClick={() => setRecipeFor(i)}>
-                        Resep Produksi
+                        Resep
                       </button>
                     )}{' '}
                     <button type="button" className="btn-ghost !min-h-0 !px-2 !py-1 text-xs" onClick={() => setEditing(i)}>

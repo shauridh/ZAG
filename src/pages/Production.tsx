@@ -37,11 +37,33 @@ export default function Production(): ReactElement {
 
   const ingById = new Map(catalog.ingredients.map((i) => [i.id, i]))
   const prepared = catalog.ingredients.filter((i) => i.kind === 'prepared' && i.active)
+  // Banner siklus minyak: keputusan rasa & biaya, jadi tampil di atas — bukan catatan sekunder
+  const bannerCycle = cycles.find((c) => c.status === 'aktif')
+  const bannerDays = bannerCycle ? Math.floor((Date.now() - new Date(bannerCycle.started_at).getTime()) / 86400000) : 0
+  const bannerWarn = bannerCycle ? (bannerDays >= settings.oil.max_days || bannerCycle.fry_count >= settings.oil.max_fry_count) : false
+  const bannerPct = bannerCycle ? Math.min(100, Math.round((bannerCycle.fry_count / Math.max(1, settings.oil.max_fry_count)) * 100)) : 0
 
   return (
     <div className="p-3 lg:p-4">
       <h1 className="mb-3 text-xl font-extrabold">Produksi & Fryer</h1>
       {err && <ErrorSummary err={err} label="Batch produksi gagal" />}
+      {bannerCycle && (
+        <div className={`card strip mb-3 flex flex-col items-start gap-3 p-4 sm:flex-row sm:items-center ${bannerWarn ? 'bg-brand-gold/15' : ''}`}>
+          <div className="text-2xl">🍟</div>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-extrabold">
+              {fryers.find((f) => f.id === bannerCycle.fryer_id)?.name ?? 'Fryer'} — minyak hari ke-{bannerDays} dari {settings.oil.max_days}
+            </p>
+            <p className="text-xs text-brand-muted">
+              {bannerCycle.fry_count}/{settings.oil.max_fry_count} gorengan · {fmtQty(bannerCycle.oil_liters)} L minyak terpakai
+            </p>
+            <div className="mt-1.5 h-2 overflow-hidden rounded border border-brand-line bg-brand-paper">
+              <div className={`h-full ${bannerWarn ? 'bg-brand-redtext' : 'bg-brand-gold'}`} style={{ width: `${Math.max(bannerPct, 2)}%` }} />
+            </div>
+          </div>
+          {bannerWarn && <span className="chip bg-brand-gold">Ambang terlampaui — segera ganti</span>}
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <BatchForm catalog={catalog} prepared={prepared} fryers={fryers} onDone={reload} setErr={setErr} toast={toast} />

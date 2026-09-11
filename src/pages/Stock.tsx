@@ -58,9 +58,92 @@ export default function StockPage(): ReactElement {
       </div>
       {err && <ErrorSummary err={err} label="Pembelian/opname gagal" />}
 
-      {tab === 'pembelian' && <PurchaseForm catalog={catalog} reload={reload} setErr={setErr} toast={toast} />}
-      {tab === 'opname' && <OpnameForm catalog={catalog} reload={reload} setErr={setErr} toast={toast} />}
-      {tab === 'waste' && <WasteForm catalog={catalog} reload={reload} setErr={setErr} toast={toast} />}
+      {tab === 'pembelian' && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          <PurchaseForm catalog={catalog} reload={reload} setErr={setErr} toast={toast} />
+          <StockTable catalog={catalog} />
+        </div>
+      )}
+      {tab === 'opname' && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          <OpnameForm catalog={catalog} reload={reload} setErr={setErr} toast={toast} />
+          <StockTable catalog={catalog} />
+        </div>
+      )}
+      {tab === 'waste' && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          <WasteForm catalog={catalog} reload={reload} setErr={setErr} toast={toast} />
+          <StockTable catalog={catalog} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Tabel stok dengan saran beli otomatis: kebutuhan = min×2 − stok (buffer satu
+ * siklus belanja), tampil hanya bahan aktif. Saran = keputusan, bukan dekorasi.
+ */
+function StockTable({ catalog }: { catalog: Catalog }): ReactElement {
+  const rows = catalog.ingredients
+    .filter((i) => i.active)
+    .sort((a, b) => {
+      // paling kritis di atas: habis dulu, lalu yang paling dekat minimum
+      const ra = a.stock <= 0 ? -1 : a.min_stock > 0 ? a.stock / a.min_stock : 9
+      const rb = b.stock <= 0 ? -1 : b.min_stock > 0 ? b.stock / b.min_stock : 9
+      return ra - rb
+    })
+  const needBuy = rows.filter((i) => i.stock <= i.min_stock).length
+
+  return (
+    <div className="card h-fit overflow-hidden">
+      <div className="flex items-center gap-2 border-b-[1.5px] border-brand-line px-4 py-2.5">
+        <p className="mr-auto text-sm font-extrabold">Stok bahan</p>
+        {needBuy > 0 && <span className="chip bg-brand-gold">{needBuy} bahan perlu beli</span>}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="tbl min-w-[460px]">
+          <thead>
+            <tr>
+              <th>Bahan</th>
+              <th className="text-right">Stok</th>
+              <th className="text-right">Min</th>
+              <th>Status</th>
+              <th className="text-right">Saran beli</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((i) => {
+              const low = i.stock <= i.min_stock
+              const kritis = i.stock <= 0
+              const saran = low ? Math.max(Math.ceil(i.min_stock * 2 - i.stock), 1) : 0
+              return (
+                <tr key={i.id}>
+                  <td className="font-bold">{i.name}</td>
+                  <td className="whitespace-nowrap text-right tabular-nums">
+                    {fmtQty(i.stock)} {i.buy_unit}
+                  </td>
+                  <td className="text-right tabular-nums text-brand-muted">{fmtQty(i.min_stock)}</td>
+                  <td>
+                    <span className={`chip ${kritis ? 'bg-brand-redtext text-white' : low ? 'bg-brand-gold' : 'bg-brand-gold/30'}`}>
+                      {kritis ? 'kritis' : low ? 'menipis' : 'aman'}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap text-right font-bold tabular-nums">
+                    {saran > 0 ? (
+                      <>
+                        {fmtQty(saran)} {i.buy_unit}
+                      </>
+                    ) : (
+                      <span className="font-normal text-brand-muted">—</span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
@@ -109,8 +192,9 @@ function PurchaseForm({
   }, [])
 
   return (
-    <div className="max-w-2xl">
-      <p className="mb-2 text-sm text-brand-muted">
+    <div className="card strip h-fit p-4">
+      <p className="mb-1 text-sm font-extrabold">Form pembelian</p>
+      <p className="mb-3 text-sm text-brand-muted">
         Catat pembelian bahan dari supplier. Stok masuk otomatis, dan harga terakhir menjadi harga bahan baru (HPP ikut terhitung ulang).
       </p>
       {lines.map((l, i) => {
@@ -201,8 +285,9 @@ function OpnameForm({
   const [qty, setQty] = useState('')
   const ing = catalog.ingredients.find((i) => i.id === ingId)
   return (
-    <div className="max-w-md">
-      <p className="mb-2 text-sm text-brand-muted">Samakan stok sistem dengan hitungan fisik (stok opname).</p>
+    <div className="card strip h-fit max-w-xl p-4">
+      <p className="mb-1 text-sm font-extrabold">Stok opname</p>
+      <p className="mb-3 text-sm text-brand-muted">Samakan stok sistem dengan hitungan fisik (stok opname).</p>
       <div className="mb-2">
         <label className="lbl" htmlFor="oing">
           Bahan
@@ -258,8 +343,9 @@ function WasteForm({
   const [qty, setQty] = useState('')
   const [note, setNote] = useState('')
   return (
-    <div className="max-w-md">
-      <p className="mb-2 text-sm text-brand-muted">
+    <div className="card strip h-fit max-w-xl p-4">
+      <p className="mb-1 text-sm font-extrabold">Waste / hangus</p>
+      <p className="mb-3 text-sm text-brand-muted">
         Bahan terbuang/hangus dikurangi dari stok, jadi margin riil di laporan tetap jujur.
       </p>
       <div className="mb-2 flex gap-1" role="radiogroup" aria-label="Jenis waste">

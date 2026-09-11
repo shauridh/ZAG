@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { loadCatalog, loadSettings, createTx, currentShift, openShift, subscribeOrders, type Catalog, type TxResult } from '../lib/db'
-import { maxAvailableQty, marginPct, hppLines, hppTotal } from '../lib/hpp'
+import { maxAvailableQty } from '../lib/hpp'
 import { fmtRp, fmtRpPlain } from '../lib/money'
 import type { OrderType, Payment, Settings, Shift } from '../lib/types'
 import { Numpad } from '../components/Numpad'
@@ -312,8 +312,6 @@ export default function Cashier(): ReactElement {
         <div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-2 overflow-y-auto sm:grid-cols-3 xl:grid-cols-4">
           {products.map((p) => {
             const tag = chipOf(p)
-            const hpp = hppTotal(hppLines(p.id, catalog.recipeByProduct, catalog.ingRecipes, ingById))
-            const mg = marginPct(p.price, hpp)
             return (
               <button
                 key={p.id}
@@ -327,15 +325,13 @@ export default function Cashier(): ReactElement {
                 ) : (
                   <div className="h-20 w-full border-b-[1.5px] border-brand-line bg-brand-paper" aria-hidden />
                 )}
+                {/* chip stok menempel di pojok foto: mata kasir memindai gambar dulu */}
+                {tag && (
+                  <span className={`chip absolute right-1.5 top-1.5 ${tag === 'Habis' ? 'bg-brand-redtext text-white' : 'bg-brand-gold'}`}>{tag}</span>
+                )}
                 <span className="flex min-h-0 flex-1 flex-col justify-between gap-1 p-2.5">
                   <span className="line-clamp-2 text-sm font-bold leading-snug">{p.name}</span>
-                  <span className="flex items-baseline justify-between">
-                    <span className="text-base font-extrabold">{fmtRp(p.price)}</span>
-                    {tag && <span className={`chip ${tag === 'Habis' ? 'bg-brand-redtext text-white' : 'bg-brand-gold'}`}>{tag}</span>}
-                  </span>
-                  {mg < settings.margin.warn_pct && tag !== 'Habis' && (
-                    <span className="chip w-fit bg-brand-paper text-[10px] font-bold text-brand-redtext">margin tipis {mg.toFixed(0)}%</span>
-                  )}
+                  <span className="text-base font-extrabold">{fmtRp(p.price)}</span>
                 </span>
               </button>
             )
@@ -422,9 +418,10 @@ export default function Cashier(): ReactElement {
               {err}
             </p>
           )}
+          {/* Total di dalam tombol: kasir tak perlu baca dua tempat sebelum menekan */}
           <button
             type="button"
-            className="btn-primary w-full !py-3 text-base"
+            className="btn-primary w-full !py-3.5 text-lg"
             disabled={cart.length === 0 || busy || (!shift && !online)}
             onClick={() => {
               setCashVal(online ? total : 0)
@@ -432,7 +429,7 @@ export default function Cashier(): ReactElement {
               setCheckout(true)
             }}
           >
-            {online ? 'Catat Pesanan Online' : 'Checkout'}
+            {online ? `Catat · ${fmtRp(total)}` : `Bayar · ${fmtRp(total)}`}
           </button>
           {!shift && !online && <p className="mt-1 text-center text-xs font-bold text-brand-redtext">Buka shift dulu untuk checkout.</p>}
         </div>

@@ -64,6 +64,27 @@ export default function Finance(): ReactElement {
         </p>
       )}
 
+      {/* KPI atas: tiga angka utama bulan terpilih */}
+      <div className="card strip mb-3 grid grid-cols-1 gap-3 p-4 min-[480px]:grid-cols-3">
+        <div>
+          <p className="text-xs font-bold text-brand-muted">Kas masuk · {monthLabel}</p>
+          <p className="text-2xl font-extrabold tabular-nums">{fmtRp(t.revenue)}</p>
+          <p className="text-xs font-bold text-brand-muted">{t.count} transaksi</p>
+        </div>
+        <div>
+          <p className="text-xs font-bold text-brand-muted">Pengeluaran · {monthLabel}</p>
+          <p className="text-2xl font-extrabold tabular-nums">{fmtRp(fin.expenses.reduce((s, e) => s + e.amount, 0))}</p>
+          <p className="text-xs font-bold text-brand-muted">{fin.expenses.length} catatan</p>
+        </div>
+        <div>
+          <p className="text-xs font-bold text-brand-muted">Laba bersih · {monthLabel}</p>
+          <p className={`whitespace-nowrap text-2xl font-extrabold tabular-nums ${(pl.find((x) => x.label === 'Laba bersih')?.amount ?? 0) < 0 ? 'text-brand-redtext' : ''}`}>
+            {fmtRp(pl.find((x) => x.label === 'Laba bersih')?.amount ?? 0)}
+          </p>
+          <p className="text-xs font-bold text-brand-muted">setelah HPP, komisi & beban tetap</p>
+        </div>
+      </div>
+
       <div className="grid gap-3 lg:grid-cols-2">
         {/* Laba rugi */}
         <div className="card strip overflow-x-auto p-4">

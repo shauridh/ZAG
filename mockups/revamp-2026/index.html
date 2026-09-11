@@ -1,0 +1,973 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sabana Kasir — Mockup Revamp UI 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ====== Token desain SAMA dengan app (styles.css / DESIGN.md) ====== */
+  :root{
+    --red:#E11B22; --btn:#C4151B; --redtext:#A31217; --gold:#F5A302;
+    --paper:#FFF8F2; --card:#FFFFFF; --ink:#1A1512; --muted:#6E6159; --line:#E8D9CD;
+    --shadow-pop:0 2px 0 rgba(26,21,18,.9);
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{background:#F3E9DF; color:var(--ink); font-family:'Plus Jakarta Sans',system-ui,sans-serif; font-size:14px; line-height:1.45}
+  a{color:inherit}
+
+  /* ====== Kerangka dokumen mockup ====== */
+  .doc{max-width:1060px; margin:0 auto; padding:28px 20px 80px}
+  .hero{background:linear-gradient(0deg,rgba(225,27,34,.06),rgba(225,27,34,.06)),#fff; border:1.5px solid var(--line); border-radius:12px; padding:26px 26px 20px; box-shadow:var(--shadow-pop)}
+  .hero .stripbar{height:8px; border-radius:4px; background:var(--red); position:relative; margin-bottom:6px}
+  .hero .stripbar::after{content:""; position:absolute; left:0; right:0; top:9px; height:1.5px; background:var(--gold)}
+  h1{font-size:26px; font-weight:800; letter-spacing:-.02em}
+  .hero p.sub{color:var(--muted); max-width:640px; margin-top:6px}
+  .legend{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px}
+  .legend span{font-size:11px; font-weight:700; border-radius:4px; padding:3px 8px; background:var(--paper); border:1.5px solid var(--line)}
+  .legend .b{background:#E9F7EC; border-color:#BFE3C6; color:#1F6B33}
+  .legend .n{background:#FFF3D6; border-color:#F0DBA0; color:#8A6400}
+
+  .toc{display:flex; flex-wrap:wrap; gap:6px; margin:16px 0 4px; position:sticky; top:0; z-index:50; background:rgba(243,233,223,.92); backdrop-filter:blur(4px); padding:10px 0}
+  .toc a{font-size:12px; font-weight:700; text-decoration:none; border:1.5px solid var(--line); background:#fff; border-radius:6px; padding:5px 10px}
+  .toc a:hover{border-color:var(--btn); color:var(--btn)}
+
+  section.screen-doc{margin-top:42px; scroll-margin-top:64px}
+  .doc-head{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap}
+  .doc-head h2{font-size:19px; font-weight:800}
+  .doc-head .no{color:var(--red); font-weight:800}
+  .doc-head .tag{font-size:11px; font-weight:700; border-radius:4px; padding:2px 8px}
+  .doc-head .tag.b{background:#E9F7EC; color:#1F6B33; border:1.5px solid #BFE3C6}
+  .doc-head .tag.n{background:#FFF3D6; color:#8A6400; border:1.5px solid #F0DBA0}
+  .doc-head .tag.k{background:var(--paper); color:var(--muted); border:1.5px solid var(--line)}
+  .doc-sub{color:var(--muted); margin:4px 0 12px; max-width:760px}
+  .changes{margin:0 0 14px; padding-left:18px; color:var(--muted); font-size:13px}
+  .changes b{color:var(--ink)}
+  .changes .gold{color:#8A6400; font-weight:700}
+
+  /* ====== Frame "layar aplikasi" 1:1 ====== */
+  .shot{border:1.5px solid #D8C4B2; border-radius:10px; overflow:hidden; background:var(--paper); box-shadow:0 10px 30px rgba(26,21,18,.10)}
+  .screen{display:flex; min-height:560px; background:var(--paper)}
+  .side{width:224px; flex-shrink:0; background:var(--card); border-right:1.5px solid var(--line); display:flex; flex-direction:column}
+  .side .brand{padding:16px 14px 12px; box-shadow:inset 0 6px 0 0 var(--red), inset 0 7px 0 0 var(--gold)}
+  .side .brand .t{font-size:17px; font-weight:800; line-height:1.15}
+  .side .brand .s{font-size:11px; font-weight:700; color:var(--muted)}
+  .side nav{padding:10px; display:flex; flex-direction:column; gap:2px; flex:1}
+  .side .gl{font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); padding:8px 10px 3px}
+  .side a{display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:8px; text-decoration:none; font-weight:700; font-size:13px; color:var(--ink)}
+  .side a.on{background:var(--btn); color:#fff}
+  .side a:not(.on):hover{background:var(--paper)}
+  .side .ic{width:20px; text-align:center}
+  .side .foot{padding:10px 14px; border-top:1.5px solid var(--line); font-size:11px; color:var(--muted)}
+  .side .out{color:var(--redtext) !important}
+
+  .main{flex:1; min-width:0; display:flex; flex-direction:column}
+  .top{display:flex; align-items:center; gap:10px; background:var(--card); border-bottom:1.5px solid var(--line); padding:7px 14px; font-size:12px}
+  .top .grow{flex:1}
+  .pill-demo{background:var(--gold); border-radius:4px; font-size:11px; font-weight:800; padding:2px 8px}
+  .content{padding:14px; display:flex; flex-direction:column; gap:12px; flex:1}
+
+  /* Komponen app */
+  .card{background:var(--card); border:1.5px solid var(--line); border-radius:10px}
+  .strip{box-shadow:inset 0 6px 0 0 var(--red), inset 0 7px 0 0 var(--gold)}
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:38px; padding:0 14px; border-radius:8px; font-weight:700; font-size:13px; border:none; cursor:pointer}
+  .btn-p{background:var(--btn); color:#fff; box-shadow:var(--shadow-pop)}
+  .btn-g{background:var(--card); border:1.5px solid var(--line)}
+  .btn-d{background:var(--card); border:1.5px solid var(--redtext); color:var(--redtext)}
+  .btn-gold{background:var(--gold); color:var(--ink)}
+  .btn.sm{min-height:30px; padding:0 10px; font-size:12px}
+  .chip{display:inline-flex; align-items:center; gap:4px; border-radius:4px; padding:2px 8px; font-size:11px; font-weight:800}
+  .chip.red{background:var(--red); color:#fff}
+  .chip.gold{background:var(--gold)}
+  .chip.ghost{border:1.5px solid var(--line); background:var(--card)}
+  .chip.paper{background:var(--paper); border:1.5px solid var(--line)}
+  .chip.green{background:#E9F7EC; color:#1F6B33}
+  .chip.redt{background:#FCE9E8; color:var(--redtext)}
+  .input{min-height:38px; width:100%; border:1.5px solid var(--line); border-radius:8px; background:#fff; padding:0 10px; font:inherit; font-size:13px}
+  .lbl{display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:4px}
+  table.tbl{width:100%; border-collapse:collapse; font-size:13px; background:var(--card)}
+  .tbl th{border-bottom:1.5px solid var(--line); background:var(--paper); text-align:left; padding:8px 10px; font-weight:800; font-size:12px}
+  .tbl td{border-bottom:1px solid var(--line); padding:8px 10px; vertical-align:top}
+  .num{font-variant-numeric:tabular-nums; font-weight:700}
+  .muted{color:var(--muted)}
+  .row{display:flex; gap:10px; align-items:center}
+  .grow{flex:1; min-width:0}
+
+  /* Donut, bar horizontal, jam ramai (dashboard+laporan) */
+  .donut{position:relative; width:128px; height:128px; border-radius:50%; flex-shrink:0; background:conic-gradient(var(--red) 0 42%, #F0C9A8 42% 72%, var(--gold) 72% 89.5%, #E8D9CD 89.5% 96.5%, #D8C4B2 96.5% 100%)}
+  .donut::after{content:""; position:absolute; inset:30px; background:var(--card); border-radius:50%}
+  .donut span{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; z-index:1}
+  .dot{width:10px; height:10px; border-radius:3px; display:inline-block; flex-shrink:0}
+  .hbars{display:flex; flex-direction:column; gap:9px; margin-top:10px}
+  .hbar{display:flex; align-items:center; gap:8px; font-size:12px}
+  .hbar .track{flex:1; height:14px; background:var(--paper); border:1px solid var(--line); border-radius:4px; overflow:hidden}
+  .hbar .track i{display:block; height:100%}
+  .hbar b{min-width:76px; text-align:right; font-size:12px}
+  .hours{display:grid; grid-template-columns:repeat(14,1fr); gap:3px; align-items:end; height:64px; margin-top:10px}
+  .hours i{background:#F0D9CB; border-radius:2px 2px 0 0}
+  .hours i.hi{background:var(--red)}
+  .hourx{display:grid; grid-template-columns:repeat(14,1fr); gap:3px; font-size:9px; color:var(--muted); margin-top:4px; text-align:center}
+
+  /* KPI dashboard */
+  .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:10px}
+  .kpi{background:var(--card); border:1.5px solid var(--line); border-radius:10px; padding:12px 14px}
+  .kpi .l{font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--muted)}
+  .kpi .v{font-size:24px; font-weight:800; letter-spacing:-.01em; margin-top:2px}
+  .kpi .d{font-size:11.5px; font-weight:700; margin-top:2px}
+  .up{color:#1F6B33} .down{color:var(--redtext)}
+  .bars{display:flex; align-items:flex-end; gap:3px; height:30px; margin-top:8px}
+  .bars i{flex:1; background:#F0D9CB; border-radius:2px 2px 0 0}
+  .bars i.hi{background:var(--red)}
+  .list{display:flex; flex-direction:column}
+  .list .li{display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:1px solid var(--line)}
+  .list .li:last-child{border-bottom:none}
+  .chart{display:flex; align-items:flex-end; gap:6px; height:150px; padding:10px 12px 0}
+  .chart .b{flex:1; display:flex; flex-direction:column; justify-content:flex-end; gap:2px; height:100%}
+  .chart .b i{display:block; border-radius:3px 3px 0 0}
+  .chart .rev{background:var(--red)} .chart .hpp{background:#F0C9A8}
+  .chart .x{font-size:9px; color:var(--muted); text-align:center; margin-top:4px}
+  .prog{height:8px; background:var(--paper); border:1px solid var(--line); border-radius:4px; overflow:hidden}
+  .prog i{display:block; height:100%; background:var(--red)}
+  .prog.g i{background:var(--gold)}
+
+  /* Kasir */
+  .kasir{display:flex; flex:1; min-height:0}
+  .katalog{flex:1; min-width:0; padding:12px; display:flex; flex-direction:column; gap:10px}
+  .cats{display:flex; gap:6px; overflow:hidden}
+  .cat{flex-shrink:0; border:1.5px solid var(--line); background:var(--card); border-radius:8px; padding:6px 12px; font-weight:800; font-size:12.5px}
+  .cat.on{background:var(--btn); color:#fff; border-color:var(--btn)}
+  .pgrid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; align-content:start}
+  .pcard{background:var(--card); border:1.5px solid var(--line); border-radius:10px; overflow:hidden; text-align:left; position:relative}
+  .pcard .ph{height:72px; background:linear-gradient(135deg,#F6E7D8,#EFD9C4); display:flex; align-items:center; justify-content:center; font-size:26px}
+  .pcard .in{padding:8px 9px; display:flex; flex-direction:column; gap:4px; min-height:74px}
+  .pcard .nm{font-weight:800; font-size:12.5px; line-height:1.25}
+  .pcard .bt{display:flex; align-items:baseline; justify-content:space-between; margin-top:auto}
+  .pcard .pr{font-weight:800; font-size:14px}
+  .pcard.off{opacity:.5}
+  .cart{width:340px; flex-shrink:0; background:var(--card); border-left:1.5px solid var(--line); display:flex; flex-direction:column}
+  .cart .hd{padding:10px 12px 8px; box-shadow:inset 0 6px 0 0 var(--red), inset 0 7px 0 0 var(--gold)}
+  .cart .hd h3{font-size:15px; font-weight:800}
+  .otypes{display:flex; flex-wrap:wrap; gap:4px; margin-top:8px}
+  .otype{border:1.5px solid var(--line); border-radius:6px; padding:4px 8px; font-size:11px; font-weight:800; background:var(--card)}
+  .otype.on{background:var(--btn); color:#fff; border-color:var(--btn)}
+  .clines{flex:1; padding:10px 12px; display:flex; flex-direction:column; gap:8px; overflow:hidden}
+  .cline{border:1.5px solid var(--line); border-radius:8px; padding:8px 10px; background:#fff}
+  .cline .r1{display:flex; justify-content:space-between; font-weight:800; font-size:13px}
+  .cline .x{color:var(--redtext); font-weight:800}
+  .cline .r2{display:flex; justify-content:space-between; align-items:center; margin-top:6px}
+  .stepper{display:flex; align-items:center; gap:6px}
+  .stepper b{width:26px; height:26px; border:1.5px solid var(--line); border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-size:14px}
+  .stepper .q{font-weight:800; min-width:18px; text-align:center}
+  .cart .ft{border-top:1.5px solid var(--line); padding:10px 12px}
+  .ft .r{display:flex; justify-content:space-between; font-size:13px; font-weight:700; color:var(--muted)}
+  .ft .tot{font-size:20px; font-weight:800; color:var(--ink); margin:4px 0 8px}
+  .paybar{display:flex; gap:8px}
+  .note{font-size:11px; color:var(--muted)}
+
+  /* Numpad */
+  .numpad{display:grid; grid-template-columns:repeat(3,1fr); gap:6px}
+  .numpad b{border:1.5px solid var(--line); border-radius:8px; min-height:40px; display:flex; align-items:center; justify-content:center; font-weight:800; background:#fff; font-size:15px}
+  .numpad .ok{background:var(--btn); color:#fff; box-shadow:var(--shadow-pop)}
+
+  /* Produk & bahan: kartu foto */
+  .mgr-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:10px}
+  .mcard{background:var(--card); border:1.5px solid var(--line); border-radius:10px; overflow:hidden}
+  .mcard .ph{height:88px; background:linear-gradient(135deg,#F6E7D8,#EFD9C4); display:flex; align-items:center; justify-content:center; font-size:30px}
+  .mcard .in{padding:9px 10px; display:flex; flex-direction:column; gap:5px}
+  .mcard .nm{font-weight:800; font-size:13.5px}
+  .mcard .pr{font-size:15px; font-weight:800}
+  .mcard .meta{font-size:11px; color:var(--muted); font-weight:600}
+  .mcard .acts{display:flex; gap:5px; margin-top:2px}
+
+  /* Pesanan kartu */
+  .ocard{border:1.5px solid var(--line); border-radius:10px; background:var(--card); padding:12px 14px}
+  .ocard .r1{display:flex; align-items:center; gap:8px}
+  .ocard .r1 .id{font-weight:800; font-size:15px}
+  .ocard .items{margin-top:6px; font-size:12.5px; color:var(--muted)}
+  .ocard .r3{display:flex; align-items:center; gap:8px; margin-top:10px}
+  .split{display:grid; grid-template-columns:1.6fr 1fr; gap:12px}
+  .split3{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+
+  /* Pengaturan */
+  .setwrap{display:grid; grid-template-columns:200px 1fr; gap:12px; flex:1}
+  .setnav{display:flex; flex-direction:column; gap:4px}
+  .setnav a{text-decoration:none; padding:9px 12px; border-radius:8px; font-weight:700; font-size:13px}
+  .setnav a.on{background:var(--btn); color:#fff}
+  .field{margin-bottom:10px}
+  .toggle{width:38px; height:22px; border-radius:11px; background:var(--btn); position:relative; flex-shrink:0}
+  .toggle::after{content:""; position:absolute; right:2px; top:2px; width:18px; height:18px; border-radius:50%; background:#fff}
+  .toggle.off{background:#D8C4B2}
+  .toggle.off::after{right:auto; left:2px}
+
+  /* Login */
+  .login-wrap{flex:1; display:flex; align-items:center; justify-content:center; padding:20px}
+  .login{width:360px; background:var(--card); border:1.5px solid var(--line); border-radius:12px; overflow:hidden}
+  .login .brandbar{background:var(--red); color:#fff; padding:22px 20px 16px}
+  .login .brandbar .s{color:#FFD9A0; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.1em}
+  .login .bd{padding:20px}
+
+  /* Portal (ponsel) */
+  .phone{width:390px; margin:0 auto; border:1.5px solid #D8C4B2; border-radius:26px; overflow:hidden; background:var(--paper); box-shadow:0 10px 30px rgba(26,21,18,.12)}
+  .phone .phead{background:var(--red); color:#fff; padding:14px 16px 12px}
+  .phone .phead .t{font-weight:800; font-size:17px}
+  .phone .phead .s{font-size:11px; opacity:.85; font-weight:600}
+  .pmode{display:flex; gap:6px; padding:10px 12px 0}
+  .pcats{display:flex; gap:6px; padding:10px 12px 4px; overflow:hidden}
+  .pgrid2{display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:8px 12px 90px}
+  .pphoto{height:86px; background:linear-gradient(135deg,#F6E7D8,#EFD9C4); display:flex; align-items:center; justify-content:center; font-size:30px}
+  .pbar{position:absolute; left:0; right:0; bottom:0; background:var(--card); border-top:1.5px solid var(--line); padding:10px 12px; display:flex; align-items:center; gap:10px}
+  .phonebox{position:relative}
+
+  footer.doc-foot{margin-top:60px; color:var(--muted); font-size:12.5px; border-top:1.5px solid var(--line); padding-top:16px}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <!-- ================= HERO ================= -->
+  <header class="hero">
+    <div class="stripbar"></div>
+    <h1>Sabana Kasir — Revamp UI/UX (Mockup)</h1>
+    <p class="sub">13 layar, satu bahasa desain: <b>merah-emas nota</b> yang sudah jadi identitas app, dirapikan jadi lebih lega, kontras angka lebih besar, dan alur kerja kasir makin sedikit ketukan. <b>Laporan digabung ke Dashboard</b> (revisi review) — semua angka &amp; grafik jadi satu halaman. Semua layar digambar dengan token asli app (warna, font, radius, strip) supaya yang kamu review = yang akan dibangun.</p>
+    <div class="legend">
+      <span class="b">Baru: layout</span>
+      <span class="n">Baru: komponen / interaksi</span>
+      <span class="k">Tetap: fungsi &amp; data tidak berubah</span>
+    </div>
+    <nav class="toc">
+      <a href="#s1">01 Dashboard</a><a href="#s2">02 Kasir</a><a href="#s3">03 Pesanan</a><a href="#s4">04 Riwayat</a>
+      <a href="#s5">05 Produksi</a><a href="#s6">06 Shift</a><a href="#s7">07 Menu &amp; Paket</a><a href="#s8">08 Bahan</a>
+      <a href="#s9">09 Stok</a>      <a href="#s10">10 Keuangan</a><a href="#s11">11 Pengaturan</a>
+      <a href="#s12">12 Login</a><a href="#s13">13 Portal /order</a>
+    </nav>
+  </header>
+
+  <p style="margin-top:18px; color:var(--muted); font-size:13px"><b>Cara review:</b> klik nomor layar di atas, bandingkan dengan app yang sekarang, lalu beri catatan per layar (mis. “02 OK tapi tombol bayar terlalu besar”). Tidak ada fungsi yang berubah di revamp ini — hanya susunan, hierarki, dan komponen.</p>
+
+  <!-- ================= 01 DASHBOARD ================= -->
+  <section class="screen-doc" id="s1">
+    <div class="doc-head"><span class="no">01</span><h2>Dashboard + Laporan</h2><span class="tag b">Baru: layout</span><span class="tag n">Baru: gabung Laporan + visualisasi</span></div>
+    <p class="doc-sub">Hasil revisi review: <b>Laporan digabung ke sini</b>. Satu halaman untuk semua angka — pilih periode di atas (Hari ini / 7 hari / 30 hari / pilih tanggal) dan semua KPI, tabel, serta grafik ikut berubah. Tidak perlu pindah halaman lagi.</p>
+    <ul class="changes">
+      <li><b>Isi Laporan pindah ke sini</b>: tabel penerimaan per kanal (fee ojek dipotong), best seller vs target, komposisi kanal. <span class="gold">Baru.</span></li>
+      <li><b>Visualisasi baru</b>: donut komposisi omzet per kanal, grafik “jam ramai” (patokan jadwal produksi), bar metode pembayaran, dan <b>mini-tren stok bahan kritis 7 hari</b> (revisi review). <span class="gold">Baru.</span></li>
+      <li><b>KPI 4 kartu</b> dengan pembanding “vs kemarin” + laba bersih kas; grafik omzet vs HPP 14 hari tetap.</li>
+      <li><b>Kolom “Perlu tindakan”</b> tetap: pesanan menunggu, stok kritis, minyak fryer, target harian.</li>
+    </ul>
+    <div class="shot"><div class="screen">
+      <aside class="side">
+        <div class="brand"><div class="t">Sabana Drieischicken</div><div class="s">Drieischicken POS</div></div>
+        <nav>
+          <div class="gl">Operasional</div>
+          <a class="on" href="#s1"><span class="ic">📊</span>Dashboard</a>
+          <a href="#s2"><span class="ic">🧾</span>Kasir</a>
+          <a href="#s3"><span class="ic">🛍️</span>Pesanan</a>
+          <a href="#s4"><span class="ic">🕘</span>Riwayat Transaksi</a>
+          <a href="#s5"><span class="ic">🍟</span>Produksi &amp; Fryer</a>
+          <a href="#s6"><span class="ic">🔄</span>Shift</a>
+          <div class="gl">Produk &amp; Stok</div>
+          <a href="#s7"><span class="ic">🍗</span>Menu &amp; Paket</a>
+          <a href="#s8"><span class="ic">🥘</span>Bahan &amp; HPP</a>
+          <a href="#s9"><span class="ic">📦</span>Stok &amp; Pembelian</a>
+          <div class="gl">Keuangan</div>
+          <a href="#s10"><span class="ic">💰</span>Keuangan</a>
+          <div class="gl">Sistem</div>
+          <a href="#s11"><span class="ic">⚙️</span>Pengaturan</a>
+          <a class="out" href="#s12"><span class="ic">🚪</span>Keluar (Pemilik)</a>
+        </nav>
+        <div class="foot">Mode demo lokal · Admin</div>
+      </aside>
+      <div class="main">
+        <div class="top"><b style="font-size:14px">Dashboard</b>
+          <span class="chip ghost">Hari ini</span><span class="chip red">7 hari</span><span class="chip ghost">30 hari</span><span class="chip ghost">Pilih tanggal</span>
+          <span class="grow"></span>
+          <span class="chip green">Shift buka · 08:02</span><span class="chip paper" style="background:#E9F7EC;border-color:#BFE3C6">● Online</span><span class="pill-demo">DEMO</span>
+        </div>
+        <div class="content">
+          <div class="kpis">
+            <div class="kpi"><div class="l">Omzet</div><div class="v">Rp1.284.000</div><div class="d up">▲ +12% vs kemarin</div><div class="bars"><i style="height:40%"></i><i style="height:55%"></i><i style="height:48%"></i><i style="height:62%"></i><i style="height:58%"></i><i style="height:70%"></i><i class="hi" style="height:92%"></i></div></div>
+            <div class="kpi"><div class="l">Transaksi</div><div class="v">96</div><div class="d up">▲ +9 nota</div><div class="note">rata-rata Rp13.375 / nota</div></div>
+            <div class="kpi"><div class="l">Laba kotor</div><div class="v">Rp612.400</div><div class="d">47,7% margin</div><div class="note">HPP Rp671.600</div></div>
+            <div class="kpi"><div class="l">Laba bersih kas</div><div class="v up">Rp132.400</div><div class="note">laba kotor − biaya tetap harian</div></div>
+          </div>
+          <div class="split">
+            <div class="card">
+              <div class="row" style="padding:12px 14px 0"><b style="font-size:14px">Omzet vs HPP — 14 hari</b><span class="grow"></span><span class="chip paper"><i style="display:inline-block;width:9px;height:9px;background:var(--red);border-radius:2px"></i> Omzet</span><span class="chip paper"><i style="display:inline-block;width:9px;height:9px;background:#F0C9A8;border-radius:2px"></i> HPP</span></div>
+              <div class="chart">
+                <div class="b"><i class="rev" style="height:52%"></i><i class="hpp" style="height:30%"></i><span class="x">29/8</span></div>
+                <div class="b"><i class="rev" style="height:61%"></i><i class="hpp" style="height:34%"></i><span class="x">30</span></div>
+                <div class="b"><i class="rev" style="height:44%"></i><i class="hpp" style="height:26%"></i><span class="x">31</span></div>
+                <div class="b"><i class="rev" style="height:70%"></i><i class="hpp" style="height:38%"></i><span class="x">1/9</span></div>
+                <div class="b"><i class="rev" style="height:58%"></i><i class="hpp" style="height:32%"></i><span class="x">2</span></div>
+                <div class="b"><i class="rev" style="height:80%"></i><i class="hpp" style="height:44%"></i><span class="x">3</span></div>
+                <div class="b"><i class="rev" style="height:66%"></i><i class="hpp" style="height:36%"></i><span class="x">4</span></div>
+                <div class="b"><i class="rev" style="height:74%"></i><i class="hpp" style="height:40%"></i><span class="x">5</span></div>
+                <div class="b"><i class="rev" style="height:49%"></i><i class="hpp" style="height:28%"></i><span class="x">6</span></div>
+                <div class="b"><i class="rev" style="height:86%"></i><i class="hpp" style="height:46%"></i><span class="x">7</span></div>
+                <div class="b"><i class="rev" style="height:63%"></i><i class="hpp" style="height:35%"></i><span class="x">8</span></div>
+                <div class="b"><i class="rev" style="height:57%"></i><i class="hpp" style="height:31%"></i><span class="x">9</span></div>
+                <div class="b"><i class="rev" style="height:78%"></i><i class="hpp" style="height:42%"></i><span class="x">10</span></div>
+                <div class="b"><i class="rev" style="height:90%"></i><i class="hpp" style="height:47%"></i><span class="x">11</span></div>
+              </div>
+            </div>
+            <div class="card">
+              <div style="padding:12px 14px 2px; font-weight:800; font-size:14px">Perlu tindakan</div>
+              <div class="list">
+                <div class="li"><span class="chip gold">2</span><div class="grow"><b>Pesanan online menunggu</b><div class="note">WB-0107 · WB-0108</div></div><a class="btn sm btn-p" href="#s3">Proses</a></div>
+                <div class="li"><span class="chip redt">3</span><div class="grow"><b>Bahan di bawah minimum</b><div class="note">Tepung Bumbu · Gas · Kemasan Ayam</div></div><a class="btn sm btn-g" href="#s9">Stok</a></div>
+                <div class="li"><span class="chip paper">🍟</span><div class="grow"><b>Fryer 1 — minyak hari ke-2</b><div class="note">42/60 gorengan · ganti besok</div></div><a class="btn sm btn-g" href="#s5">Cek</a></div>
+                <div class="li"><span class="chip paper">🎯</span><div class="grow"><b>Target harian 3/4 tercapai</b><div class="note">Katsu 6/10 · Kentang 5/5 ✓ · Nasi 12/10 ✓</div></div></div>
+              </div>
+            </div>
+          </div>
+          <!-- ====== Bagian LAPORAN (digabung ke dashboard) ====== -->
+          <div class="card" style="padding:12px 14px">
+            <div class="row"><b style="font-size:14px">Komposisi omzet per kanal</b><span class="grow"></span><span class="note">periode 7 hari</span></div>
+            <div class="row" style="align-items:center; gap:18px; margin-top:10px">
+              <div class="donut"><span>Rp9,66jt</span></div>
+              <div class="grow">
+                <div class="hbars">
+                  <div class="hbar"><span class="dot" style="background:var(--red)"></span><span style="width:120px">Makan di tempat</span><div class="track"><i style="width:100%; background:var(--red)"></i></div><b>Rp4,12jt · 43%</b></div>
+                  <div class="hbar"><span class="dot" style="background:#F0C9A8"></span><span style="width:120px">Bungkus</span><div class="track"><i style="width:72%; background:#F0C9A8"></i></div><b>Rp2,98jt · 31%</b></div>
+                  <div class="hbar"><span class="dot" style="background:var(--gold)"></span><span style="width:120px">GoFood</span><div class="track"><i style="width:40%; background:var(--gold)"></i></div><b>Rp1,64jt · 17%</b></div>
+                  <div class="hbar"><span class="dot" style="background:#E8D9CD"></span><span style="width:120px">GrabFood</span><div class="track"><i style="width:22%; background:#E8D9CD"></i></div><b>Rp0,92jt · 9%</b></div>
+                  <div class="hbar"><span class="dot" style="background:#D8C4B2"></span><span style="width:120px">ShopeeFood</span><div class="track"><i style="width:4%; background:#D8C4B2"></i></div><b>Rp0,03jt · 0,5%</b></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="split">
+            <div class="card" style="overflow:hidden">
+              <div style="padding:10px 14px; font-weight:800">Penerimaan per kanal <span class="note">— fee ojek sudah dipotong</span></div>
+              <table class="tbl">
+                <tr><th>Kanal</th><th style="text-align:right">Omzet</th><th style="text-align:right">Fee</th><th style="text-align:right">Bersih</th><th style="text-align:right">Trx</th></tr>
+                <tr><td>Makan di tempat</td><td style="text-align:right" class="num">Rp4.120.000</td><td style="text-align:right" class="num muted">—</td><td style="text-align:right" class="num"><b>Rp4.120.000</b></td><td style="text-align:right" class="num">312</td></tr>
+                <tr><td>Bungkus</td><td style="text-align:right" class="num">Rp2.980.000</td><td style="text-align:right" class="num muted">—</td><td style="text-align:right" class="num"><b>Rp2.980.000</b></td><td style="text-align:right" class="num">241</td></tr>
+                <tr><td><span class="chip paper">GoFood</span></td><td style="text-align:right" class="num">Rp1.640.000</td><td style="text-align:right" class="num">−Rp164.000</td><td style="text-align:right" class="num"><b>Rp1.476.000</b></td><td style="text-align:right" class="num">118</td></tr>
+                <tr><td><span class="chip paper">GrabFood</span></td><td style="text-align:right" class="num">Rp920.000</td><td style="text-align:right" class="num">−Rp92.000</td><td style="text-align:right" class="num"><b>Rp828.000</b></td><td style="text-align:right" class="num">64</td></tr>
+                <tr><td><span class="chip paper">ShopeeFood</span></td><td style="text-align:right" class="num">Rp35.000</td><td style="text-align:right" class="num">−Rp3.500</td><td style="text-align:right" class="num"><b>Rp31.500</b></td><td style="text-align:right" class="num">3</td></tr>
+              </table>
+            </div>
+            <div class="split3" style="grid-template-columns:1fr; gap:12px">
+              <div class="card">
+                <div style="padding:10px 14px 0; font-weight:800">Jam ramai <span class="note">— patokan jadwal produksi</span></div>
+                <div style="padding:0 14px 12px">
+                  <div class="hours">
+                    <i style="height:10%"></i><i style="height:16%"></i><i style="height:38%"></i><i style="height:55%"></i><i style="height:42%"></i><i style="height:30%"></i><i style="height:34%"></i><i style="height:48%"></i><i class="hi" style="height:100%"></i><i class="hi" style="height:88%"></i><i style="height:64%"></i><i style="height:40%"></i><i style="height:22%"></i><i style="height:12%"></i>
+                  </div>
+                  <div class="hourx"><span>08</span><span>09</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span><span>19</span><span>20</span><span>21</span></div>
+                  <div class="note" style="margin-top:6px">Puncak 16.00–17.00 — produksi ayam marinasi 2× lipat jam 15.00.</div>
+                </div>
+              </div>
+              <div class="card">
+                <div style="padding:10px 14px 0; font-weight:800">Metode pembayaran</div>
+                <div style="padding:4px 14px 12px">
+                  <div class="hbars">
+                    <div class="hbar"><span style="width:64px">Tunai</span><div class="track"><i style="width:58%; background:var(--red)"></i></div><b>58%</b></div>
+                    <div class="hbar"><span style="width:64px">QRIS</span><div class="track"><i style="width:33%; background:var(--gold)"></i></div><b>33%</b></div>
+                    <div class="hbar"><span style="width:64px">Transfer</span><div class="track"><i style="width:9%; background:#E8D9CD"></i></div><b>9%</b></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="row" style="padding:10px 14px 0"><b style="font-size:14px">Stok bahan kritis — 7 hari</b><span class="grow"></span><span class="note">garis putus = stok minimum</span></div>
+            <div style="display:flex; gap:14px; padding:4px 14px 12px; flex-wrap:wrap">
+              <div class="grow" style="min-width:220px">
+                <div class="row" style="justify-content:space-between; font-size:12px"><b>Tepung Bumbu</b><span class="chip redt">1,6 / min 2 pack</span></div>
+                <svg viewBox="0 0 200 44" style="width:100%; height:44px; margin-top:2px">
+                  <line x1="0" y1="22" x2="200" y2="22" stroke="#E8D9CD" stroke-width="1.5" stroke-dasharray="4 3"/>
+                  <polyline points="6,16 38,15 70,17 102,20 134,24 166,27 194,30" fill="none" stroke="#A31217" stroke-width="2.5" stroke-linecap="round"/>
+                  <circle cx="194" cy="30" r="3.5" fill="#A31217"/>
+                </svg>
+                <div class="note">turun 0,8 pack seminggu — habis ±5 hari</div>
+              </div>
+              <div class="grow" style="min-width:220px">
+                <div class="row" style="justify-content:space-between; font-size:12px"><b>Gas 3 kg</b><span class="chip gold">2 / min 1 tabung</span></div>
+                <svg viewBox="0 0 200 44" style="width:100%; height:44px; margin-top:2px">
+                  <line x1="0" y1="33" x2="200" y2="33" stroke="#E8D9CD" stroke-width="1.5" stroke-dasharray="4 3"/>
+                  <polyline points="6,10 38,12 70,11 102,14 134,18 166,21 194,24" fill="none" stroke="#8A6400" stroke-width="2.5" stroke-linecap="round"/>
+                  <circle cx="194" cy="24" r="3.5" fill="#8A6400"/>
+                </svg>
+                <div class="note">1 tabung terpakai 6 hari — beli cadangan</div>
+              </div>
+              <div class="grow" style="min-width:220px">
+                <div class="row" style="justify-content:space-between; font-size:12px"><b>Kemasan Ayam</b><span class="chip gold">1,5 / min 1 ikat</span></div>
+                <svg viewBox="0 0 200 44" style="width:100%; height:44px; margin-top:2px">
+                  <line x1="0" y1="35" x2="200" y2="35" stroke="#E8D9CD" stroke-width="1.5" stroke-dasharray="4 3"/>
+                  <polyline points="6,12 38,14 70,18 102,20 134,23 166,26 194,28" fill="none" stroke="#8A6400" stroke-width="2.5" stroke-linecap="round"/>
+                  <circle cx="194" cy="28" r="3.5" fill="#8A6400"/>
+                </svg>
+                <div class="note">stabil — cukup s/d pembelian berikutnya</div>
+              </div>
+            </div>
+          </div>
+          <div class="split3">
+            <div class="card" style="grid-column:1 / -1; overflow:hidden">
+              <div class="row" style="padding:10px 14px"><b style="font-size:14px">Best seller vs target</b><span class="grow"></span><span class="note">periode 7 hari</span></div>
+              <table class="tbl">
+                <tr><th>Menu</th><th style="text-align:right">Terjual</th><th style="text-align:right">Target</th><th style="text-align:right">Pencapaian</th><th style="text-align:right">Omzet</th></tr>
+                <tr><td><b>Ayam 1 Ekor (9 potong)</b></td><td style="text-align:right" class="num">84</td><td style="text-align:right" class="num">84</td><td style="text-align:right"><div class="prog" style="width:120px; margin-left:auto"><i style="width:100%"></i></div></td><td style="text-align:right" class="num">Rp7.476.000</td></tr>
+                <tr><td><b>Nasi Putih</b></td><td style="text-align:right" class="num">102</td><td style="text-align:right" class="num">70</td><td style="text-align:right"><div class="prog" style="width:120px; margin-left:auto"><i style="width:100%"></i></div></td><td style="text-align:right" class="num">Rp510.000</td></tr>
+                <tr><td><b>Ayam Paha Atas</b></td><td style="text-align:right" class="num">196</td><td style="text-align:right" class="num muted">—</td><td style="text-align:right" class="muted">tanpa target</td><td style="text-align:right" class="num">Rp2.156.000</td></tr>
+                <tr><td><b>Chicken Katsu 650ml</b></td><td style="text-align:right" class="num">41</td><td style="text-align:right" class="num">70</td><td style="text-align:right"><div class="prog g" style="width:120px; margin-left:auto"><i style="width:59%"></i></div></td><td style="text-align:right" class="num">Rp328.000</td></tr>
+                <tr><td><b>Kentang Goreng</b></td><td style="text-align:right" class="num">28</td><td style="text-align:right" class="num">35</td><td style="text-align:right"><div class="prog g" style="width:120px; margin-left:auto"><i style="width:80%"></i></div></td><td style="text-align:right" class="num">Rp224.000</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= 02 KASIR ================= -->
+  <section class="screen-doc" id="s2">
+    <div class="doc-head"><span class="no">02</span><h2>Kasir</h2><span class="tag b">Baru: layout</span><span class="tag n">Baru: kartu menu foto besar</span></div>
+    <p class="doc-sub">Layar paling sering dipakai. Prinsip: <b>menu dulu, keranjang menyusul</b> — katalog 4 kolom dengan foto, keranjang ramping di kanan, tombol Bayar selalu terlihat tanpa scroll.</p>
+    <ul class="changes">
+      <li><b>Kartu menu lebih besar &amp; foto penuh</b>: nama + harga di bawah foto, chip stok (“sisa 4”) di pojok foto — mata kasir memindai gambar dulu, bukan teks. <span class="gold">Baru.</span></li>
+      <li><b>Cari + kategori jadi 1 baris</b> menempel di atas grid; kategori aktif merah tebal.</li>
+      <li><b>Tombol Bayar besar dengan total di dalamnya</b> (“Bayar · Rp41.000”) — tidak perlu lagi baca dua tempat sebelum menekan. <span class="gold">Baru.</span></li>
+      <li>Checkout (numpad + struk hidup) dan popup shift <b>tidak berubah</b> — pola lama dipertahankan.</li>
+    </ul>
+    <div class="shot"><div class="screen">
+      <aside class="side" style="width:68px">
+        <div class="brand" style="text-align:center; padding:16px 6px 12px"><div style="font-size:20px">🍗</div></div>
+        <nav style="align-items:center">
+          <a href="#s1"><span class="ic">📊</span></a>
+          <a class="on" href="#s2"><span class="ic">🧾</span></a>
+          <a href="#s3"><span class="ic">🛍️</span></a>
+          <a href="#s4"><span class="ic">🕘</span></a>
+          <a href="#s5"><span class="ic">🍟</span></a>
+          <a href="#s6"><span class="ic">🔄</span></a>
+          <a href="#s9"><span class="ic">📦</span></a>
+        </nav>
+        <div class="foot" style="text-align:center">·</div>
+      </aside>
+      <div class="main" style="flex-direction:row">
+        <div class="kasir" style="flex:1">
+          <div class="katalog">
+            <div class="row">
+              <input class="input" style="max-width:220px" placeholder="🔍 Cari menu..." />
+              <span class="chip gold pulse">● Pesanan baru masuk!</span>
+              <span class="grow"></span>
+              <span class="chip green">Shift 08:02</span>
+            </div>
+            <div class="cats">
+              <span class="cat on">Semua</span><span class="cat">Ayam</span><span class="cat">Nasi &amp; Rice Box</span><span class="cat">Snack Goreng</span><span class="cat">Saos &amp; Sambal</span><span class="cat">Minuman</span><span class="cat">Paket Hemat</span>
+            </div>
+            <div class="pgrid">
+              <button class="pcard"><div class="ph">🍗<span class="chip gold" style="position:absolute; right:6px; top:6px">sisa 4</span></div><div class="in"><div class="nm">Ayam Paha Atas</div><div class="bt"><span class="pr">Rp11.000</span></div></div></button>
+              <button class="pcard"><div class="ph">🍗</div><div class="in"><div class="nm">Ayam Dada</div><div class="bt"><span class="pr">Rp11.000</span></div></div></button>
+              <button class="pcard"><div class="ph">🍗</div><div class="in"><div class="nm">Ayam Paha Bawah</div><div class="bt"><span class="pr">Rp9.000</span></div></div></button>
+              <button class="pcard"><div class="ph">🍗</div><div class="in"><div class="nm">Ayam Sayap</div><div class="bt"><span class="pr">Rp8.000</span></div></div></button>
+              <button class="pcard"><div class="ph">🍛</div><div class="in"><div class="nm">Chicken Katsu 650ml</div><div class="bt"><span class="pr">Rp8.000</span></div></div></button>
+              <button class="pcard"><div class="ph">🍚</div><div class="in"><div class="nm">Nasi Putih</div><div class="bt"><span class="pr">Rp5.000</span></div></div></button>
+              <button class="pcard"><div class="ph">🍟</div><div class="in"><div class="nm">Kentang Goreng</div><div class="bt"><span class="pr">Rp8.000</span></div></div></button>
+              <button class="pcard off"><div class="ph">🥤<span class="chip red" style="position:absolute; right:6px; top:6px">Habis</span></div><div class="in"><div class="nm">Teh Botol Sosro</div><div class="bt"><span class="pr">Rp5.000</span></div></div></button>
+            </div>
+            <div class="note">+5 menu lain saat scroll — grid min. 2 kolom di HP, 3 di tablet, 4 di desktop.</div>
+          </div>
+          <div class="cart">
+            <div class="hd"><h3>Pesanan Baru</h3>
+              <div class="otypes"><span class="otype on">Makan di tempat</span><span class="otype">Bungkus</span><span class="otype">GoFood</span><span class="otype">GrabFood</span><span class="otype">ShopeeFood</span><span class="otype">Delivery</span></div>
+            </div>
+            <div class="clines">
+              <div class="cline"><div class="r1"><span>Ayam Paha Atas</span><span class="x">✕</span></div><div class="r2"><span class="stepper"><b>−</b><span class="q">2</span><b>+</b></span><span class="num">Rp22.000</span></div></div>
+              <div class="cline"><div class="r1"><span>Nasi Putih</span><span class="x">✕</span></div><div class="r2"><span class="stepper"><b>−</b><span class="q">2</span><b>+</b></span><span class="num">Rp10.000</span></div></div>
+              <div class="cline"><div class="r1"><span>Teh Botol Sosro</span><span class="x">✕</span></div><div class="r2"><span class="stepper"><b>−</b><span class="q">1</span><b>+</b></span><span class="num">Rp5.000</span></div></div>
+            </div>
+            <div class="ft">
+              <div class="row" style="margin-bottom:8px"><span class="lbl" style="margin:0">Diskon Rp</span><input class="input" style="min-height:32px; text-align:right" placeholder="0" /></div>
+              <div class="r"><span>Subtotal</span><span class="num">Rp37.000</span></div>
+              <div class="tot row" style="justify-content:space-between"><span>Total</span><span class="num">Rp37.000</span></div>
+              <button class="btn btn-p" style="width:100%; min-height:52px; font-size:16px">Bayar · Rp37.000</button>
+              <div class="note" style="margin-top:6px; text-align:center">Ketuk untuk pilih tunai / QRIS / transfer</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= 03 PESANAN ================= -->
+  <section class="screen-doc" id="s3">
+    <div class="doc-head"><span class="no">03</span><h2>Pesanan (portal online)</h2><span class="tag b">Baru: layout</span><span class="tag n">Baru: kartu alur status</span></div>
+    <p class="doc-sub">Dari daftar panjang jadi <b>papan alur</b>: kolom “Menunggu verifikasi” → “Disiapkan” → “Siap / Selesai”. Kartu terpenting paling atas, tombol aksi utama merah.</p>
+    <ul class="changes">
+      <li><b>Kartu per pesanan</b> dengan status besar dan langkah berikutnya sebagai tombol tunggal — kasir tak perlu hafal alur. <span class="gold">Baru.</span></li>
+      <li>Pesanan butuh verifikasi pembayaran diberi <b>pita emas “cek bukti transfer”</b>.</li>
+      <li>Riwayat pesanan selesai tetap bisa dibuka lewat filter di atas (tidak hilang).</li>
+    </ul>
+    <div class="shot"><div class="screen">
+      <aside class="side">
+        <div class="brand"><div class="t">Sabana Drieischicken</div><div class="s">Drieischicken POS</div></div>
+        <nav>
+          <div class="gl">Operasional</div>
+          <a href="#s1"><span class="ic">📊</span>Dashboard</a>
+          <a href="#s2"><span class="ic">🧾</span>Kasir</a>
+          <a class="on" href="#s3"><span class="ic">🛍️</span>Pesanan</a>
+          <a href="#s4"><span class="ic">🕘</span>Riwayat Transaksi</a>
+          <a href="#s5"><span class="ic">🍟</span>Produksi &amp; Fryer</a>
+          <a href="#s6"><span class="ic">🔄</span>Shift</a>
+        </nav>
+        <div class="foot">Mode demo lokal · Admin</div>
+      </aside>
+      <div class="main">
+        <div class="top"><b style="font-size:14px">Pesanan Online</b><span class="grow"></span><span class="chip ghost">Semua</span><span class="chip red">Menunggu (2)</span><span class="chip ghost">Disiapkan</span><span class="chip ghost">Selesai</span></div>
+        <div class="content">
+          <div class="ocard" style="border-left:5px solid var(--gold)">
+            <div class="r1"><span class="id">WB-0107</span><span class="chip paper">Wahyu · 0812xxxx</span><span class="chip gold">Cek bukti transfer</span><span class="grow"></span><span class="num">Rp47.000</span></div>
+            <div class="items">2× Ayam Paha Atas · 1× Nasi Putih · 1× Kentang Goreng — <b>Delivery 3 km (Rp10.000)</b> · catatan: “pedas sambal dipisah”</div>
+            <div class="r3"><button class="btn sm btn-p">Verifikasi &amp; Terima</button><button class="btn sm btn-d">Tolak</button><span class="grow"></span><span class="note">masuk 10:32</span></div>
+          </div>
+          <div class="ocard">
+            <div class="r1"><span class="id">WB-0108</span><span class="chip paper">Sari · 0857xxxx</span><span class="chip red">Disiapkan</span><span class="grow"></span><span class="num">Rp27.000</span></div>
+            <div class="items">1× Ayam Dada · 2× Nasi Putih · 1× Sambal Geprek (cup) — <b>ambil di kasir</b></div>
+            <div class="r3"><button class="btn sm btn-p">Tandai Siap</button><span class="grow"></span><span class="note">masuk 10:41</span></div>
+          </div>
+          <div class="ocard" style="opacity:.75">
+            <div class="r1"><span class="id">WB-0106</span><span class="chip paper">Dewi · 0813xxxx</span><span class="chip green">Selesai ✓</span><span class="grow"></span><span class="num">Rp16.000</span></div>
+            <div class="items">1× Chicken Katsu 650ml · 1× Teh Botol Sosro — <b>ambil di kasir</b></div>
+            <div class="r3"><span class="note">selesai 10:05</span></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= 04 RIWAYAT ================= -->
+  <section class="screen-doc" id="s4">
+    <div class="doc-head"><span class="no">04</span><h2>Riwayat Transaksi</h2><span class="tag b">Baru: layout</span></div>
+    <p class="doc-sub">Tabel nota dengan <b>angka rata kanan dan status berwarna</b>. Filter tanggal + pencarian tetap di atas; total hari ini selalu terlihat di bar ringkasan.</p>
+    <ul class="changes">
+      <li>Baris nota: <b>status jadi chip</b> (Normal / Direvisi / Refund / Batal) — sekarang status cuma teks kecil.</li>
+      <li>Aksi per baris mengikuti status: nota normal dapat Lihat · Edit · Refund · Hapus; sisanya terkunci dengan alasan. <span class="gold">Baru.</span></li>
+      <li>Bar ringkasan: total, jumlah nota, rata-rata/nota untuk rentang terpilih.</li>
+    </ul>
+    <div class="shot"><div class="screen">
+      <aside class="side">
+        <div class="brand"><div class="t">Sabana Drieischicken</div><div class="s">Drieischicken POS</div></div>
+        <nav>
+          <div class="gl">Operasional</div>
+          <a href="#s1"><span class="ic">📊</span>Dashboard</a>
+          <a href="#s2"><span class="ic">🧾</span>Kasir</a>
+          <a href="#s3"><span class="ic">🛍️</span>Pesanan</a>
+          <a class="on" href="#s4"><span class="ic">🕘</span>Riwayat Transaksi</a>
+          <a href="#s5"><span class="ic">🍟</span>Produksi &amp; Fryer</a>
+          <a href="#s6"><span class="ic">🔄</span>Shift</a>
+        </nav>
+        <div class="foot">Mode demo lokal · Admin</div>
+      </aside>
+      <div class="main">
+        <div class="top"><input class="input" style="max-width:200px; min-height:32px" placeholder="Cari no. nota / nama" /><input class="input" style="max-width:150px; min-height:32px" value="11 Sep 2026" /><span class="chip ghost">7 hari</span><span class="chip ghost">30 hari</span><span class="grow"></span><span class="chip paper">96 nota · Rp1.284.000</span></div>
+        <div class="content">
+          <div class="card" style="overflow:hidden">
+            <table class="tbl">
+              <tr><th>No. Nota</th><th>Jam</th><th>Kanal</th><th>Bayar</th><th style="text-align:right">Total</th><th>Status</th><th>Aksi</th></tr>
+              <tr><td><b>SB260911-0103</b></td><td>10:44</td><td>Makan di tempat</td><td>Tunai</td><td style="text-align:right" class="num">Rp37.000</td><td><span class="chip green">Normal</span></td><td><a href="#s4"><b>Lihat</b></a> · <a href="#s4"><b>Edit</b></a> · <a href="#s4"><b>Refund</b></a> · <a href="#s4" style="color:var(--redtext)"><b>Hapus</b></a></td></tr>
+              <tr><td><b>SB260911-0102</b></td><td>10:31</td><td><span class="chip paper">GoFood</span></td><td>—</td><td style="text-align:right" class="num">Rp55.000 <span class="muted">(+fee 10%)</span></td><td><span class="chip green">Normal</span></td><td><a href="#s4"><b>Lihat</b></a> · <a href="#s4"><b>Refund</b></a></td></tr>
+              <tr><td><b>SB260911-0101</b></td><td>10:12</td><td>Bungkus</td><td>QRIS</td><td style="text-align:right" class="num">Rp27.000</td><td><span class="chip green">Normal</span></td><td><a href="#s4"><b>Lihat</b></a> · <a href="#s4"><b>Edit</b></a> · <a href="#s4"><b>Refund</b></a> · <a href="#s4" style="color:var(--redtext)"><b>Hapus</b></a></td></tr>
+              <tr><td><b>SB260911-0100</b></td><td>09:58</td><td>Bungkus</td><td>Tunai</td><td style="text-align:right" class="num">Rp16.000</td><td><span class="chip gold">Direvisi</span></td><td><a href="#s4"><b>Lihat</b></a> <span class="muted">→ SB260911-0104</span></td></tr>
+              <tr><td><b>SB260911-0104</b></td><td>10:01</td><td>Bungkus</td><td>Tunai</td><td style="text-align:right" class="num">Rp21.000</td><td><span class="chip green">Normal</span></td><td><a href="#s4"><b>Lihat</b></a> · <a href="#s4"><b>Edit</b></a> · <a href="#s4"><b>Refund</b></a> · <a href="#s4" style="color:var(--redtext)"><b>Hapus</b></a></td></tr>
+              <tr><td><b>RF260911-0098</b></td><td>09:40</td><td>Makan di tempat</td><td>Tunai</td><td style="text-align:right" class="num" style="color:var(--redtext)">−Rp11.000</td><td><span class="chip redt">Refund</span></td><td><a href="#s4"><b>Lihat</b></a> <span class="muted">→ nota asli 0096</span></td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= 05 PRODUKSI ================= -->
+  <section class="screen-doc" id="s5">
+    <div class="doc-head"><span class="no">05</span><h2>Produksi &amp; Fryer</h2><span class="tag b">Baru: layout</span><span class="tag n">Baru: status minyak menonjol</span></div>
+    <p class="doc-sub">Status minyak fryer dinaikkan jadi <b>banner pengingat</b> di atas (hari ke-berapa, sudah berapa gorengan) — karena ini keputusan rasa &amp; biaya, bukan catatan sekunder.</p>
+    <ul class="changes">
+      <li><b>Banner siklus minyak</b> dengan tombol “Akhiri siklus + catat jelantah” langsung di tempat. <span class="gold">Baru.</span></li>
+      <li>Form batch produksi jadi <b>satu baris ringkas</b> (bahan jadi, jumlah, fryer, catatan) — tidak lagi form panjang menutupi tabel.</li>
+      <li>Tabel batch hari ini + sisa stok prepared berdampingan.</li>
+    </ul>
+    <div class="shot"><div class="screen">
+      <aside class="side">
+        <div class="brand"><div class="t">Sabana Drieischicken</div><div class="s">Drieischicken POS</div></div>
+        <nav>
+          <div class="gl">Operasional</div>
+          <a href="#s1"><span class="ic">📊</span>Dashboard</a>
+          <a href="#s2"><span class="ic">🧾</span>Kasir</a>
+          <a href="#s3"><span class="ic">🛍️</span>Pesanan</a>
+          <a href="#s4"><span class="ic">🕘</span>Riwayat Transaksi</a>
+          <a class="on" href="#s5"><span class="ic">🍟</span>Produksi &amp; Fryer</a>
+          <a href="#s6"><span class="ic">🔄</span>Shift</a>
+        </nav>
+        <div class="foot">Mode demo lokal · Admin</div>
+      </aside>
+      <div class="main">
+        <div class="top"><b style="font-size:14px">Produksi &amp; Fryer</b><span class="grow"></span><span class="chip paper">2 fryer</span></div>
+        <div class="content">
+          <div class="card strip" style="padding:14px 16px; display:flex; align-items:center; gap:14px">
+            <div style="font-size:26px">🍟</div>
+            <div class="grow"><b style="font-size:15px">Fryer 1 — minyak hari ke-2 dari 3</b><div class="note">42/60 gorengan · 6,1 L minyak terpakai · batas app: 3 hari / 60 gorengan</div><div class="prog g" style="margin-top:6px"><i style="width:70%"></i></div></div>
+            <button class="btn btn-gold">Akhiri Siklus + Jelantah</button>
+          </div>
+          <div class="card" style="padding:12px 14px">
+            <div class="row" style="gap:8px">
+              <div class="grow"><span class="lbl">Hasil (bahan jadi)</span><select class="input"><option>Ayam Marinasi (per potong)</option></select></div>
+              <div style="width:110px"><span class="lbl">Jumlah</span><input class="input" value="24" /></div>
+              <div style="width:130px"><span class="lbl">Fryer</span><select class="input"><option>Fryer 1</option><option>Fryer 2</option></select></div>
+              <div style="width:150px"><span class="lbl">Catatan</span><input class="input" placeholder="opsional" /></div>
+              <button class="btn btn-p" style="margin-top:18px">Catat Batch</button>
+            </div>
+          </div>
+          <div class="split">
+            <div class="card" style="overflow:hidden">
+              <div style="padding:10px 14px; font-weight:800">Batch hari ini</div>
+              <table class="tbl">
+                <tr><th>Jam</th><th>Hasil</th><th style="text-align:right">Qty</th><th>Fryer</th></tr>
+                <tr><td>08:10</td><td>Ayam Marinasi</td><td style="text-align:right" class="num">+18 potong</td><td>Fryer 1</td></tr>
+                <tr><td>09:25</td><td>Ayam Marinasi</td><td style="text-align:right" class="num">+24 potong</td><td>Fryer 1</td></tr>
+                <tr><td>10:02</td><td>Sambal Geprek Cup</td><td style="text-align:right" class="num">+12 cup</td><td>—</td></tr>
+              </table>
+            </div>
+            <div class="card">
+              <div style="padding:10px 14px; font-weight:800">Stok siap jual (prepared)</div>
+              <div class="list">
+                <div class="li"><div class="grow">Ayam Marinasi</div><b class="num">42 potong</b><span class="chip green">aman</span></div>
+                <div class="li"><div class="grow">Sambal Geprek Cup</div><b class="num">6 cup</b><span class="chip gold">menipis</span></div>
+                <div class="li"><div class="grow">Saos Mentai Cup</div><b class="num">8 cup</b><span class="chip green">aman</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= 06 SHIFT ================= -->
+  <section class="screen-doc" id="s6">
+    <div class="doc-head"><span class="no">06</span><h2>Shift</h2><span class="tag b">Baru: layout</span></div>
+    <p class="doc-sub">Tutup shift = momen paling sensitif. Kartu ringkasan <b>sebelum tombol</b>: kasir lihat dulu “seharusnya di drawer”, baru hitung fisik.</p>
+    <ul class="changes">
+      <li>Urutan baru: <b>ringkasan kas → input fisik → tombol Tutup Shift</b> (sekarang tombolnya lebih dulu). <span class="gold">Baru.</span></li>
+      <li>Selisih kas ditampilkan <b>besar dan berwarna</b> (0 hijau, kurang merah, lebih emas).</li>
+      <li>Riwayat shift jadi tabel dengan chip selisih, bisa dicek lintas hari.</li>
+    </ul>
+    <div class="shot"><div class="screen">
+      <aside class="side">
+        <div class="brand"><div class="t">Sabana Drieischicken</div><div class="s">Drieischicken POS</div></div>
+        <nav>
+          <div class="gl">Operasional</div>
+          <a href="#s1"><span class="ic">📊</span>Dashboard</a>
+          <a href="#s2"><span class="ic">🧾</span>Kasir</a>
+          <a href="#s3"><span class="ic">🛍️</span>Pesanan</a>
+          <a href="#s4"><span class="ic">🕘</span>Riwayat Transaksi</a>
+          <a href="#s5"><span class="ic">🍟</span>Produksi &amp; Fryer</a>
+          <a class="on" href="#s6"><span class="ic">🔄</span>Shift</a>
+        </nav>
+        <div class="foot">Mode demo lokal · Admin</div>
+      </aside>
+      <div class="main">
+        <div class="top"><b style="font-size:14px">Shift</b><span class="grow"></span><span class="chip green">Shift #12 buka sejak 08:02</span></div>
+        <div class="content">
+          <div class="split">
+            <div class="card strip" style="padding:16px">
+              <b style="font-size:15px">Tutup Shift #12</b>
+              <div class="list" style="margin-top:8px">
+                <div class="li"><span class="grow muted">Modal awal</span><b class="num">Rp350.000</b></div>
+                <div class="li"><span class="grow muted">Penjualan tunai</span><b class="num">Rp842.000</b></div>
+                <div class="li"><span class="grow muted">Seharusnya di drawer</span><b class="num" style="font-size:18px">Rp1.192.000</b></div>
+              </div>
+              <div class="field" style="margin-top:12px"><span class="lbl">Kas fisik di drawer</span><input class="input" style="font-size:20px; font-weight:800; text-align:right" value="1.192.000" /></div>
+              <div class="card" style="padding:10px 12px; background:#E9F7EC; border-color:#BFE3C6; text-align:center"><b style="font-size:20px">Selisih Rp0</b><div class="note">pas — bagus</div></div>
+              <div class="field" style="margin-top:10px"><span class="lbl">Catatan (wajib bila kas kurang)</span><input class="input" placeholder="mis. kembalian kurang Rp5.000" /></div>
+              <button class="btn btn-p" style="width:100%; min-height:48px; margin-top:6px">Tutup Shift Sekarang</button>
+            </div>
+            <div class="card" style="overflow:hidden">
+              <div style="padding:10px 14px; font-weight:800">Riwayat shift</div>
+              <table class="tbl">
+                <tr><th>Tanggal</th><th style="text-align:right">Selisih</th></tr>
+                <tr><td>10 Sep · #11</td><td style="text-align:right"><span class="chip green">Rp0</span></td></tr>
+                <tr><td>9 Sep · #10</td><td style="text-align:right"><span class="chip redt">−Rp5.000</span></td></tr>
+                <tr><td>8 Sep · #9</td><td style="text-align:right"><span class="chip gold">+Rp2.000</span></td></tr>
+                <tr><td>7 Sep · #8</td><td style="text-align:right"><span class="chip green">Rp0</span></td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= 07 MENU & PAKET ================= -->
+  <section class="screen-doc" id="s7">
+    <div class="doc-head"><span class="no">07</span><h2>Menu &amp; Paket</h2><span class="tag b">Baru: layout</span><span class="tag n">Baru: kartu foto + margin</span></div>
+    <p class="doc-sub">Kelola menu dengan <b>kartu foto</b> (bukan baris tabel): foto, harga, HPP, dan margin terlihat sekaligus — sesuai tujuan app: jujur menampilkan angka.</p>
+    <ul class="changes">
+      <li><b>Kartu produk</b> dengan foto + chip margin; margin tipis ditandai emas/merah. <span class="gold">Baru.</span></li>
+      <li>Tab Produk / Paket / Target tetap; upload foto &amp; resep lewat tombol di kartu.</li>
+      <li>Baris “HPP belum diatur” diberi chip merah agar tak lewat.</li>
+    </ul>
+    <div class="shot"><div class="screen">
+      <aside class="side">
+        <div class="brand"><div class="t">Sabana Drieischicken</div><div class="s">Drieischicken POS</div></div>
+        <nav>
+          <div class="gl">Produk &amp; Stok</div>
+          <a class="on" href="#s7"><span class="ic">🍗</span>Menu &amp; Paket</a>
+          <a href="#s8"><span class="ic">🥘</span>Bahan &amp; HPP</a>
+          <a href="#s9"><span class="ic">📦</span>Stok &amp; Pembelian</a>
+        </nav>
+        <div class="foot">Mode demo lokal · Admin</div>
+      </aside>
+      <div class="main">
+        <div class="top"><span class="chip ghost">Produk</span><span class="chip ghost">Paket Hemat</span><span class="chip ghost">Target Harian</span><span class="grow"></span><input class="input" style="max-width:170px; min-height:32px" placeholder="🔍 Cari" /><button class="btn sm btn-g">+ Kategori</button><button class="btn sm btn-p">+ Produk Baru</button></div>
+        <div class="content">
+          <div class="mgr-grid">
+            <div class="mcard"><div class="ph">🍗<span class="chip gold" style="position:absolute; margin-left:-84px; margin-top:-76px">sisa 4</span></div><div class="in"><div class="nm">Ayam Paha Atas</div><span class="meta">Ayam · potong</span><div class="row"><span class="pr">Rp11.000</span><span class="grow"></span><span class="chip green">margin 38%</span></div><div class="acts"><button class="btn sm btn-g">Foto</button><button class="btn sm btn-g">Resep</button><button class="btn sm btn-g">Edit</button></div></div></div>
+            <div class="mcard"><div class="ph">🍗</div><div class="in"><div class="nm">Ayam Dada</div><span class="meta">Ayam · potong</span><div class="row"><span class="pr">Rp11.000</span><span class="grow"></span><span class="chip green">margin 38%</span></div><div class="acts"><button class="btn sm btn-g">Foto</button><button class="btn sm btn-g">Resep</button><button class="btn sm btn-g">Edit</button></div></div></div>
+            <div class="mcard"><div class="ph">🍛</div><div class="in"><div class="nm">Chicken Katsu 650ml</div><span class="meta">Nasi &amp; Rice Box</span><div class="row"><span class="pr">Rp8.000</span><span class="grow"></span><span class="chip green">margin 37%</span></div><div class="acts"><button class="btn sm btn-g">Foto</button><button class="btn sm btn-g">Resep</button><button class="btn sm btn-g">Edit</button></div></div></div>
+            <div class="mcard"><div class="ph">🥤</div><div class="in"><div class="nm">Teh Botol Sosro</div><span class="meta">Minuman</span><div class="row"><span class="pr">Rp5.000</span><span class="grow"></span><span class="chip green">margin 50%</span></div><div class="acts"><button class="btn sm btn-g">Foto</button><button class="btn sm btn-g">Resep</button><button class="btn sm btn-g">Edit</button></div></div></div>
+            <div class="mcard"><div class="ph">🌶️</div><div class="in"><div class="nm">Sambal Geprek (cup)</div><span class="meta">Saos &amp; Sambal</span><div class="row"><span class="pr">Rp4.000</span><span class="grow"></span><span class="chip redt">margin 6%</span></div><div class="acts"><button class="btn sm btn-g">Foto</button><button class="btn sm btn-g">Resep</button><button class="btn sm btn-g">Edit</button></div></div></div>
+            <div class="mcard"><div class="ph">🍗</div><div class="in"><div class="nm">Chicken Roll</div><span class="meta">Snack Goreng</span><div class="row"><span class="pr">Rp4.000</span><span class="grow"></span><span class="chip redt">HPP belum diatur</span></div><div class="acts"><button class="btn sm btn-g">Foto</button><button class="btn sm btn-g" style="border-color:var(--redtext); color:var(--redtext)">Atur resep</button><button class="btn sm btn-g">Edit</button></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= 08 BAHAN & HPP ================= -->
+  <section class="screen-doc" id="s8">
+    <div class="doc-head"><span class="no">08</span><h2>Bahan &amp; HPP</h2><span class="tag b">Baru: layout</span></div>
+    <p class="doc-sub">Tetap tabel (data padat), tapi dengan <b>ringkasan atas + status stok berwarna</b>. Bahan “prepared” ditandai dan resepnya bisa dibuka langsung dari baris.</p>
+    <ul class="changes">
+      <li>Bar ringkasan: <b>nilai total stok, jumlah bahan di bawah minimum</b>. <span class="gold">Baru.</span></li>
+      <li>Chip stok per baris: aman / menipis / kritis.</li>
+      <li>Baris prepared punya tombol “Resep” inline.</li>
+    </ul>
+    <div class="shot"><div class="screen">
+      <aside class="side">
+        <div class="brand"><div class="t">Sabana Drieischicken</div><div class="s">Drieischicken POS</div></div>
+        <nav>
+          <div class="gl">Produk &amp; Stok</div>
+          <a href="#s7"><span class="ic">🍗</span>Menu &amp; Paket</a>
+          <a class="on" href="#s8"><span class="ic">🥘</span>Bahan &amp; HPP</a>
+          <a href="#s9"><span class="ic">📦</span>Stok &amp; Pembelian</a>
+        </nav>
+        <div class="foot">Mode demo lokal · Admin</div>
+      </aside>
+      <div class="main">
+        <div class="top"><span class="chip paper">Nilai stok <b>Rp4.1jt</b></span><span class="chip redt">3 bahan di bawah minimum</span><span class="grow"></span><input class="input" style="max-width:170px; min-height:32px" placeholder="🔍 Cari bahan" /><button class="btn sm btn-g">+ Bahan</button><button class="btn sm btn-p">+ Resep Bahan</button></div>
+        <div class="content">
+          <div class="card" style="overflow:hidden">
+            <table class="tbl">
+              <tr><th>Kode</th><th>Bahan</th><th style="text-align:right">Stok</th><th style="text-align:right">Min</th><th style="text-align:right">Harga / satuan</th><th>Status</th><th></th></tr>
+              <tr><td>100001</td><td><b>Ayam Potong 9</b><div class="note">ekor = 9 potong</div></td><td style="text-align:right" class="num">12 ekor</td><td style="text-align:right" class="num muted">6</td><td style="text-align:right" class="num">Rp5.333</td><td><span class="chip green">aman</span></td><td><a href="#s8"><b>Edit</b></a></td></tr>
+              <tr><td>200001</td><td><b>Tepung Bumbu Fried Chicken</b></td><td style="text-align:right" class="num">2 pack</td><td style="text-align:right" class="num muted">2</td><td style="text-align:right" class="num">Rp23.500</td><td><span class="chip gold">menipis</span></td><td><a href="#s8"><b>Edit</b></a></td></tr>
+              <tr><td>200002</td><td><b>Minyak Goreng Sunco 2L</b></td><td style="text-align:right" class="num">8 L</td><td style="text-align:right" class="num muted">4</td><td style="text-align:right" class="num">Rp21.700</td><td><span class="chip green">aman</span></td><td><a href="#s8"><b>Edit</b></a></td></tr>
+              <tr><td>—</td><td><b>Ayam Marinasi</b> <span class="chip paper">prepared</span></td><td style="text-align:right" class="num">18 potong</td><td style="text-align:right" class="num muted">9</td><td style="text-align:right" class="num muted">HPP turunan</td><td><span class="chip green">aman</span></td><td><a href="#s8"><b>Resep</b></a> · <a href="#s8"><b>Edit</b></a></td></tr>
+              <tr><td>—</td><td><b>Sambal Geprek Cup</b> <span class="chip paper">prepared</span></td><td style="text-align:right" class="num">6 cup</td><td style="text-align:right" class="num muted">5</td><td style="text-align:right" class="num muted">HPP turunan</td><td><span class="chip gold">menipis</span></td><td><a href="#s8"><b>Resep</b></a> · <a href="#s8"><b>Edit</b></a></td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= 09 STOK & PEMBELIAN ================= -->
+  <section class="screen-doc" id="s9">
+    <div class="doc-head"><span class="no">09</span><h2>Stok &amp; Pembelian</h2><span class="tag b">Baru: layout</span></div>
+    <p class="doc-sub">Tiga tugas (pembelian, opname, wasted) jadi <b>tab tindakan</b> di atas tabel — form muncul sesuai tab, tidak menumpuk.</p>
+    <ul class="changes">
+      <li>Tab tindakan: <b>Pembelian / Opname / Wasted</b>, form inline ringkas. <span class="gold">Baru.</span></li>
+      <li>Tabel stok dengan chip status &amp; kolom “butuh beli” saran otomatis. <span class="gold">Baru.</span></li>
+    </ul>
+    <div class="shot"><div class="screen">
+      <aside class="side">
+        <div class="brand"><div class="t">Sabana Drieischicken</div><div class="s">Drieischicken POS</div></div>
+        <nav>
+          <div class="gl">Produk &amp; Stok</div>
+          <a href="#s7"><span class="ic">🍗</span>Menu &amp; Paket</a>
+          <a href="#s8"><span class="ic">🥘</span>Bahan &amp; HPP</a>
+          <a class="on" href="#s9"><span class="ic">📦</span>Stok &amp; Pembelian</a>
+        </nav>
+        <div class="foot">Mode demo lokal · Admin</div>
+      </aside>
+      <div class="main">
+        <div class="top"><span class="chip red">Pembelian</span><span class="chip ghost">Opname</span><span class="chip ghost">Wasted</span><span class="grow"></span><span class="chip paper">3 bahan perlu beli</span></div>
+        <div class="content">
+          <div class="card" style="padding:12px 14px">
+            <b>Form pembelian</b>
+            <div class="row" style="gap:8px; margin-top:8px">
+              <div class="grow"><span class="lbl">Bahan</span><select class="input"><option>Tepung Bumbu Fried Chicken</option></select></div>
+              <div style="width:110px"><span class="lbl">Pack</span><input class="input" value="4" /></div>
+              <div style="width:150px"><span class="lbl">Harga / pack</span><input class="input" value="23.500" /></div>
+              <button class="btn btn-p" style="margin-top:18px">Simpan</button>
+            </div>
+            <div class="note" style="margin-top:6px">Stok +4 pack · harga dasar di-update otomatis (Rp23.500/pack)</div>
+          </div>
+          <div class="card" style="overflow:hidden">
+            <table class="tbl">
+              <tr><th>Bahan</th><th style="text-align:right">Stok</th><th style="text-align:right">Min</th><th>Status</th><th style="text-align:right">Saran beli</th></tr>
+              <tr><td><b>Tepung Bumbu</b></td><td style="text-align:right" class="num">2 pack</td><td style="text-align:right" class="num">2</td><td><span class="chip gold">menipis</span></td><td style="text-align:right" class="num">4 pack</td></tr>
+              <tr><td><b>Gas 3 kg</b></td><td style="text-align:right" class="num">2 tabung</td><td style="text-align:right" class="num">1</td><td><span class="chip green">aman</span></td><td style="text-align:right" class="num muted">—</td></tr>
+              <tr><td><b>Kemasan Ayam</b></td><td style="text-align:right" class="num">1,5 ikat</td><td style="text-align:right" class="num">1</td><td><span class="chip gold">menipis</span></td><td style="text-align:right" class="num">2 ikat</td></tr>
+              <tr><td><b>Beras Mentik Wangi</b></td><td style="text-align:right" class="num">20 kg</td><td style="text-align:right" class="num">10</td><td><span class="chip green">aman</span></td><td style="text-align:right" class="num muted">—</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= 10 KEUANGAN ================= -->
+  <section class="screen-doc" id="s10">
+    <div class="doc-head"><span class="no">10</span><h2>Keuangan</h2><span class="tag b">Baru: layout</span></div>
+    <p class="doc-sub">Kas masuk − keluar − biaya tetap = <b>laba bersih hari ini</b> di KPI atas, form catat pengeluaran satu baris.</p>
+    <ul class="changes">
+      <li>KPI: <b>Kas masuk / Pengeluaran / Laba bersih</b> (dipotong biaya tetap harian). <span class="gold">Baru.</span></li>
+      <li>Dua tabel berdampingan: pengeluaran &amp; pemasukan lain (mis. jelantah).</li>
+    </ul>
+    <div class="shot"><div class="screen">
+      <aside class="side">
+        <div class="brand"><div class="t">Sabana Drieischicken</div><div class="s">Drieischicken POS</div></div>
+        <nav>
+          <div class="gl">Keuangan</div>
+          <a class="on" href="#s10"><span class="ic">💰</span>Keuangan</a>
+        </nav>
+        <div class="foot">Mode demo lokal · Admin</div>
+      </aside>
+      <div class="main">
+        <div class="top"><span class="chip ghost">Hari ini</span><span class="chip ghost">Bulan ini</span><span class="grow"></span><span class="chip paper">Biaya tetap: Listrik · Karyawan · Kios</span></div>
+        <div class="content">
+          <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+            <div class="kpi"><div class="l">Kas masuk</div><div class="v">Rp1.284.000</div><div class="note">96 transaksi</div></div>
+            <div class="kpi"><div class="l">Pengeluaran</div><div class="v">Rp480.000</div><div class="note">3 catatan hari ini</div></div>
+            <div class="kpi"><div class="l">Laba bersih (kas)</div><div class="v up">Rp804.000</div><div class="note">setelah biaya tetap harian</div></div>
+          </div>
+          <div class="card" style="padding:12px 14px">
+            <div class="row" style="gap:8px">
+              <div class="grow"><span class="lbl">Kategori</span><select class="input"><option>Listrik &amp; Air</option><option>Gaji</option><option>Sewa &amp; Kios</option><option>Gas</option><option>Lainnya</option></select></div>
+              <div style="width:160px"><span class="lbl">Nominal</span><input class="input" placeholder="Rp0" /></div>
+              <div class="grow"><span class="lbl">Catatan</span><input class="input" placeholder="mis. token listrik" /></div>
+              <button class="btn btn-p" style="margin-top:18px">Catat</button>
+            </div>
+          </div>
+          <div class="split3">
+            <div class="card" style="overflow:hidden">
+              <div style="padding:10px 14px; font-weight:800">Pengeluaran hari ini</div>
+              <table class="tbl"><tr><th>Jam</th><th>Kategori</th><th style="text-align:right">Nominal</th></tr>
+                <tr><td>08:30</td><td>Gas</td><td style="text-align:right" class="num">Rp230.000</td></tr>
+                <tr><td>09:10</td><td>Listrik &amp; Air</td><td style="text-align:right" class="num">Rp150.000</td></tr>
+                <tr><td>09:40</td><td>Lainnya</td><td style="text-align:right" class="num">Rp100.000</td></tr>
+              </table>
+            </div>
+            <div class="card" style="overflow:hidden">
+              <div style="padding:10px 14px; font-weight:800">Pemasukan lain</div>
+              <table class="tbl"><tr><th>Sumber</th><th style="text-align:right">Nominal</th></tr>
+                <tr><td>Penjualan minyak jelantah <div class="note">Siklus minyak #7 · 9 Sep</div></td><td style="text-align:right" class="num">Rp90.000</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= 11 PENGATURAN ================= -->
+  <section class="screen-doc" id="s11">
+    <div class="doc-head"><span class="no">11</span><h2>Pengaturan</h2><span class="tag b">Baru: layout</span></div>
+    <p class="doc-sub">Sekarang semua form tersusun ke bawah panjang. Revamp: <b>nav pengaturan di kiri</b>, satu panel per topik, tombol Simpan menempel di bawah panel.</p>
+    <ul class="changes">
+      <li>Nav topik: Toko / Struk / Printer / Portal / Tablet / Biaya tetap / Data demo. <span class="gold">Baru.</span></li>
+      <li>Toggle jadi saklar visual, bukan checkbox polos.</li>
+    </ul>
+    <div class="shot"><div class="screen">
+      <aside class="side">
+        <div class="brand"><div class="t">Sabana Drieischicken</div><div class="s">Drieischicken POS</div></div>
+        <nav>
+          <div class="gl">Sistem</div>
+          <a class="on" href="#s11"><span class="ic">⚙️</span>Pengaturan</a>
+        </nav>
+        <div class="foot">Mode demo lokal · Admin</div>
+      </aside>
+      <div class="main">
+        <div class="top"><b style="font-size:14px">Pengaturan</b><span class="grow"></span><span class="chip green">Tersimpan otomatis</span></div>
+        <div class="content">
+          <div class="setwrap">
+            <div class="card setnav" style="padding:8px">
+              <a class="on" href="#s11">🏪 Toko</a>
+              <a href="#s11">🧾 Struk</a>
+              <a href="#s11">🖨️ Printer</a>
+              <a href="#s11">🛍️ Portal Online</a>
+              <a href="#s11">📱 Tablet</a>
+              <a href="#s11">🏷️ Biaya Tetap</a>
+              <a href="#s11">🗄️ Data Demo</a>
+            </div>
+            <div class="card" style="padding:16px">
+              <b style="font-size:15px">Toko</b>
+              <div class="split3" style="margin-top:10px">
+                <div class="field"><span class="lbl">Nama toko</span><input class="input" value="Sabana Drieischicken" /></div>
+                <div class="field"><span class="lbl">Tagline</span><input class="input" value="Drieischicken POS" /></div>
+              </div>
+              <div class="split3">
+                <div class="field"><span class="lbl">Alamat</span><input class="input" value="Jl. Kebun Sayur No. 1" /></div>
+                <div class="field"><span class="lbl">No. WhatsApp</span><input class="input" value="0812xxxxxxx" /></div>
+              </div>
+              <div class="field"><span class="lbl">Footer struk</span><input class="input" value="Terima kasih, datang kembali!" /></div>
+              <div class="row" style="margin-top:14px"><button class="btn btn-p">Simpan</button><span class="note">Perubahan langsung terlihat di struk &amp; portal</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= 12 LOGIN ================= -->
+  <section class="screen-doc" id="s12">
+    <div class="doc-head"><span class="no">12</span><h2>Login</h2><span class="tag n">Baru: komponen</span></div>
+    <p class="doc-sub">Header merah penuh dengan nama toko dari settings (identitas gerai dari detik pertama). Form tetap sederhana.</p>
+    <div class="shot"><div class="screen" style="min-height:420px">
+      <div class="login-wrap">
+        <div class="login">
+          <div class="brandbar"><div class="s">Drieischicken POS</div><div style="font-size:22px; font-weight:800">Sabana Kasir</div></div>
+          <div class="bd">
+            <div class="field"><span class="lbl">Email</span><input class="input" placeholder="admin@sabana.id" /></div>
+            <div class="field"><span class="lbl">Kata sandi</span><input class="input" type="password" placeholder="••••••••" /></div>
+            <button class="btn btn-p" style="width:100%; min-height:46px; margin-top:4px">Masuk</button>
+            <p class="note" style="margin-top:10px; text-align:center">Tanpa koneksi Supabase? App jalan otomatis dalam <b>mode demo</b>.</p>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ================= 13 PORTAL ================= -->
+  <section class="screen-doc" id="s13">
+    <div class="doc-head"><span class="no">13</span><h2>Portal pelanggan /order</h2><span class="tag b">Baru: layout</span><span class="tag n">Baru: bar keranjang melekat</span></div>
+    <p class="doc-sub">Dilihat dari HP pelanggan. <b>Bar keranjang melekat di bawah</b> — jumlah item &amp; total selalu terlihat, satu ketuk menuju checkout.</p>
+    <ul class="changes">
+      <li>Bar keranjang melekat dengan total. <span class="gold">Baru.</span></li>
+      <li>Toggle Ambil sendiri / Delivery di atas katalog (sekarang tersembunyi di form akhir).</li>
+      <li>Status pesanan aktif tampil sebagai kartu di atas katalog. <span class="gold">Baru.</span></li>
+    </ul>
+    <div class="phonebox phone">
+      <div class="phead"><div class="t">Sabana Drieischicken</div><div class="s">Pesan antre / ambil / diantar</div></div>
+      <div class="ocard" style="margin:10px 12px 0; border-left:5px solid #1F6B33"><div class="r1"><span class="id">WB-0109</span><span class="chip green">Disiapkan</span><span class="grow"></span><span class="num">Rp16.000</span></div></div>
+      <div class="pmode"><span class="otype on">Ambil di kasir</span><span class="otype">Diantar</span><span class="grow"></span><span class="note">Buka 08.00–21.00</span></div>
+      <div class="pcats"><span class="cat on">Semua</span><span class="cat">Ayam</span><span class="cat">Nasi</span><span class="cat">Snack</span><span class="cat">Minuman</span></div>
+      <div class="pgrid2">
+        <div class="pcard"><div class="pphoto">🍗</div><div class="in"><div class="nm">Ayam Paha Atas</div><div class="bt"><span class="pr">Rp11.000</span><b style="width:26px;height:26px;border:1.5px solid var(--line);border-radius:6px;display:inline-flex;align-items:center;justify-content:center">+</b></div></div></div>
+        <div class="pcard"><div class="pphoto">🍛</div><div class="in"><div class="nm">Chicken Katsu 650ml</div><div class="bt"><span class="pr">Rp8.000</span><b style="width:26px;height:26px;border:1.5px solid var(--line);border-radius:6px;display:inline-flex;align-items:center;justify-content:center">+</b></div></div></div>
+        <div class="pcard"><div class="pphoto">🍚</div><div class="in"><div class="nm">Nasi Putih</div><div class="bt"><span class="pr">Rp5.000</span><b style="width:26px;height:26px;border:1.5px solid var(--line);border-radius:6px;display:inline-flex;align-items:center;justify-content:center">+</b></div></div></div>
+        <div class="pcard"><div class="pphoto">🥤</div><div class="in"><div class="nm">Teh Botol Sosro</div><div class="bt"><span class="pr">Rp5.000</span><b style="width:26px;height:26px;border:1.5px solid var(--line);border-radius:6px;display:inline-flex;align-items:center;justify-content:center">+</b></div></div></div>
+      </div>
+      <div class="pbar"><span class="chip red">2 item</span><span class="grow"></span><b class="num">Rp16.000</b><button class="btn btn-p sm">Lihat Keranjang</button></div>
+    </div>
+  </section>
+
+  <footer class="doc-foot">
+    Mockup statis — token warna, font (Plus Jakarta Sans), radius, strip merah-emas, dan seluruh nama fungsi mengikuti app asli supaya transisi mockup → kode minim kejutan. Ceritakan catatanmu per nomor layar; yang sudah disetujui akan saya eksekusi tanpa mengubah logika bisnis (db.ts, HPP, struk, printer).
+  </footer>
+</div>
+</body>
+</html>

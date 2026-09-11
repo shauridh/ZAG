@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { Link } from 'react-router-dom'
-import { loadCatalog, loadTransactions, loadFinance, loadSettings, loadFryers, type Catalog } from '../lib/db'
+import { loadCatalog, loadTransactions, loadFinance, loadSettings, loadFryers, loadPortalOrders, type Catalog } from '../lib/db'
 import { totalsOf, byChannel, byItem, byHour, byPayment, methodLabel } from '../lib/reports'
-import { fmtRp, fmtQty } from '../lib/money'
+import { stockTrendsFrom } from '../lib/stock-trend'
+import { downloadCsv } from '../lib/csv'
+import { fmtRp, fmtRpPlain, fmtQty } from '../lib/money'
 import { todayISO, addDaysISO, dayStart, dayEnd, fmtDate, localDateISO } from '../lib/dates'
 import type { Expense, OtherIncome, Settings, Transaction, OilCycle } from '../lib/types'
 import {
@@ -29,11 +31,12 @@ const CHAN_LABEL: Record<string, string> = {
   delivery: 'Delivery sendiri'
 }
 
-type Period = 'today' | 'yesterday' | 'month' | 'all' | 'custom'
+type Period = 'today' | 'yesterday' | 'week7' | 'month' | 'all' | 'custom'
 
 const PERIODS: [Period, string][] = [
   ['today', 'Hari ini'],
   ['yesterday', 'Kemarin'],
+  ['week7', '7 hari'],
   ['month', 'Bulan ini'],
   ['all', 'All time'],
   ['custom', 'Pilih tanggal']
@@ -47,6 +50,8 @@ function rangeOf(p: Period, customFrom: string, customTo: string): { from: strin
       return { from: today, to: today, label: 'Hari ini' }
     case 'yesterday':
       return { from: addDaysISO(today, -1), to: addDaysISO(today, -1), label: 'Kemarin' }
+    case 'week7':
+      return { from: addDaysISO(today, -6), to: today, label: '7 hari' }
     case 'month':
       return { from: today.slice(0, 8) + '01', to: today, label: 'Bulan ini' }
     case 'all':
@@ -128,6 +133,7 @@ export default function Dashboard(): ReactElement {
   const [txs, setTxs] = useState<Transaction[]>([])
   const [fin, setFin] = useState<{ expenses: Expense[]; otherIncome: OtherIncome[] } | null>(null)
   const [cycles, setCycles] = useState<OilCycle[]>([])
+  const [pendingOrders, setPendingOrders] = useState(0)
   const [err, setErr] = useState('')
 
   const { from, to, label } = useMemo(() => rangeOf(period, customFrom, customTo), [period, customFrom, customTo])
@@ -136,14 +142,15 @@ export default function Dashboard(): ReactElement {
   const reload = useCallback(async () => {
     try {
       const today = todayISO()
-      const [c, s, tSel, , f, fr, tCmp] = await Promise.all([
+      const [c, s, tSel, , f, fr, tCmp, orders] = await Promise.all([
         loadCatalog(),
         loadSettings(),
         loadTransactions(dayStart(from), dayEnd(to)),
         loadTransactions(dayStart(today.slice(0, 8) + '01'), dayEnd(today)),
         loadFinance(today.slice(0, 8) + '01', today),
         loadFryers(),
-        cmp ? loadTransactions(dayStart(cmp.from), dayEnd(cmp.to)) : Promise.resolve([])
+        cmp ? loadTransactions(dayStart(cmp.from), dayEnd(cmp.to)) : Promise.resolve([]),
+        loadPortalOrders().catch(() => [])
       ])
       setCatalog(c)
       setSettings(s)
@@ -151,6 +158,7 @@ export default function Dashboard(): ReactElement {
       setFin(f)
       setCycles(fr.cycles)
       setTxsCmp(tCmp)
+      setPendingOrders(orders.filter((o) => o.status === 'menunggu' || o.status === 'menunggu_verifikasi').length)
       // pembanding bulan berjalan utk kartu laba bersih (tetap tampil di semua periode)
       void loadTransactions(dayStart(today.slice(0, 8) + '01'), dayEnd(today)).then(setTxsMonth)
     } catch (ex) {
@@ -205,7 +213,35 @@ export default function Dashboard(): ReactElement {
       })
   }, [catalog, txs, period])
 
+  /** Best seller vs target (pindahan Laporan): qty terjual, omzet, pencapaian target bila ada. */
+  const bestSellers = useMemo(() => {
+    if (!catalog) return []
+    return byItem(txs)
+      .map((i) => {
+        const pid = catalog.products.find((p) => p.name === i.name)?.id
+        const target = pid ? (catalog.targets.get(pid) ?? 0) : 0
+        // target adalah per-hari; utk rentang panjang dikali jumlah hari
+        const targetTotal = target * (period === 'today' ? 1 : Math.min(spanDays(from, to), 31))
+        return { name: i.name, qty: i.qty, revenue: i.revenue, target: targetTotal }
+      })
+      .slice(0, 8)
+      .sort((a, b) => b.qty - a.qty)
+  }, [catalog, txs, period, from, to])
+
   const lowStock = useMemo(() => (catalog?.ingredients ?? []).filter((i) => i.active && i.stock <= i.min_stock), [catalog])
+
+  /** Tren stok 7 hari bahan kritis (estimasi rekonstruksi dari resep transaksi). */
+  const stockTrend = useMemo(() => {
+    if (!catalog || lowStock.length === 0) return []
+    return stockTrendsFrom(
+      // pakai transaksi 30 hari terakhir sebagai dasar pemakaian
+      txs.length > 0 ? txs : [],
+      catalog.products,
+      lowStock,
+      catalog.recipeByProduct,
+      catalog.ingRecipes
+    )
+  }, [catalog, lowStock, txs])
 
   if (!catalog || !settings || !fin) {
     return <div className="p-6 text-sm font-bold text-brand-muted">Memuat dashboard...</div>
@@ -220,20 +256,29 @@ export default function Dashboard(): ReactElement {
         c.fry_count >= settings.oil.max_fry_count)
   )
 
+  const downloadReport = (): void =>
+    downloadCsv(`laporan-${from}_${to}.csv`, [
+      ['Ringkasan', `${from} s.d. ${to}`],
+      ['Omzet', sum.revenue],
+      ['HPP', sum.hpp],
+      ['Komisi channel', sum.fee],
+      ['Laba kotor', sum.gross],
+      ['Jumlah transaksi', sum.count],
+      [],
+      ['Per channel', 'Omzet', 'Trx', 'Komisi', 'Bersih'],
+      ...chans.map((c) => [CHAN_LABEL[c.key] ?? c.key, c.revenue, c.count, c.fee, c.revenue - c.fee]),
+      [],
+      ['Per metode bayar', 'Jumlah'],
+      ...pays.map((p) => [methodLabel(p.method), p.amount]),
+      [],
+      ['Item', 'Qty', 'Omzet', 'Margin'],
+      ...byItem(txs).map((i) => [i.name, i.qty, i.revenue, i.margin])
+    ])
+
   return (
     <div className="p-3 lg:p-4">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-extrabold">Dashboard</h1>
-        {oilAlert.length > 0 && (
-          <Link to="/produksi" className="chip h-9 bg-brand-gold px-3">
-            ⚠ {oilAlert.length} fryer wajib ganti minyak
-          </Link>
-        )}
-        {lowStock.length > 0 && (
-          <Link to="/stok" className="chip h-9 border-[1.5px] border-brand-line bg-brand-card px-3">
-            {lowStock.length} bahan menipis
-          </Link>
-        )}
         {/* Pemilih periode: di kanan header, bukan kartu sendiri */}
         <div className="ml-auto flex flex-wrap justify-end gap-1" role="tablist" aria-label="Periode">
           {PERIODS.map(([k, lbl]) => (
@@ -248,6 +293,9 @@ export default function Dashboard(): ReactElement {
               {lbl}
             </button>
           ))}
+          <button type="button" className="btn-ghost !min-h-0 !h-9 !px-3" onClick={downloadReport}>
+            Unduh CSV
+          </button>
         </div>
       </div>
       {period === 'custom' && (
@@ -307,6 +355,45 @@ export default function Dashboard(): ReactElement {
         </div>
       </div>
 
+      {/* ===== Perlu tindakan: satu kolom kartu aksi urut urgensi ===== */}
+      {(pendingOrders > 0 || lowStock.length > 0 || oilAlert.length > 0) && (
+        <div className="card mb-3 p-3">
+          <h2 className="mb-2 font-extrabold">Perlu tindakan</h2>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {pendingOrders > 0 && (
+              <Link to="/pesanan" className="flex items-center gap-2.5 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3 hover:border-brand-btn">
+                <span className="chip h-7 bg-brand-gold px-2 text-sm">{pendingOrders}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-extrabold">Pesanan online menunggu</span>
+                  <span className="block text-xs text-brand-muted">verifikasi / proses sekarang</span>
+                </span>
+                <span className="text-xs font-extrabold text-brand-btn">Proses →</span>
+              </Link>
+            )}
+            {lowStock.length > 0 && (
+              <Link to="/stok" className="flex items-center gap-2.5 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3 hover:border-brand-btn">
+                <span className="chip h-7 bg-brand-redtext px-2 text-sm text-white">{lowStock.length}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-extrabold">Bahan di bawah minimum</span>
+                  <span className="block truncate text-xs text-brand-muted">{lowStock.slice(0, 3).map((i) => i.name).join(' · ')}</span>
+                </span>
+                <span className="text-xs font-extrabold text-brand-btn">Stok →</span>
+              </Link>
+            )}
+            {oilAlert.length > 0 && (
+              <Link to="/produksi" className="flex items-center gap-2.5 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3 hover:border-brand-btn">
+                <span className="chip h-7 bg-brand-gold px-2 text-sm">🍟</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-extrabold">{oilAlert.length} fryer wajib ganti minyak</span>
+                  <span className="block text-xs text-brand-muted">batas {settings.oil.max_days} hari / {settings.oil.max_fry_count} gorengan</span>
+                </span>
+                <span className="text-xs font-extrabold text-brand-btn">Cek →</span>
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-3 lg:grid-cols-3">
         {/* Tren harian sesuai periode */}
         <div className="card p-3 lg:col-span-2">
@@ -353,6 +440,40 @@ export default function Dashboard(): ReactElement {
               </li>
             ))}
           </ul>
+        </div>
+
+        {/* ===== Pindahan Laporan: tabel penerimaan per channel (bersih) ===== */}
+        <div className="card p-3 lg:col-span-2">
+          <h2 className="mb-2 font-extrabold">Penerimaan per channel · {label}</h2>
+          {chans.length === 0 ? (
+            <p className="py-6 text-center text-sm text-brand-muted">Belum ada penjualan pada periode ini.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Channel</th>
+                    <th className="text-right">Omzet</th>
+                    <th className="text-right">Komisi</th>
+                    <th className="text-right">Bersih</th>
+                    <th className="text-right">Trx</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {chans.map((c) => (
+                    <tr key={c.key}>
+                      <td className="font-bold">{CHAN_LABEL[c.key] ?? c.key}</td>
+                      <td className="text-right tabular-nums">{fmtRpPlain(c.revenue)}</td>
+                      <td className="text-right tabular-nums text-brand-muted">{c.fee > 0 ? `-${fmtRpPlain(c.fee)}` : '—'}</td>
+                      <td className="text-right font-extrabold tabular-nums">{fmtRpPlain(c.revenue - c.fee)}</td>
+                      <td className="text-right tabular-nums">{c.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="mt-2 text-xs text-brand-muted">Bersih = omzet − komisi channel. Beban tetap bulanan {fmtRp(settings.fixed_costs.reduce((s, f) => s + f.amount, 0))} tidak dihitung di sini; lihat Keuangan.</p>
         </div>
 
         {/* Terlaris */}
@@ -451,9 +572,56 @@ export default function Dashboard(): ReactElement {
           </ul>
         </div>
 
-        {/* Omzet vs periode pembanding (sejajar hari kerja) */}
+        {/* ===== Pindahan Laporan: best seller vs target (tabel) ===== */}
         <div className="card p-3 lg:col-span-2">
-          <h2 className="mb-2 font-extrabold">Omzet vs periode lalu · {label}</h2>
+          <h2 className="mb-2 font-extrabold">Best seller vs target · {label}</h2>
+          {bestSellers.length === 0 ? (
+            <p className="py-6 text-center text-sm text-brand-muted">Belum ada penjualan pada periode ini.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Menu</th>
+                    <th className="text-right">Terjual</th>
+                    <th className="text-right">Target</th>
+                    <th>Pencapaian</th>
+                    <th className="text-right">Omzet</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bestSellers.map((b) => {
+                    const pct = b.target > 0 ? Math.min(100, Math.round((b.qty / b.target) * 100)) : null
+                    return (
+                      <tr key={b.name}>
+                        <td className="font-bold">{b.name}</td>
+                        <td className="text-right tabular-nums">{b.qty}</td>
+                        <td className="text-right tabular-nums text-brand-muted">{b.target > 0 ? b.target : '—'}</td>
+                        <td style={{ minWidth: 120 }}>
+                          {pct === null ? (
+                            <span className="text-xs text-brand-muted">tanpa target</span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <div className="h-2.5 flex-1 rounded border border-brand-line bg-brand-paper">
+                                <div className={`h-full rounded ${pct >= 100 ? 'bg-brand-btn' : 'bg-brand-gold'}`} style={{ width: `${Math.max(pct, 2)}%` }} />
+                              </div>
+                              <span className="w-10 text-right text-xs font-bold tabular-nums">{pct}%</span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="text-right tabular-nums">{fmtRpPlain(b.revenue)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Omzet vs periode pembanding (sejajar hari kerja) */}
+        <div className="card p-3">
+          <h2 className="mb-2 font-extrabold">Omzet vs periode lalu</h2>
           {!cmp ? (
             <p className="py-10 text-center text-sm text-brand-muted">Pilih Hari ini, Kemarin, Bulan ini, atau tanggal tertentu untuk perbandingan.</p>
           ) : (
@@ -483,6 +651,46 @@ export default function Dashboard(): ReactElement {
             </>
           )}
         </div>
+
+        {/* ===== Tren stok bahan kritis 7 hari (estimasi dari resep) ===== */}
+        {stockTrend.length > 0 && (
+          <div className="card p-3 lg:col-span-3">
+            <h2 className="mb-2 font-extrabold">
+              Stok bahan kritis — 7 hari <span className="text-xs font-bold text-brand-muted">(estimasi dari resep transaksi; garis putus = minimum)</span>
+            </h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {stockTrend.map((t) => {
+                const chipCls = t.habis ? 'bg-brand-redtext text-white' : 'bg-brand-gold'
+                const stocks = t.points.map((p) => p.stock)
+                const max = Math.max(...stocks, t.ingredient.min_stock) || 1
+                const minY = Math.min(...stocks, 0)
+                const linePts = t.points.map((p, i) => `${(i / Math.max(1, t.points.length - 1)) * 100},${40 - ((p.stock - minY) / (max - minY || 1)) * 36}`).join(' ')
+                const minLine = 40 - ((t.ingredient.min_stock - minY) / (max - minY || 1)) * 36
+                return (
+                  <div key={t.ingredient.id} className="rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="min-w-0 truncate text-sm font-extrabold">{t.ingredient.name}</p>
+                      <span className={`chip shrink-0 ${chipCls}`}>
+                        {fmtQty(t.ingredient.stock)} / min {fmtQty(t.ingredient.min_stock)} {t.ingredient.buy_unit}
+                      </span>
+                    </div>
+                    <svg viewBox="0 0 100 44" className="mt-1 h-12 w-full" preserveAspectRatio="none" aria-hidden>
+                      {t.ingredient.min_stock > 0 && <line x1="0" y1={minLine} x2="100" y2={minLine} stroke="#e8d9cd" strokeWidth="1" strokeDasharray="3 2" />}
+                      <polyline points={linePts} fill="none" stroke={t.habis ? '#a31217' : '#8a6400'} strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                    <p className="mt-1 text-xs font-bold text-brand-muted">
+                      {t.daysLeft === Infinity
+                        ? 'belum terpakai minggu ini'
+                        : t.daysLeft <= 0
+                          ? 'habis — catat pembelian sekarang'
+                          : `habis ±${Math.floor(t.daysLeft)} hari pada ritme ini`}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Peringatan stok: kartu per bahan, habis didahulukan */}
         <div className="card p-3 lg:col-span-3">

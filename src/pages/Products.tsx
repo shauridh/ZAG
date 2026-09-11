@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
-import { loadCatalog, upsertProduct, upsertCategory, saveRecipe, saveTargets, saveBundle, saveBundleItems, deleteBundle, uploadProductPhoto, removeProductPhoto, type Catalog } from '../lib/db'
-import { hppLines, hppTotal, marginPct, fmtHppQty } from '../lib/hpp'
+import { loadCatalog, loadSettings, upsertProduct, upsertCategory, saveRecipe, saveTargets, saveBundle, saveBundleItems, deleteBundle, uploadProductPhoto, removeProductPhoto, type Catalog } from '../lib/db'
+import { hppLines, hppTotal, marginPct, maxAvailableQty, fmtHppQty } from '../lib/hpp'
 import { fmtRp, fmtRpPlain, parseNum } from '../lib/money'
 import type { Product } from '../lib/types'
 import { Modal } from '../components/Modal'
@@ -14,6 +14,8 @@ export default function Products(): ReactElement {
   const [catalog, setCatalog] = useState<Catalog | null>(null)
   const [tab, setTab] = useState<Tab>('produk')
   const [err, setErr] = useState('')
+  // ambang margin tipis dari settings (bukan angka patokan hardcoded)
+  const [warnPct, setWarnPct] = useState(15)
 
   const reload = useCallback(async () => {
     try {
@@ -25,6 +27,9 @@ export default function Products(): ReactElement {
 
   useEffect(() => {
     void reload()
+    void loadSettings()
+      .then((s) => setWarnPct(s.margin.warn_pct))
+      .catch(() => {})
   }, [reload])
 
   const ingById = useMemo(() => new Map((catalog?.ingredients ?? []).map((i) => [i.id, i])), [catalog])
@@ -62,7 +67,7 @@ export default function Products(): ReactElement {
         </p>
       )}
 
-      {tab === 'produk' && <ProductsTab catalog={catalog} ingById={ingById} reload={reload} toast={toast} setErr={setErr} />}
+      {tab === 'produk' && <ProductsTab catalog={catalog} ingById={ingById} warnPct={warnPct} reload={reload} toast={toast} setErr={setErr} />}
       {tab === 'paket' && <BundlesTab catalog={catalog} reload={reload} toast={toast} setErr={setErr} />}
       {tab === 'target' && <TargetsTab catalog={catalog} reload={reload} toast={toast} setErr={setErr} />}
     </div>
@@ -72,12 +77,14 @@ export default function Products(): ReactElement {
 function ProductsTab({
   catalog,
   ingById,
+  warnPct,
   reload,
   toast,
   setErr
 }: {
   catalog: Catalog
   ingById: Map<number, import('../lib/types').Ingredient>
+  warnPct: number
   reload: () => Promise<void>
   toast: (s: string) => void
   setErr: (s: string) => void
@@ -106,35 +113,49 @@ function ProductsTab({
           const lines = hppLines(p.id, catalog.recipeByProduct, catalog.ingRecipes, ingById)
           const hpp = hppTotal(lines)
           const mg = marginPct(p.price, hpp)
+          // chip stok di pojok foto: pengelola langsung lihat sisa porsi tanpa buka detail
+          const avail = maxAvailableQty(p.id, catalog.recipeByProduct, ingById)
           return (
             <article key={p.id} className={`card flex flex-col overflow-hidden ${p.is_active ? '' : 'opacity-70'}`}>
-              {p.photo ? (
-                <img src={p.photo} alt={p.name} className="h-28 w-full border-b-[1.5px] border-brand-line object-cover" loading="lazy" />
-              ) : (
-                <div className="h-28 w-full border-b-[1.5px] border-brand-line bg-brand-paper" aria-hidden />
-              )}
+              <button
+                type="button"
+                className="relative block border-b-[1.5px] border-brand-line text-left"
+                title="Ganti foto menu"
+                onClick={() => setEditProd(p)}
+              >
+                {p.photo ? (
+                  <img src={p.photo} alt={p.name} className="h-28 w-full object-cover" loading="lazy" />
+                ) : (
+                  <div className="h-28 w-full bg-brand-paper" aria-hidden />
+                )}
+                {avail <= 0 ? (
+                  <span className="chip absolute right-1.5 top-1.5 bg-brand-redtext text-white">Habis</span>
+                ) : avail <= 10 && p.is_active ? (
+                  <span className="chip absolute right-1.5 top-1.5 bg-brand-gold">sisa {avail}</span>
+                ) : null}
+              </button>
               <div className="flex min-h-0 flex-1 flex-col gap-1 p-2.5">
                 <span className="line-clamp-2 text-sm font-bold leading-snug">{p.name}</span>
                 <span className="text-xs font-semibold text-brand-muted">{catName(p.category_id)}</span>
-                <span className="mt-auto flex items-baseline justify-between gap-1 pt-1">
+                <span className="mt-auto flex flex-wrap items-center justify-between gap-1 pt-1">
                   <span className="text-base font-extrabold tabular-nums">{fmtRp(p.price)}</span>
-                  {!p.is_active && <span className="chip bg-brand-line">Nonaktif</span>}
-                </span>
-                <span className="text-[11px] font-semibold tabular-nums text-brand-muted">
                   {hpp > 0 ? (
-                    <>
-                      HPP {fmtRp(hpp)} · <span className={mg < 15 ? 'text-brand-redtext' : ''}>{mg.toFixed(0)}%</span>
-                    </>
+                    <span className={`chip ${mg < warnPct ? 'bg-brand-redtext text-white' : 'bg-brand-gold/30'}`}>margin {mg.toFixed(0)}%</span>
                   ) : (
-                    'HPP belum diatur'
+                    <span className="chip bg-brand-redtext text-white">HPP belum diatur</span>
                   )}
                 </span>
+                {!p.is_active && <span className="chip w-fit bg-brand-line">Nonaktif</span>}
                 <span className="mt-1.5 flex gap-1.5">
+                  <button
+                    type="button"
+                    className={`btn-ghost flex-1 !min-h-0 !py-1.5 text-xs ${hpp <= 0 ? '!border-brand-redtext !text-brand-redtext' : ''}`}
+                    onClick={() => setRecipeFor(p)}
+                  >
+                    {hpp > 0 ? 'Resep' : 'Atur resep'}
+                  </button>
                   <button type="button" className="btn-ghost flex-1 !min-h-0 !py-1.5 text-xs" onClick={() => setEditProd(p)}>
                     Edit
-                  </button>
-                  <button type="button" className="btn-ghost flex-1 !min-h-0 !py-1.5 text-xs" onClick={() => setRecipeFor(p)}>
-                    Resep
                   </button>
                 </span>
               </div>

@@ -137,9 +137,15 @@ export default function Orders(): ReactElement {
       )}
       {orders.length === 0 && <p className="py-10 text-center text-sm text-brand-muted">Belum ada pesanan masuk.</p>}
 
+      {/* Papan alur: kartu terpenting dulu (cek bayar → menunggu → disiapkan → antrean lain) */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {orders.map((o) => (
-          <div key={o.id} className={`card p-3 ${o.status === 'menunggu' ? 'border-brand-gold' : ''}`}>
+        {[...orders]
+          .sort((a, b) => {
+            const rank: Record<string, number> = { menunggu_verifikasi: 0, menunggu: 1, qris_dikirim: 2, diproses: 3, dikirim: 4, selesai: 5, batal: 6, ditolak: 7 }
+            return (rank[a.status] ?? 8) - (rank[b.status] ?? 8)
+          })
+          .map((o) => (
+          <div key={o.id} className={`card p-3 ${o.status === 'menunggu' ? 'border-brand-gold' : ''} ${o.status === 'menunggu_verifikasi' ? 'border-l-4 border-l-brand-gold' : ''}`}>
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="text-lg font-extrabold">#{o.id}</p>
@@ -239,7 +245,7 @@ export default function Orders(): ReactElement {
               )}
             </div>
           </div>
-        ))}
+          ))}
       </div>
 
       {/* Modal tolak */}
