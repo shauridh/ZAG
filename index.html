@@ -3,12 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#E11B22" />
     <title>Sabana Kasir</title>
     <meta name="description" content="Aplikasi kasir, stok, produksi, dan pesanan online untuk Sabana Drieischicken — fried chicken POS." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preload" href="/registerSW.js" as="script" />
+    <!-- registerSW.js hanya ada di hasil build (vite-plugin-pwa); preload manual
+         bikin 404 di dev -->
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Font non-blocking: swap cepat via system font, font web async (font-display:swap) -->
     <link

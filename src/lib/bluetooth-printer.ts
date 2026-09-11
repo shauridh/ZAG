@@ -1,6 +1,11 @@
 // Cetak ke printer thermal Bluetooth via Web Bluetooth (Chrome/Edge di Android,
 // Windows, macOS). Safari/iOS belum mendukung: otomatis fallback print dialog.
 // Printer yang dipilih DISIMPAN (localStorage) dan dipakai ulang tanpa dialog.
+//
+// Anti "minta pair terus": requestDevice hanya terjadi kalau belum ada printer
+// tersimpan ATAU user menekan tombol ganti printer. Sambung ulang ke printer
+// tersimpan dicoba berkali-kali (printer Bluetooth sering "tidur" sekejap
+// setelah idle), jadi transaksi berjalan tidak pernah memunculkan dialog pair.
 
 interface BtCharacteristic {
   writeValue(value: BufferSource): Promise<void>
@@ -18,6 +23,8 @@ interface BtService {
 
 interface BtServer {
   connect(): Promise<BtServer>
+  disconnect?(): void
+  connected?: boolean
   getPrimaryService(service: string | number): Promise<BtService>
 }
 
@@ -96,35 +103,90 @@ async function writeBytes(ch: BtCharacteristic, bytes: number[]): Promise<void> 
   }
 }
 
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * Cek printer tersimpan masih bisa disambung (tanpa dialog, tanpa mencetak).
+ * Dipakai Pengaturan untuk menampilkan status printer secara jujur.
+ */
+export async function canReconnectSaved(): Promise<boolean> {
+  const saved = getSavedPrinter()
+  if (!saved) return false
+  const bt = (navigator as unknown as { bluetooth: BtApi }).bluetooth
+  return (await reconnectSaved(bt, saved)) !== null
+}
+
+/**
+ * Sambung ulang printer tersimpan tanpa dialog pair.
+ * Bluetooth printer sering menolak koneksi pertama setelah idle/akitf tidur,
+ * jadi dicoba beberapa kali dengan jeda sebelum menyerah.
+ */
+async function reconnectSaved(bt: BtApi, saved: SavedPrinter): Promise<BtDevice | null> {
+  if (!bt.getDevices) return null
+  const delays = [0, 800, 2000] // percobaan 1 langsung, lalu beri printer waktu bangun
+  let lastErr: unknown = null
+  for (const wait of delays) {
+    if (wait) await sleep(wait)
+    try {
+      const devices = await bt.getDevices()
+      const found = devices.find((d) => d.id === saved.id)
+      if (!found) {
+        lastErr = new Error('Printer tidak terdaftar di browser')
+        continue
+      }
+      await connectDevice(found) // tes sambung tanpa mencetak
+      return found
+    } catch (ex) {
+      lastErr = ex
+    }
+  }
+  console.warn('Sambung ulang printer gagal:', lastErr)
+  return null
+}
+
 async function printToDevice(device: BtDevice, text: string): Promise<void> {
-  if (!device.gatt) throw new Error('gatt missing')
-  await device.gatt.connect()
-  const ch = await getCharacteristic(device)
+  const ch = await connectDevice(device)
   const bytes = [...initCmd(), ...Array.from(encoder.encode(text)), ...feedCut()]
   await writeBytes(ch, bytes)
 }
 
+/** Sambung + siapkan karakteristik tulis. Boleh dipanggil ulang, GATT connect idempoten. */
+async function connectDevice(device: BtDevice): Promise<BtCharacteristic> {
+  if (!device.gatt) throw new Error('GATT tidak tersedia')
+  if (device.gatt.connected !== true) await device.gatt.connect()
+  return getCharacteristic(device)
+}
+
 /**
- * Cetak teks ke printer tersimpan. Bila belum ada yang tersimpan (atau gagal
- * sambung ulang), buka dialog pilih perangkat lalu simpan pilihannya.
- * Return 'bt' bila sukses via bluetooth, 'fallback' bila perlu print dialog.
+ * Cetak teks ke printer tersimpan. Tidak pernah memunculkan dialog pair secara
+ * otomatis: kalau sambung ulang gagal, kembalikan 'reconnect-gagal' supaya
+ * pemanggil bisa menampilkan pesan & tombol pilih printer (atau fallback
+ * print dialog bila diminta).
  */
-export async function printTextBluetooth(text: string): Promise<'bt' | 'fallback'> {
+export async function printTextBluetooth(text: string): Promise<'bt' | 'fallback' | 'reconnect-gagal'> {
   try {
     const bt = (navigator as unknown as { bluetooth: BtApi }).bluetooth
     const saved = getSavedPrinter()
 
-    // 1) coba sambung ulang printer tersimpan tanpa dialog
-    if (saved && bt.getDevices) {
-      const devices = await bt.getDevices()
-      const found = devices.find((d) => d.id === saved.id)
+    // 1) sambung ulang printer tersimpan tanpa dialog, dengan retry
+    if (saved) {
+      const found = await reconnectSaved(bt, saved)
       if (found) {
         await printToDevice(found, text)
         return 'bt'
       }
+      // tersimpan tapi tak terjangkau: JANGAN buka dialog pair otomatis.
+      // Biarkan pemanggil memutuskan (pesan + tombol, atau fallback dialog).
+      return 'reconnect-gagal'
     }
+  } catch (ex) {
+    console.warn('Print bluetooth gagal:', ex)
+    return 'reconnect-gagal'
+  }
 
-    // 2) minta pilih perangkat (sekali), lalu simpan
+  try {
+    // 2) belum ada printer tersimpan: minta pilih perangkat (sekali), lalu simpan
+    const bt = (navigator as unknown as { bluetooth: BtApi }).bluetooth
     const device = await bt.requestDevice({
       filters: [{ services: [PRINTER_SERVICES[0]] }, { services: [PRINTER_SERVICES[1]] }, { services: [PRINTER_SERVICES[2]] }],
       optionalServices: PRINTER_SERVICES
@@ -132,7 +194,8 @@ export async function printTextBluetooth(text: string): Promise<'bt' | 'fallback
     await printToDevice(device, text)
     savePrinter({ id: device.id, name: device.name ?? 'Printer Bluetooth' })
     return 'bt'
-  } catch {
+  } catch (ex) {
+    console.warn('Pilih printer dibatalkan/gagal:', ex)
     // user batal atau printer tak didukung: fallback ke print dialog
     return 'fallback'
   }
@@ -146,8 +209,7 @@ export async function pickAndSavePrinter(): Promise<SavedPrinter> {
     optionalServices: PRINTER_SERVICES
   })
   // tes koneksi langsung supaya user tahu printer-nya benar
-  await device.gatt!.connect()
-  await getCharacteristic(device)
+  await connectDevice(device)
   const saved = { id: device.id, name: device.name ?? 'Printer Bluetooth' }
   savePrinter(saved)
   return saved

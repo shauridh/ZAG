@@ -6,15 +6,16 @@ import type { Fryer, Ingredient, OilCycle, Settings } from '../lib/types'
 import { loadSettings } from '../lib/db'
 import { Modal } from '../components/Modal'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { useToast } from '../components/Toast'
 import { fmtDateTime } from '../lib/dates'
 
 export default function Production(): ReactElement {
+  const { toast } = useToast()
   const [catalog, setCatalog] = useState<Catalog | null>(null)
   const [fryers, setFryers] = useState<Fryer[]>([])
   const [cycles, setCycles] = useState<OilCycle[]>([])
   const [settings, setSettings] = useState<Settings | null>(null)
   const [err, setErr] = useState('')
-  const [msg, setMsg] = useState('')
 
   const reload = useCallback(async () => {
     try {
@@ -41,10 +42,9 @@ export default function Production(): ReactElement {
     <div className="p-3 lg:p-4">
       <h1 className="mb-3 text-xl font-extrabold">Produksi & Fryer</h1>
       {err && <ErrorSummary err={err} label="Batch produksi gagal" />}
-      {msg && <p role="status" className="mb-2 rounded-lg bg-brand-gold/25 px-3 py-2 text-sm font-bold">{msg}</p>}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <BatchForm catalog={catalog} prepared={prepared} fryers={fryers} onDone={reload} setErr={setErr} setMsg={setMsg} />
+        <BatchForm catalog={catalog} prepared={prepared} fryers={fryers} onDone={reload} setErr={setErr} toast={toast} />
         <FryerPanel
           fryers={fryers}
           cycles={cycles}
@@ -53,7 +53,7 @@ export default function Production(): ReactElement {
           ingById={ingById}
           onDone={reload}
           setErr={setErr}
-          setMsg={setMsg}
+          toast={toast}
         />
       </div>
 
@@ -83,14 +83,14 @@ function BatchForm({
   fryers,
   onDone,
   setErr,
-  setMsg
+  toast
 }: {
   catalog: Catalog
   prepared: Ingredient[]
   fryers: Fryer[]
   onDone: () => Promise<void>
   setErr: (s: string) => void
-  setMsg: (s: string) => void
+  toast: (s: string) => void
 }): ReactElement {
   const [outputs, setOutputs] = useState<{ ingredient_id: number; qty: number }[]>(prepared.length ? [{ ingredient_id: prepared[0].id, qty: 9 }] : [])
   const [fryerId, setFryerId] = useState<number | ''>('')
@@ -198,7 +198,7 @@ function BatchForm({
               fried_grams: parseInt(grams, 10) || 0,
               note: ''
             })
-            setMsg('Batch produksi tersimpan, stok diperbarui.')
+            toast('Batch produksi tersimpan, stok diperbarui.')
             await onDone()
           } catch (ex) {
             setErr((ex as Error).message)
@@ -219,7 +219,7 @@ function FryerPanel({
   ingById,
   onDone,
   setErr,
-  setMsg
+  toast
 }: {
   fryers: Fryer[]
   cycles: OilCycle[]
@@ -228,7 +228,7 @@ function FryerPanel({
   ingById: Map<number, Ingredient>
   onDone: () => Promise<void>
   setErr: (s: string) => void
-  setMsg: (s: string) => void
+  toast: (s: string) => void
 }): ReactElement {
   const [fillOpen, setFillOpen] = useState<Fryer | null>(null)
   const [endOpen, setEndOpen] = useState<OilCycle | null>(null)
@@ -319,7 +319,7 @@ function FryerPanel({
               try {
                 await fillFryer(fillOpen.id, oilId, liters)
                 setFillOpen(null)
-                setMsg('Siklus minyak dimulai.')
+                toast('Siklus minyak dimulai.')
                 await onDone()
               } catch (ex) {
                 setErr((ex as Error).message)
@@ -337,7 +337,7 @@ function FryerPanel({
               try {
                 await endOilCycle(endOpen.id, liters, income)
                 setEndOpen(null)
-                setMsg('Siklus minyak ditutup. Pemasukan jelantah tercatat di Keuangan.')
+                toast('Siklus minyak ditutup. Pemasukan jelantah tercatat di Keuangan.')
                 await onDone()
               } catch (ex) {
                 setErr((ex as Error).message)

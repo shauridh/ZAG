@@ -1,7 +1,7 @@
-import { lazy, Suspense, useState, type ReactElement } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react'
 import { NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
-import { isDemo } from './lib/db'
+import { isDemo, loadSettings } from './lib/db'
 import { OfflineIndicator } from './components/OfflineIndicator'
 import { TabletBar } from './components/TabletBar'
 import { FullscreenGate } from './components/FullscreenGate'
@@ -20,6 +20,7 @@ const StockPage = lazy(() => import('./pages/Stock'))
 const Finance = lazy(() => import('./pages/Finance'))
 const Reports = lazy(() => import('./pages/Reports'))
 const ShiftPage = lazy(() => import('./pages/Shift'))
+const HistoryPage = lazy(() => import('./pages/History'))
 const SettingsPage = lazy(() => import('./pages/Settings'))
 
 interface NavItem {
@@ -42,6 +43,7 @@ const NAV_ADMIN: NavGroup[] = [
       { to: '/', label: 'Dashboard', icon: '📊', end: true },
       { to: '/kasir', label: 'Kasir', icon: '🧾' },
       { to: '/pesanan', label: 'Pesanan', icon: '🛍️' },
+      { to: '/riwayat', label: 'Riwayat Transaksi', icon: '🕘' },
       { to: '/produksi', label: 'Produksi & Fryer', icon: '🍟' },
       { to: '/shift', label: 'Shift', icon: '🔄' }
     ]
@@ -72,6 +74,7 @@ const NAV_KASIR: NavGroup[] = [
     items: [
       { to: '/kasir', label: 'Kasir', icon: '🧾' },
       { to: '/pesanan', label: 'Pesanan', icon: '🛍️' },
+      { to: '/riwayat', label: 'Riwayat Transaksi', icon: '🕘' },
       { to: '/produksi', label: 'Produksi & Fryer', icon: '🍟' },
       { to: '/shift', label: 'Shift', icon: '🔄' }
     ]
@@ -88,6 +91,14 @@ function Shell(): ReactElement {
   const { session, signOut } = useAuth()
   const nav = useNavigate()
   const [open, setOpen] = useState(false)
+  // Brand dari settings toko (nama + tagline); fallback aman saat gagal muat
+  const [brand, setBrand] = useState({ name: 'Sabana Kasir', tagline: 'Drieischicken POS' })
+  useEffect(() => {
+    if (!session) return
+    void loadSettings()
+      .then((s) => setBrand({ name: s.store.name || 'Sabana Kasir', tagline: s.store.tagline || 'Drieischicken POS' }))
+      .catch(() => {})
+  }, [session])
   const [collapsed, setCollapsed] = useState(() => {
     const saved = localStorage.getItem(LS_SIDEBAR)
     if (saved !== null) return saved === '1'
@@ -164,8 +175,8 @@ function Shell(): ReactElement {
         <div className="strip flex items-center justify-between px-3 pb-3 pt-5">
           {!collapsed && (
             <div>
-              <p className="text-lg font-extrabold leading-tight">Sabana Kasir</p>
-              <p className="text-xs font-bold text-brand-muted">Drieischicken POS</p>
+              <p className="text-lg font-extrabold leading-tight">{brand.name}</p>
+              {brand.tagline && <p className="text-xs font-bold text-brand-muted">{brand.tagline}</p>}
             </div>
           )}
           <button
@@ -180,7 +191,9 @@ function Shell(): ReactElement {
         </div>
         {renderNav(collapsed)}
         {!collapsed && (
-          <p className="px-4 pb-4 text-[11px] text-brand-muted">{isDemo ? 'Mode demo lokal' : 'Tersambung Supabase'}</p>
+          <p className="px-4 pb-4 text-[11px] text-brand-muted">
+            {isDemo ? 'Mode demo lokal' : 'Tersambung Supabase'} · {session.role === 'admin' ? 'Admin' : 'Kasir'}
+          </p>
         )}
       </aside>
 
@@ -190,8 +203,8 @@ function Shell(): ReactElement {
           <div className="absolute inset-0 bg-black/45" onClick={() => setOpen(false)} />
           <aside className="relative w-64 border-r-[1.5px] border-brand-line bg-brand-card">
             <div className="strip px-4 pb-3 pt-5">
-              <p className="text-lg font-extrabold leading-tight">Sabana Kasir</p>
-              <p className="text-xs font-bold text-brand-muted">Drieischicken POS</p>
+              <p className="text-lg font-extrabold leading-tight">{brand.name}</p>
+              {brand.tagline && <p className="text-xs font-bold text-brand-muted">{brand.tagline}</p>}
             </div>
             {renderNav(false)}
           </aside>
@@ -203,7 +216,7 @@ function Shell(): ReactElement {
           <button type="button" className="btn-ghost !min-h-0 !px-3 !py-2 text-lg" onClick={() => setOpen(true)} aria-label="Buka menu">
             ☰
           </button>
-          <p className="text-base font-extrabold">Sabana Kasir</p>
+          <p className="truncate text-base font-extrabold">{brand.name}</p>
           <OfflineIndicator className="ml-auto" />
           {isDemo && <span className="chip bg-brand-gold">DEMO</span>}
         </header>
@@ -222,6 +235,7 @@ function Shell(): ReactElement {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/kasir" element={<Cashier />} />
                 <Route path="/pesanan" element={<Orders />} />
+                <Route path="/riwayat" element={<HistoryPage />} />
                 <Route path="/produksi" element={<Production />} />
                 <Route path="/bahan" element={<Ingredients />} />
                 <Route path="/menu" element={<Products />} />

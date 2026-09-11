@@ -6,3 +6,5 @@ dev-dist
 *.local
 .vite
 *.log
+screenshots/
+supabase/.temp/

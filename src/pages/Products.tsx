@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
-import { loadCatalog, upsertProduct, upsertCategory, saveRecipe, saveTargets, saveBundle, saveBundleItems, deleteBundle, type Catalog } from '../lib/db'
+import { loadCatalog, upsertProduct, upsertCategory, saveRecipe, saveTargets, saveBundle, saveBundleItems, deleteBundle, uploadProductPhoto, removeProductPhoto, type Catalog } from '../lib/db'
 import { hppLines, hppTotal, marginPct, fmtHppQty } from '../lib/hpp'
 import { fmtRp, fmtRpPlain, parseNum } from '../lib/money'
 import type { Product } from '../lib/types'
 import { Modal } from '../components/Modal'
-import { fileToDataUrl } from '../lib/image'
+import { fileToPreviewBlob, type PreviewBlob } from '../lib/image'
+import { useToast } from '../components/Toast'
 
 type Tab = 'produk' | 'paket' | 'target'
 
 export default function Products(): ReactElement {
+  const { toast } = useToast()
   const [catalog, setCatalog] = useState<Catalog | null>(null)
   const [tab, setTab] = useState<Tab>('produk')
   const [err, setErr] = useState('')
-  const [msg, setMsg] = useState('')
 
   const reload = useCallback(async () => {
     try {
@@ -60,11 +61,10 @@ export default function Products(): ReactElement {
           {err}
         </p>
       )}
-      {msg && <p role="status" className="mb-2 rounded-lg bg-brand-gold/25 px-3 py-2 text-sm font-bold">{msg}</p>}
 
-      {tab === 'produk' && <ProductsTab catalog={catalog} ingById={ingById} reload={reload} setMsg={setMsg} setErr={setErr} />}
-      {tab === 'paket' && <BundlesTab catalog={catalog} reload={reload} setMsg={setMsg} setErr={setErr} />}
-      {tab === 'target' && <TargetsTab catalog={catalog} reload={reload} setMsg={setMsg} setErr={setErr} />}
+      {tab === 'produk' && <ProductsTab catalog={catalog} ingById={ingById} reload={reload} toast={toast} setErr={setErr} />}
+      {tab === 'paket' && <BundlesTab catalog={catalog} reload={reload} toast={toast} setErr={setErr} />}
+      {tab === 'target' && <TargetsTab catalog={catalog} reload={reload} toast={toast} setErr={setErr} />}
     </div>
   )
 }
@@ -73,13 +73,13 @@ function ProductsTab({
   catalog,
   ingById,
   reload,
-  setMsg,
+  toast,
   setErr
 }: {
   catalog: Catalog
   ingById: Map<number, import('../lib/types').Ingredient>
   reload: () => Promise<void>
-  setMsg: (s: string) => void
+  toast: (s: string) => void
   setErr: (s: string) => void
 }): ReactElement {
   const [editProd, setEditProd] = useState<Partial<Product> | null>(null)
@@ -101,171 +101,63 @@ function ProductsTab({
           + Kategori
         </button>
       </div>
-      <div className="card overflow-x-auto">
-        <table className="tbl min-w-[680px]">
-          <thead>
-            <tr>
-              <th>Menu</th>
-              <th>Kategori</th>
-              <th className="whitespace-nowrap text-right">Harga</th>
-              <th className="text-right">HPP</th>
-              <th className="text-right">Margin</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {prods.map((p) => {
-              const lines = hppLines(p.id, catalog.recipeByProduct, catalog.ingRecipes, ingById)
-              const hpp = hppTotal(lines)
-              const mg = marginPct(p.price, hpp)
-              return (
-                <tr key={p.id}>
-                  <td className="font-bold">
-                  <span className="flex items-center gap-2">
-                    {p.photo ? (
-                      <img src={p.photo} alt="" className="h-8 w-8 shrink-0 rounded-md object-cover" loading="lazy" />
-                    ) : (
-                      <span className="inline-block h-8 w-8 shrink-0 rounded-md bg-brand-line" />
-                    )}
-                    {p.name}
-                  </span>
-                  </td>
-                  <td>{catName(p.category_id)}</td>
-                  <td className="text-right tabular-nums">{fmtRp(p.price)}</td>
-                  <td className="text-right tabular-nums">{hpp > 0 ? fmtRp(hpp) : '—'}</td>
-                  <td className={`text-right font-bold tabular-nums ${hpp > 0 && mg < 15 ? 'text-brand-redtext' : ''}`}>{hpp > 0 ? mg.toFixed(0) + '%' : '—'}</td>
-                  <td>
-                    <span className={`chip ${p.is_active ? 'bg-brand-gold/30' : 'bg-brand-line'}`}>{p.is_active ? 'Aktif' : 'Nonaktif'}</span>
-                  </td>
-                  <td className="whitespace-nowrap">
-                    <button type="button" className="btn-ghost !min-h-0 !px-2 !py-1 text-xs" onClick={() => setEditProd(p)}>
-                      Edit
-                    </button>{' '}
-                    <button type="button" className="btn-ghost !min-h-0 !px-2 !py-1 text-xs" onClick={() => setRecipeFor(p)}>
-                      Resep
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      <div className="grid grid-cols-2 content-start gap-2 sm:grid-cols-3 xl:grid-cols-4">
+        {prods.map((p) => {
+          const lines = hppLines(p.id, catalog.recipeByProduct, catalog.ingRecipes, ingById)
+          const hpp = hppTotal(lines)
+          const mg = marginPct(p.price, hpp)
+          return (
+            <article key={p.id} className={`card flex flex-col overflow-hidden ${p.is_active ? '' : 'opacity-70'}`}>
+              {p.photo ? (
+                <img src={p.photo} alt={p.name} className="h-28 w-full border-b-[1.5px] border-brand-line object-cover" loading="lazy" />
+              ) : (
+                <div className="h-28 w-full border-b-[1.5px] border-brand-line bg-brand-paper" aria-hidden />
+              )}
+              <div className="flex min-h-0 flex-1 flex-col gap-1 p-2.5">
+                <span className="line-clamp-2 text-sm font-bold leading-snug">{p.name}</span>
+                <span className="text-xs font-semibold text-brand-muted">{catName(p.category_id)}</span>
+                <span className="mt-auto flex items-baseline justify-between gap-1 pt-1">
+                  <span className="text-base font-extrabold tabular-nums">{fmtRp(p.price)}</span>
+                  {!p.is_active && <span className="chip bg-brand-line">Nonaktif</span>}
+                </span>
+                <span className="text-[11px] font-semibold tabular-nums text-brand-muted">
+                  {hpp > 0 ? (
+                    <>
+                      HPP {fmtRp(hpp)} · <span className={mg < 15 ? 'text-brand-redtext' : ''}>{mg.toFixed(0)}%</span>
+                    </>
+                  ) : (
+                    'HPP belum diatur'
+                  )}
+                </span>
+                <span className="mt-1.5 flex gap-1.5">
+                  <button type="button" className="btn-ghost flex-1 !min-h-0 !py-1.5 text-xs" onClick={() => setEditProd(p)}>
+                    Edit
+                  </button>
+                  <button type="button" className="btn-ghost flex-1 !min-h-0 !py-1.5 text-xs" onClick={() => setRecipeFor(p)}>
+                    Resep
+                  </button>
+                </span>
+              </div>
+            </article>
+          )
+        })}
+        {prods.length === 0 && <p className="col-span-full py-8 text-center text-sm text-brand-muted">Tidak ada produk yang cocok.</p>}
       </div>
 
       {/* Modal produk */}
       <Modal open={editProd !== null} title={editProd?.id ? 'Edit Produk' : 'Produk Baru'} onClose={() => setEditProd(null)}>
         {editProd && (
-          <form
-            className="flex flex-col gap-3"
-            onSubmit={async (e) => {
-              e.preventDefault()
-              try {
-                await upsertProduct({
-                  id: editProd.id,
-                  name: editProd.name ?? '',
-                  category_id: editProd.category_id ?? null,
-                  price: editProd.price ?? 0,
-                  unit: editProd.unit ?? 'porsi',
-                  is_active: editProd.is_active ?? true,
-                  sort: editProd.sort ?? 99,
-                  photo: editProd.photo ?? null
-                })
-                setEditProd(null)
-                await reload()
-                setMsg('Produk tersimpan.')
-              } catch (ex) {
-                setErr((ex as Error).message)
-              }
+          <ProductForm
+            editProd={editProd}
+            setEditProd={setEditProd}
+            onSaved={async () => {
+              setEditProd(null)
+              await reload()
+              toast('Produk tersimpan.')
             }}
-          >
-            <div>
-              <label className="lbl" htmlFor="pname">
-                Nama menu
-              </label>
-              <input id="pname" className="input" value={editProd.name ?? ''} onChange={(e) => setEditProd({ ...editProd, name: e.target.value })} required />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="lbl" htmlFor="pcat">
-                  Kategori
-                </label>
-                <select id="pcat" className="input" value={editProd.category_id ?? ''} onChange={(e) => setEditProd({ ...editProd, category_id: e.target.value ? parseInt(e.target.value, 10) : null })}>
-                  <option value="">Tanpa kategori</option>
-                  {catalog.categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="lbl" htmlFor="punit">
-                  Satuan jual
-                </label>
-                <select id="punit" className="input" value={editProd.unit} onChange={(e) => setEditProd({ ...editProd, unit: e.target.value as Product['unit'] })}>
-                  {(['porsi', 'potong', 'ekor', 'cup', 'paket'] as const).map((u) => (
-                    <option key={u} value={u}>
-                      {u}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="lbl" htmlFor="pprice">
-                Harga jual (Rp)
-              </label>
-              <input
-                id="pprice"
-                className="input text-right"
-                inputMode="numeric"
-                value={editProd.price ? fmtRpPlain(editProd.price) : ''}
-                onChange={(e) => setEditProd({ ...editProd, price: parseInt(e.target.value.replace(/\D/g, ''), 10) || 0 })}
-                required
-              />
-            </div>
-            <div>
-              <label className="lbl" htmlFor="pphoto">
-                Foto menu
-              </label>
-              <div className="flex items-center gap-3">
-                {editProd.photo ? (
-                  <>
-                    <img src={editProd.photo} alt="" className="h-16 w-16 rounded-lg border-[1.5px] border-brand-line object-cover" />
-                    <button type="button" className="btn-ghost !min-h-0 !py-1.5 text-xs" onClick={() => setEditProd({ ...editProd, photo: null })}>
-                      Hapus Foto
-                    </button>
-                  </>
-                ) : (
-                  <input
-                    id="pphoto"
-                    type="file"
-                    accept="image/*"
-                    className="text-sm"
-                    onChange={async (e) => {
-                      const f = e.target.files?.[0]
-                      if (!f) return
-                      try {
-                        setEditProd({ ...editProd, photo: await fileToDataUrl(f) })
-                      } catch {
-                        setErr('Foto gagal diproses')
-                      }
-                      e.target.value = ''
-                    }}
-                  />
-                )}
-              </div>
-              <p className="mt-1 text-xs text-brand-muted">Otomatis dikompres (sisi terpanjang 320px). Tampil di kasir &amp; portal customer.</p>
-            </div>
-            <label className="flex items-center gap-2 text-sm font-bold">
-              <input type="checkbox" checked={editProd.is_active ?? true} onChange={(e) => setEditProd({ ...editProd, is_active: e.target.checked })} />
-              Tampilkan di kasir & portal
-            </label>
-            <button type="submit" className="btn-primary">
-              Simpan Produk
-            </button>
-          </form>
+            setErr={setErr}
+            catalog={catalog}
+          />
         )}
       </Modal>
 
@@ -280,7 +172,7 @@ function ProductsTab({
                 await upsertCategory(editCat)
                 setEditCat(null)
                 await reload()
-                setMsg('Kategori tersimpan.')
+                toast('Kategori tersimpan.')
               } catch (ex) {
                 setErr((ex as Error).message)
               }
@@ -434,12 +326,12 @@ function RecipeEditor({
 function BundlesTab({
   catalog,
   reload,
-  setMsg,
+  toast,
   setErr
 }: {
   catalog: Catalog
   reload: () => Promise<void>
-  setMsg: (s: string) => void
+  toast: (s: string) => void
   setErr: (s: string) => void
 }): ReactElement {
   const [editing, setEditing] = useState<{ id?: number; name: string; price: number; items: { product_id: number; qty: number }[] } | null>(null)
@@ -571,7 +463,7 @@ function BundlesTab({
                   }
                   setEditing(null)
                   await reload()
-                  setMsg('Paket tersimpan.')
+                  toast('Paket tersimpan.')
                 } catch (ex) {
                   setErr((ex as Error).message)
                 }
@@ -589,12 +481,12 @@ function BundlesTab({
 function TargetsTab({
   catalog,
   reload,
-  setMsg,
+  toast,
   setErr
 }: {
   catalog: Catalog
   reload: () => Promise<void>
-  setMsg: (s: string) => void
+  toast: (s: string) => void
   setErr: (s: string) => void
 }): ReactElement {
   const [vals, setVals] = useState<Record<number, string>>(() => {
@@ -640,7 +532,7 @@ function TargetsTab({
           try {
             await saveTargets(Object.entries(vals).map(([id, v]) => ({ product_id: parseInt(id, 10), qty: parseInt(v, 10) || 0 })).filter((t) => t.qty > 0))
             await reload()
-            setMsg('Target harian tersimpan.')
+            toast('Target harian tersimpan.')
           } catch (ex) {
             setErr((ex as Error).message)
           }
@@ -649,5 +541,168 @@ function TargetsTab({
         Simpan Target
       </button>
     </div>
+  )
+}
+
+/**
+ * Form produk: field sama seperti sebelumnya, foto kini diupload ke Storage
+ * saat simpan (bukan disimpan sebagai data URL di baris produk). Foto lama
+ * dihapus dari bucket begitu diganti/dilepas supaya bucket tidak menumpuk.
+ */
+function ProductForm({
+  editProd,
+  setEditProd,
+  onSaved,
+  setErr,
+  catalog
+}: {
+  editProd: Partial<Product>
+  setEditProd: (p: Partial<Product> | null) => void
+  onSaved: () => Promise<void>
+  setErr: (s: string) => void
+  catalog: Catalog
+}): ReactElement {
+  // preview foto baru (data URL kecil); null = tidak mengganti foto
+  const [newPhoto, setNewPhoto] = useState<PreviewBlob | null>(null)
+  // foto lama yang akan dilepas saat simpan (dari Hapus Foto / ganti foto)
+  const [releaseOld, setReleaseOld] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const shownPhoto = newPhoto ? newPhoto.preview : (releaseOld ? null : editProd.photo)
+
+  const pick = async (f: File | undefined, ev: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    if (!f) return
+    try {
+      const pb = await fileToPreviewBlob(f)
+      // foto lama akan diganti: tandai utk dihapus dari bucket
+      if (editProd.photo && editProd.photo !== releaseOld) setReleaseOld(editProd.photo)
+      setNewPhoto(pb)
+      ev.target.value = ''
+    } catch {
+      setErr('Foto gagal diproses')
+    }
+  }
+
+  const submit = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault()
+    setBusy(true)
+    setErr('')
+    try {
+      let photo = editProd.photo ?? null
+      if (newPhoto) {
+        const up = await uploadProductPhoto(newPhoto.blob, newPhoto.ext)
+        photo = up.url
+        // simpan dulu baru hapus yang lama supaya gagal-hapus tidak merusak data
+        const old = releaseOld
+        if (old) await removeProductPhoto(old).catch(() => undefined)
+      } else if (releaseOld) {
+        photo = null
+        await removeProductPhoto(releaseOld).catch(() => undefined)
+      }
+      await upsertProduct({
+        id: editProd.id,
+        name: editProd.name ?? '',
+        category_id: editProd.category_id ?? null,
+        price: editProd.price ?? 0,
+        unit: editProd.unit ?? 'porsi',
+        is_active: editProd.is_active ?? true,
+        sort: editProd.sort ?? 99,
+        photo
+      })
+      setNewPhoto(null)
+      setReleaseOld(null)
+      await onSaved()
+    } catch (ex) {
+      setErr((ex as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="flex flex-col gap-3" onSubmit={submit}>
+      <div>
+        <label className="lbl" htmlFor="pname">
+          Nama menu
+        </label>
+        <input id="pname" className="input" value={editProd.name ?? ''} onChange={(e) => setEditProd({ ...editProd, name: e.target.value })} required />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="lbl" htmlFor="pcat">
+            Kategori
+          </label>
+          <select id="pcat" className="input" value={editProd.category_id ?? ''} onChange={(e) => setEditProd({ ...editProd, category_id: e.target.value ? parseInt(e.target.value, 10) : null })}>
+            <option value="">Tanpa kategori</option>
+            {catalog.categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="lbl" htmlFor="punit">
+            Satuan jual
+          </label>
+          <select id="punit" className="input" value={editProd.unit} onChange={(e) => setEditProd({ ...editProd, unit: e.target.value as Product['unit'] })}>
+            {(['porsi', 'potong', 'ekor', 'cup', 'paket'] as const).map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label className="lbl" htmlFor="pprice">
+          Harga jual (Rp)
+        </label>
+        <input
+          id="pprice"
+          className="input text-right"
+          inputMode="numeric"
+          value={editProd.price ? fmtRpPlain(editProd.price) : ''}
+          onChange={(e) => setEditProd({ ...editProd, price: parseInt(e.target.value.replace(/\D/g, ''), 10) || 0 })}
+          required
+        />
+      </div>
+      <div>
+        <label className="lbl" htmlFor="pphoto">
+          Foto menu
+        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          {shownPhoto && (
+            <>
+              <img src={shownPhoto} alt="" className="h-16 w-16 rounded-lg border-[1.5px] border-brand-line object-cover" />
+              <button
+                type="button"
+                className="btn-ghost !min-h-0 !py-1.5 text-xs"
+                onClick={() => {
+                  if (newPhoto) {
+                    // batal ganti: kembali ke foto lama apa adanya
+                    setNewPhoto(null)
+                    setReleaseOld(null)
+                  } else if (editProd.photo) {
+                    setReleaseOld(editProd.photo)
+                  }
+                }}
+              >
+                {newPhoto ? 'Batal Ganti' : 'Hapus Foto'}
+              </button>
+            </>
+          )}
+          <input id="pphoto" type="file" accept="image/*" className="text-sm" onChange={(e) => void pick(e.target.files?.[0], e)} />
+        </div>
+        <p className="mt-1 text-xs text-brand-muted">Tersimpan di Storage Supabase (maks sisi 640px). Tampil di kasir &amp; portal customer.</p>
+      </div>
+      <label className="flex items-center gap-2 text-sm font-bold">
+        <input type="checkbox" checked={editProd.is_active ?? true} onChange={(e) => setEditProd({ ...editProd, is_active: e.target.checked })} />
+        Tampilkan di kasir & portal
+      </label>
+      <button type="submit" className="btn-primary" disabled={busy}>
+        {busy ? 'Menyimpan...' : 'Simpan Produk'}
+      </button>
+    </form>
   )
 }

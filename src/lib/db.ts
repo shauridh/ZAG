@@ -30,9 +30,12 @@ import type {
 } from './types'
 import { ingredientNeeds, productNeeds, maxAvailableQty } from './hpp'
 import { feeForDistance, haversineKm } from './geo'
+import { fmtRpPlain } from './money'
+import { ensureAdminWrite } from './supabase-guard'
 import { todayISO } from './dates'
 import { endOfDayReport } from './reports'
 import { enqueueTx, isNetworkError, markAttempt, readQueue, removeQueued, type QueuedTx } from './offline'
+import type { TxStatus } from './types'
 export { queueCount, QUEUE_EVENT } from './offline'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -145,7 +148,7 @@ function defaultDemo(): DemoData {
   return {
     v: 3,
     settings: {
-      store: { name: 'Sabana Drieischicken', address: 'Jl. Kebun Sayur No. 1', phone: '', footer: 'Terima kasih, datang kembali!' },
+      store: { name: 'Sabana Drieischicken', tagline: 'Drieischicken POS', address: 'Jl. Kebun Sayur No. 1', phone: '', footer: 'Terima kasih, datang kembali!' },
       shift: { float_cash: 350000 },
       channels: { gofood: { fee: 10 }, grabfood: { fee: 10 }, shopeefood: { fee: 10 } },
       oil: { max_days: 3, max_fry_count: 60 },
@@ -481,7 +484,8 @@ export async function loadSettings(): Promise<Settings> {
   const map = new Map((data ?? []).map((r) => [r.key, r.value]))
   const demo = defaultDemo().settings
   const s: Settings = {
-    store: (map.get('store') as Settings['store']) ?? demo.store,
+    // merge per-field: data lama di DB (tanpa tagline) tetap dapat nilai default
+    store: { ...demo.store, ...((map.get('store') as Partial<Settings['store']> | undefined) ?? {}) },
     shift: (map.get('shift') as Settings['shift']) ?? demo.shift,
     channels: (map.get('channels') as Settings['channels']) ?? demo.channels,
     oil: (map.get('oil') as Settings['oil']) ?? demo.oil,
@@ -646,6 +650,211 @@ async function createTxLive(p: {
     items: items ?? [],
     payments: pays ?? []
   }
+}
+
+// ================= Riwayat transaksi: ubah, hapus, refund =================
+
+/**
+ * Nota mana yang boleh diubah/dihapus/di-refund: hanya yang masih 'normal'.
+ * Nota refund (total negatif) dan nota hasil revisi otomatis ikut tersembunyi
+ * dari daftar aksi karena statusnya bukan 'normal'.
+ */
+export function txIsEditable(t: Transaction): boolean {
+  return (t.status ?? 'normal') === 'normal' && t.total >= 0
+}
+
+export interface RefundResult {
+  refund_id: number
+  receipt_no: string
+  amount: number
+  method: string
+}
+
+/** Refund: uang kembali, stok kembali, nota asli berstatus 'refund'. */
+export async function refundTx(txId: number, reason: string): Promise<RefundResult> {
+  if (isDemo) {
+    const d = loadDemo()
+    const tx = d.txs.find((t) => t.id === txId) ?? err('Transaksi tidak ditemukan')
+    if (!txIsEditable(tx)) err('Transaksi sudah diproses sebelumnya')
+    const method = tx.payments?.[0]?.method ?? 'qris'
+    const amount = tx.total
+    const id = ++d.seq
+    const refundTx: Transaction = {
+      id,
+      receipt_no: 'RF' + todayISO().replace(/-/g, '').slice(2) + '-' + String(id).padStart(4, '0'),
+      shift_id: tx.shift_id,
+      user_id: null,
+      order_type: tx.order_type,
+      channel_fee: 0,
+      subtotal: 0,
+      discount: 0,
+      total: -amount,
+      hpp: 0,
+      note: reason.trim() ? `${reason.trim()} (refund nota ${tx.receipt_no ?? tx.id})` : `Refund nota ${tx.receipt_no ?? tx.id}`,
+      created_at: new Date().toISOString(),
+      status: 'refund',
+      refund_of: tx.id,
+      refund_amount: amount,
+      items: (tx.items ?? []).map((it) => ({ name: it.name, qty: -it.qty, price: it.price, hpp: it.hpp })),
+      payments: [{ method, amount: -amount }]
+    }
+    d.txs.push(refundTx)
+    // stok kembali sesuai resep produk asli
+    const { recipeByProduct } = mapsOf(d)
+    for (const it of tx.items ?? []) {
+      const prod = d.products.find((p) => p.name === it.name)
+      if (!prod) continue
+      for (const [iid, need] of productNeeds(prod.id, it.qty, recipeByProduct, new Map(d.ingredients.map((i) => [i.id, i])))) {
+        const ing = d.ingredients.find((x) => x.id === iid)
+        if (ing) ing.stock = Math.round((ing.stock + need) * 10000) / 10000
+      }
+    }
+    tx.status = 'refund'
+    saveDemo(d)
+    return { refund_id: id, receipt_no: refundTx.receipt_no!, amount, method }
+  }
+  const { data, error } = await sb!.rpc('refund_transaction', { p_tx_id: txId, p_reason: reason.trim() || null })
+  if (error) throw new Error(error.message)
+  return data as RefundResult
+}
+
+/** Hapus (batal): salah input, tanpa pergerakan uang, stok kembali. */
+export async function deleteTx(txId: number, reason: string): Promise<void> {
+  if (isDemo) {
+    const d = loadDemo()
+    const tx = d.txs.find((t) => t.id === txId) ?? err('Transaksi tidak ditemukan')
+    if (!txIsEditable(tx)) err('Transaksi sudah diproses sebelumnya')
+    const { recipeByProduct } = mapsOf(d)
+    for (const it of tx.items ?? []) {
+      const prod = d.products.find((p) => p.name === it.name)
+      if (!prod) continue
+      for (const [iid, need] of productNeeds(prod.id, it.qty, recipeByProduct, new Map(d.ingredients.map((i) => [i.id, i])))) {
+        const ing = d.ingredients.find((x) => x.id === iid)
+        if (ing) ing.stock = Math.round((ing.stock + need) * 10000) / 10000
+      }
+    }
+    tx.status = 'batal'
+    tx.note = [tx.note, `Dibatalkan: ${reason.trim() || 'tanpa alasan'}`].filter(Boolean).join(' ')
+    saveDemo(d)
+    return
+  }
+  const { error } = await sb!.rpc('delete_transaction', { p_tx_id: txId, p_reason: reason.trim() || null })
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Edit: nota lama jadi 'direvisi', nota baru diterbitkan dengan item & diskon
+ * baru. Pembayaran lama dipakai ulang, jadi total baru tidak boleh melebihi
+ * yang sudah dibayar (dicek di RPC; demo meniru aturan yang sama).
+ */
+export async function editTx(txId: number, items: { product_id: number; qty: number }[], discount: number, note: string): Promise<number> {
+  if (isDemo) {
+    const d = loadDemo()
+    const tx = d.txs.find((t) => t.id === txId) ?? err('Transaksi tidak ditemukan')
+    if (!txIsEditable(tx)) err('Transaksi sudah diproses sebelumnya')
+    if (items.length === 0) err('Nota revisi minimal punya 1 item')
+    const { recipeByProduct, ingRecipes } = mapsOf(d)
+    const ings = new Map(d.ingredients.map((i) => [i.id, i]))
+
+    // validasi kecukupan stok utk nota baru
+    const totalNeed = new Map<number, number>()
+    for (const it of items)
+      for (const [iid, need] of productNeeds(it.product_id, it.qty, recipeByProduct, ings))
+        totalNeed.set(iid, (totalNeed.get(iid) ?? 0) + need)
+
+    // hitung subtotal & hpp nota baru (harga dari data, bukan client)
+    let subtotal = 0
+    let hpp = 0
+    const itemNames: TransactionItem[] = []
+    for (const it of items) {
+      const prod = d.products.find((x) => x.id === it.product_id) ?? err('Menu tidak ditemukan')
+      subtotal += Math.round(it.qty * prod.price)
+      for (const [iid, need] of productNeeds(it.product_id, it.qty, recipeByProduct, ings)) {
+        const ing = ings.get(iid)
+        if (!ing) continue
+        if (ing.kind === 'prepared') {
+          for (const [cid, cq] of ingredientNeeds(iid, need, ingRecipes)) {
+            const raw = ings.get(cid)
+            if (raw) hpp += Math.round(cq * raw.price)
+          }
+        } else {
+          hpp += Math.round(need * ing.price)
+        }
+      }
+      itemNames.push({ name: prod.name, qty: it.qty, price: prod.price, hpp: 0 })
+    }
+    const total = subtotal - discount
+    if (total < 0) err('Total tidak boleh negatif')
+    const paid = (tx.payments ?? []).reduce((s, p) => s + p.amount, 0)
+    const online = tx.order_type === 'gofood' || tx.order_type === 'grabfood' || tx.order_type === 'shopeefood'
+    if (!online && paid < total) err(`Total revisi ${fmtRpPlain(total)} melebihi uang yang sudah dibayar ${fmtRpPlain(paid)}`)
+    for (const [iid, need] of totalNeed) {
+      const ing = d.ingredients.find((x) => x.id === iid)
+      // stok efektif = stok sekarang + pengembalian dari nota lama
+      let oldReturn = 0
+      for (const old of tx.items ?? []) {
+        const oldProd = d.products.find((p) => p.name === old.name)
+        if (!oldProd) continue
+        for (const [rid, rneed] of productNeeds(oldProd.id, old.qty, recipeByProduct, ings)) {
+          if (rid === iid) oldReturn += rneed
+        }
+      }
+      if (ing && ing.stock + oldReturn < need) err(`Stok kurang: ${ing.name}`)
+    }
+
+    // kembalikan stok nota lama
+    for (const it of tx.items ?? []) {
+      const prod = d.products.find((p) => p.name === it.name)
+      if (!prod) continue
+      for (const [iid, need] of productNeeds(prod.id, it.qty, recipeByProduct, ings)) {
+        const ing = d.ingredients.find((x) => x.id === iid)
+        if (ing) ing.stock = Math.round((ing.stock + need) * 10000) / 10000
+      }
+    }
+    // potong stok nota baru
+    for (const [iid, need] of totalNeed) {
+      const ing = d.ingredients.find((x) => x.id === iid)
+      if (ing) ing.stock = Math.round((ing.stock - need) * 10000) / 10000
+    }
+
+    tx.status = 'direvisi'
+    tx.note = [tx.note, 'Direvisi: item/diskon diperbarui, lihat nota berikutnya'].filter(Boolean).join(' ')
+    // pembayaran pindah ke nota baru: kosongkan di nota lama supaya kas tidak terhitung dobel
+    tx.payments = []
+
+    const id = ++d.seq
+    const newTx: Transaction = {
+      id,
+      receipt_no: 'SB' + todayISO().replace(/-/g, '').slice(2) + '-' + String(id).padStart(4, '0'),
+      shift_id: tx.shift_id,
+      user_id: null,
+      order_type: tx.order_type,
+      channel_fee: tx.channel_fee,
+      subtotal,
+      discount,
+      total,
+      hpp,
+      note: note.trim() ? note.trim() : `Revisi nota ${tx.receipt_no ?? tx.id}`,
+      created_at: new Date().toISOString(),
+      status: 'normal',
+      items: itemNames,
+      payments: tx.payments
+    }
+    d.txs.push(newTx)
+    saveDemo(d)
+    return id
+  }
+  const { data, error } = await sb!.rpc('edit_transaction', { p_tx_id: txId, p_items: items, p_discount: discount, p_note: note.trim() || null })
+  if (error) throw new Error(error.message)
+  return data as number
+}
+
+/** Status label Indonesia utk ditampilkan di UI. */
+export const TX_STATUS_LABEL: Record<TxStatus, string> = {
+  normal: '',
+  direvisi: 'Direvisi',
+  refund: 'Refund',
+  batal: 'Batal'
 }
 
 // ================= Sinkronisasi antrean offline =================
@@ -830,6 +1039,7 @@ export async function closeShift(closingCash: number, note: string): Promise<{ c
     if (closingCash < floatCash) err(`Kas drawer kurang dari float wajib ${floatCash.toLocaleString('id-ID')}, tidak bisa tutup shift`)
     const cashSales = d.txs
       .filter((t) => t.shift_id === shift.id)
+      .filter((t) => (t.status ?? 'normal') === 'normal' || t.status === 'refund')
       .reduce((s, t) => s + (t.payments ?? []).filter((p) => p.method === 'cash').reduce((a, p) => a + p.amount, 0), 0)
     const expected = shift.opening_cash + cashSales
     const diff = closingCash - expected
@@ -1089,10 +1299,19 @@ export async function opname(ingredientId: number, actualQty: number): Promise<v
 
 // ================= Laporan =================
 
-export async function loadTransactions(fromISO: string, toISO: string): Promise<Transaction[]> {
+/**
+ * Muat transaksi dalam rentang waktu.
+ * Default: nota direvisi & batal tidak ikut (uang/stoknya kini menempel di
+ * nota revisinya), nota refund tetap ikut (total negatif) supaya semua
+ * laporan menghitung uang kembali otomatis. Riwayat transaksi memakai
+ * allStatus supaya bisa menampilkan jejak lengkapnya.
+ */
+export async function loadTransactions(fromISO: string, toISO: string, allStatus = false): Promise<Transaction[]> {
+  const keep = (t: Transaction): boolean =>
+    allStatus || t.status === undefined || t.status === 'normal' || t.status === 'refund'
   if (isDemo) {
     const d = loadDemo()
-    return d.txs.filter((t) => t.created_at >= fromISO && t.created_at <= toISO)
+    return d.txs.filter((t) => t.created_at >= fromISO && t.created_at <= toISO && keep(t))
   }
   const { data, error } = await sb!
     .from('transactions')
@@ -1101,7 +1320,7 @@ export async function loadTransactions(fromISO: string, toISO: string): Promise<
     .lte('created_at', toISO)
     .order('created_at')
   if (error) throw new Error(error.message)
-  return (data ?? []) as unknown as Transaction[]
+  return ((data ?? []) as unknown as Transaction[]).filter(keep)
 }
 
 export async function loadShifts(): Promise<Shift[]> {
@@ -1155,6 +1374,48 @@ export async function addOtherIncome(source: string, amount: number, note: strin
   if (error) throw new Error(error.message)
 }
 
+// ================= Foto menu (Supabase Storage) =================
+
+export const MENU_BUCKET = 'menu-photos'
+
+/**
+ * Upload foto menu ke bucket publik 'menu-photos' dan balik URL publiknya.
+ * Nama file memakai timestamp supaya URL baru tidak ter-cache browser setelah
+ * foto diganti. Mode demo: blob tak bisa disimpan di localStorage -> data URL.
+ */
+export async function uploadProductPhoto(blob: Blob, ext = 'jpg'): Promise<{ url: string; path: string }> {
+  if (isDemo) {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const fr = new FileReader()
+      fr.onload = () => resolve(fr.result as string)
+      fr.onerror = () => reject(new Error('Gagal membaca berkas gambar'))
+      fr.readAsDataURL(blob)
+    })
+    return { url: dataUrl, path: 'demo/' + Date.now() + '.' + ext }
+  }
+  const path = `menu/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+  const { error } = await sb!.storage.from(MENU_BUCKET).upload(path, blob, {
+    contentType: 'image/jpeg',
+    cacheControl: '31536000', // nama file selalu baru, boleh di-cache permanen
+    upsert: false
+  })
+  if (error) throw new Error('Upload foto gagal: ' + error.message)
+  const { data } = sb!.storage.from(MENU_BUCKET).getPublicUrl(path)
+  if (!data?.publicUrl) throw new Error('URL foto tidak tersedia setelah upload')
+  return { url: data.publicUrl, path }
+}
+
+/** Hapus objek foto dari Storage (abaikan error: objek mungkin sudah tiada). */
+export async function removeProductPhoto(photoUrl: string | null | undefined): Promise<void> {
+  if (isDemo || !photoUrl) return
+  const marker = `/${MENU_BUCKET}/`
+  const i = photoUrl.indexOf(marker)
+  if (i === -1) return // data URL lama / URL luar: tidak ada yang dihapus
+  const path = photoUrl.slice(i + marker.length).split('?')[0]
+  const { error } = await sb!.storage.from(MENU_BUCKET).remove([path])
+  if (error) console.warn('Hapus foto lama gagal (diabaikan):', error.message)
+}
+
 // ================= Master CRUD (admin) =================
 
 export async function upsertProduct(p: { id?: number; name: string; category_id: number | null; price: number; unit: Product['unit']; is_active: boolean; sort: number; photo?: string | null }): Promise<void> {
@@ -1169,10 +1430,15 @@ export async function upsertProduct(p: { id?: number; name: string; category_id:
     saveDemo(d)
     return
   }
-  const { error } = p.id
-    ? await sb!.from('products').update(p).eq('id', p.id)
-    : await sb!.from('products').insert(p)
+  // id jangan ikut di UPDATE: kolom id GENERATED ALWAYS, Postgres menolak
+  // seluruh baris dengan error 428C9 kalau id dikirim (foto "tidak bisa" diubah).
+  const { data, error } = await (p.id
+    ? sb!.from('products').update({ ...p, id: undefined }).eq('id', p.id)
+    : sb!.from('products').insert(p)
+  ).select('id')
   if (error) throw new Error(error.message)
+  // tulis master cuma boleh admin (RLS): 0 baris terdampak = ditolak diam-diam
+  ensureAdminWrite(data?.length ?? 0, p.id !== undefined)
 }
 
 export async function upsertCategory(c: { id?: number; name: string; sort: number }): Promise<void> {
@@ -1187,8 +1453,12 @@ export async function upsertCategory(c: { id?: number; name: string; sort: numbe
     saveDemo(d)
     return
   }
-  const { error } = c.id ? await sb!.from('categories').update(c).eq('id', c.id) : await sb!.from('categories').insert(c)
+  const { data, error } = await (c.id
+    ? sb!.from('categories').update({ ...c, id: undefined }).eq('id', c.id)
+    : sb!.from('categories').insert(c)
+  ).select('id')
   if (error) throw new Error(error.message)
+  ensureAdminWrite(data?.length ?? 0, c.id !== undefined)
 }
 
 export async function upsertIngredient(i: { id?: number; name: string; code: string | null; kind: 'raw' | 'prepared'; buy_unit: string; pack_content: number; price: number; min_stock: number; active: boolean }): Promise<void> {
@@ -1203,8 +1473,12 @@ export async function upsertIngredient(i: { id?: number; name: string; code: str
     saveDemo(d)
     return
   }
-  const { error } = i.id ? await sb!.from('ingredients').update(i).eq('id', i.id) : await sb!.from('ingredients').insert(i)
+  const { data, error } = await (i.id
+    ? sb!.from('ingredients').update({ ...i, id: undefined }).eq('id', i.id)
+    : sb!.from('ingredients').insert(i)
+  ).select('id')
   if (error) throw new Error(error.message)
+  ensureAdminWrite(data?.length ?? 0, i.id !== undefined)
 }
 
 export async function saveRecipe(productId: number, lines: { kind: 'ingredient' | 'product'; component_id: number; qty: number }[]): Promise<void> {
@@ -1369,7 +1643,8 @@ export async function saveBundle(b: { id?: number; name: string; price: number; 
     saveDemo(d)
     return
   }
-  const { error } = b.id ? await sb!.from('bundles').update(b).eq('id', b.id) : await sb!.from('bundles').insert(b)
+  // id tidak boleh ikut di UPDATE (GENERATED ALWAYS, error 428C9)
+  const { error } = b.id ? await sb!.from('bundles').update({ ...b, id: undefined }).eq('id', b.id) : await sb!.from('bundles').insert(b)
   if (error) throw new Error(error.message)
 }
 
@@ -1600,8 +1875,14 @@ export interface PortalAddress {
 
 export function subscribeOrders(cb: () => void): () => void {
   if (isDemo) {
-    // Demo: polling ringan, cukup untuk mode tanpa server
-    const h = window.setInterval(cb, 3000)
+    // Demo: polling ringan. Bunyi hanya saat jumlah pesanan 'menunggu'
+    // bertambah — bukan tiap tick, supaya alarm tidak bunyi terus-menerus.
+    let last = -1
+    const h = window.setInterval(() => {
+      const n = loadDemo().orders.filter((o) => o.status === 'menunggu').length
+      if (n > 0 && n !== last) cb()
+      last = n
+    }, 3000)
     return () => window.clearInterval(h)
   }
   const ch = sb!.channel('orders-watch')

@@ -72,6 +72,8 @@ export interface Shift {
 
 export interface Payment { method: 'cash' | 'qris' | 'transfer'; amount: number }
 
+export type TxStatus = 'normal' | 'direvisi' | 'refund' | 'batal'
+
 export interface Transaction {
   id: number
   receipt_no: string | null
@@ -85,6 +87,10 @@ export interface Transaction {
   hpp: number
   note: string | null
   created_at: string
+  /** normal = terjual; direvisi = diganti nota baru; refund = uang kembali; batal = salah input */
+  status?: TxStatus
+  refund_of?: number | null
+  refund_amount?: number
   items?: TransactionItem[]
   payments?: Payment[]
 }
@@ -112,7 +118,7 @@ export interface ExpenseCategory { id: number; name: string }
 export interface OtherIncome { id: number; source: string; amount: number; note: string | null; earned_at: string }
 
 export interface Settings {
-  store: { name: string; address: string; phone: string; footer: string }
+  store: { name: string; tagline: string; address: string; phone: string; footer: string }
   shift: { float_cash: number }
   channels: Record<'gofood' | 'grabfood' | 'shopeefood', { fee: number }>
   oil: { max_days: number; max_fry_count: number }

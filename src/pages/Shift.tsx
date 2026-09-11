@@ -7,8 +7,10 @@ import { Modal } from '../components/Modal'
 import { fmtDateTime, todayISO } from '../lib/dates'
 import { byChannel, byItem, byPayment, totalsOf, endOfDayReport, endOfDayText } from '../lib/reports'
 import { downloadCsv } from '../lib/csv'
+import { useToast } from '../components/Toast'
 
 export default function ShiftPage(): ReactElement {
+  const { toast } = useToast()
   const [shift, setShift] = useState<Shift | null>(null)
   const [history, setHistory] = useState<Shift[]>([])
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -22,7 +24,6 @@ export default function ShiftPage(): ReactElement {
   const [txs, setTxs] = useState<Transaction[]>([])
   const [eodTxs, setEodTxs] = useState<Transaction[]>([])
   const [err, setErr] = useState('')
-  const [msg, setMsg] = useState('')
 
   const reload = useCallback(async () => {
     try {
@@ -55,7 +56,6 @@ export default function ShiftPage(): ReactElement {
           {err}
         </p>
       )}
-      {msg && <p role="status" className="mb-2 rounded-lg bg-brand-gold/25 px-3 py-2 text-sm font-bold">{msg}</p>}
 
       {shift ? (
         <div className="card strip max-w-xl p-4">
@@ -182,7 +182,7 @@ export default function ShiftPage(): ReactElement {
             try {
               await openShift(cash)
               setOpenModal(false)
-              setMsg('Shift dibuka. Selamat bekerja!')
+              toast('Shift dibuka. Selamat bekerja!')
               await reload()
             } catch (ex) {
               setErr((ex as Error).message)
@@ -221,7 +221,7 @@ export default function ShiftPage(): ReactElement {
               } catch {
                 // laporan WhatsApp gagal dibuat — email tetap terkirim
               }
-              setMsg(notes.join(' '))
+              toast(notes.join(' '))
               await reload()
             } catch (ex) {
               setErr((ex as Error).message)

@@ -6,11 +6,12 @@ import { buyPlanFromSales, buyPlanToText, dailySalesOf, type BuyPlan } from '../
 import { fmtRp, fmtRpPlain, fmtQty, parseNum } from '../lib/money'
 import type { Ingredient, IngredientRecipe } from '../lib/types'
 import { Modal } from '../components/Modal'
+import { useToast } from '../components/Toast'
 
 export default function Ingredients(): ReactElement {
+  const { toast } = useToast()
   const [catalog, setCatalog] = useState<Catalog | null>(null)
   const [err, setErr] = useState('')
-  const [msg, setMsg] = useState('')
   const [editing, setEditing] = useState<Partial<Ingredient> | null>(null)
   const [recipeFor, setRecipeFor] = useState<Ingredient | null>(null)
   const [q, setQ] = useState('')
@@ -43,7 +44,7 @@ export default function Ingredients(): ReactElement {
         if (ing) await upsertIngredient({ ...ing, price })
       }
       await reload()
-      setMsg('Harga tersimpan. HPP semua resep terkait ikut terhitung ulang.')
+      toast('Harga tersimpan. HPP semua resep terkait ikut terhitung ulang.')
     } catch (ex) {
       setErr((ex as Error).message)
     }
@@ -63,7 +64,6 @@ export default function Ingredients(): ReactElement {
           {err}
         </p>
       )}
-      {msg && <p role="status" className="mb-2 rounded-lg bg-brand-gold/25 px-3 py-2 text-sm font-bold">{msg}</p>}
 
       <BuyInsight catalog={catalog} setErr={setErr} />
 
@@ -160,7 +160,7 @@ export default function Ingredients(): ReactElement {
                 })
                 setEditing(null)
                 await reload()
-                setMsg('Bahan tersimpan.')
+                toast('Bahan tersimpan.')
               } catch (ex) {
                 setErr((ex as Error).message)
               }

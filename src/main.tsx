@@ -2,6 +2,7 @@ import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import App from './App'
+import { ToastProvider } from './components/Toast'
 import { initSync } from './lib/db'
 import { applyScreenPrefs } from './lib/screen'
 import './styles.css'
@@ -18,9 +19,11 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Suspense fallback={null}>
-      <RouterProvider router={router} />
-    </Suspense>
+    <ToastProvider>
+      <Suspense fallback={null}>
+        <RouterProvider router={router} />
+      </Suspense>
+    </ToastProvider>
   </StrictMode>
 )
 

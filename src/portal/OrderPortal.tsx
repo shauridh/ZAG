@@ -5,6 +5,7 @@ import { fmtRp, fmtQty } from '../lib/money'
 import { checkSchedule, deliveryActive, DAY_LABELS, normalizeSchedule } from '../lib/delivery-schedule'
 import type { DeliveryZone, OutletSetting, PortalOrder, Settings } from '../lib/types'
 import { MapPicker } from '../components/MapPicker'
+import { useToast } from '../components/Toast'
 
 const LS_TOKEN = 'sabana-portal-token'
 const LS_NAME = 'sabana-portal-name'
@@ -810,10 +811,10 @@ function OrderStatusCard({
 // ================= Akun =================
 
 function AccountScreen({ token, settings, setErr }: { token: string; settings: Settings; setErr: (s: string) => void }): ReactElement {
+  const { toast } = useToast()
   const [prof, setProf] = useState<{ phone: string; name: string; address: string; label: string } | null>(null)
   const [pinOld, setPinOld] = useState('')
   const [pinNew, setPinNew] = useState('')
-  const [msg, setMsg] = useState('')
 
   useEffect(() => {
     void portal
@@ -842,8 +843,7 @@ function AccountScreen({ token, settings, setErr }: { token: string; settings: S
           onClick={async () => {
             try {
               await portal.updateProfile(token, prof.name, prof.address)
-              setMsg('Profil tersimpan.')
-              window.setTimeout(() => setMsg(''), 1500)
+              toast('Profil tersimpan.')
             } catch (ex) {
               setErr((ex as Error).message)
             }
@@ -851,7 +851,6 @@ function AccountScreen({ token, settings, setErr }: { token: string; settings: S
         >
           Simpan Profil
         </button>
-        {msg && <p className="mt-2 text-sm font-bold text-brand-redtext">{msg}</p>}
       </div>
       <div className="card p-4">
         <h2 className="mb-2 font-extrabold">Ganti PIN</h2>
@@ -871,8 +870,7 @@ function AccountScreen({ token, settings, setErr }: { token: string; settings: S
               await portal.changePin(token, pinOld, pinNew)
               setPinOld('')
               setPinNew('')
-              setMsg('PIN diganti.')
-              window.setTimeout(() => setMsg(''), 1500)
+              toast('PIN diganti.')
             } catch (ex) {
               setErr((ex as Error).message)
             }

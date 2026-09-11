@@ -37,9 +37,19 @@ export function beepRegister(): void {
   tone(2093, 0.12, 0.14)
 }
 
+/** Getar singkat: tablet kasir di tangan terasa, di meja tidak mengganggu. */
+export function haptic(pattern: number | number[]): void {
+  try {
+    navigator.vibrate?.(pattern)
+  } catch {
+    // sebagian browser melempar bila permission ditolak; abaikan
+  }
+}
+
 /** Bunyi pesanan masuk, diulang sampai dihentikan. */
 export function startOrderAlert(): void {
   if (loopTimer !== null) return
+  haptic([70, 50, 70])
   const ring = () => {
     tone(988, 0, 0.12)
     tone(1319, 0.15, 0.12)
@@ -54,6 +64,11 @@ export function stopOrderAlert(): void {
     window.clearInterval(loopTimer)
     loopTimer = null
   }
+}
+
+/** Getar "lunas": dua denyut pendek mengikuti beep kasir. */
+export function vibrateSuccess(): void {
+  haptic([25, 35, 25])
 }
 
 /** Lepas kunci autoplay audio dari gesture pertama pengguna. */

@@ -4,17 +4,18 @@ import { fmtRpPlain, parseNum } from '../lib/money'
 import { normalizeSchedule, DAY_LABELS, DAY_ORDER, type DeliveryWeek } from '../lib/delivery-schedule'
 import type { Settings } from '../lib/types'
 import { MapPicker } from '../components/MapPicker'
-import { bluetoothAvailable, getSavedPrinter, forgetPrinter, pickAndSavePrinter, printTextBluetooth, type SavedPrinter } from '../lib/bluetooth-printer'
+import { useToast } from '../components/Toast'
+import { bluetoothAvailable, getSavedPrinter, forgetPrinter, pickAndSavePrinter, printTextBluetooth, canReconnectSaved, type SavedPrinter } from '../lib/bluetooth-printer'
 
 type Tab = 'toko' | 'struk' | 'printer' | 'qris' | 'outlet' | 'biaya'
 
 export default function SettingsPage(): ReactElement {
+  const { toast } = useToast()
   const [tab, setTab] = useState<Tab>('toko')
   const [settings, setSettings] = useState<Settings | null>(null)
   const [zones, setZones] = useState<{ radius_km: number; fee: number }[]>([])
   const [outlet, setOutlet] = useState<{ lat: number | null; lng: number | null; max_radius_km: number }>({ lat: null, lng: null, max_radius_km: 8 })
   const [err, setErr] = useState('')
-  const [msg, setMsg] = useState('')
 
   const reload = useCallback(async () => {
     try {
@@ -37,8 +38,7 @@ export default function SettingsPage(): ReactElement {
     try {
       await saveSetting(key, value)
       setSettings({ ...settings, [key]: value } as Settings)
-      setMsg('Tersimpan.')
-      window.setTimeout(() => setMsg(''), 1500)
+      toast('Tersimpan.')
     } catch (ex) {
       setErr((ex as Error).message)
     }
@@ -77,7 +77,6 @@ export default function SettingsPage(): ReactElement {
           {err}
         </p>
       )}
-      {msg && <p role="status" className="mb-2 rounded-lg bg-brand-gold/25 px-3 py-2 text-sm font-bold">{msg}</p>}
 
       {tab === 'toko' && (
         <div className="grid max-w-3xl gap-3 lg:grid-cols-2">
@@ -377,7 +376,7 @@ export default function SettingsPage(): ReactElement {
               onClick={async () => {
                 try {
                   await saveZones(zones.filter((z) => z.radius_km > 0), outlet)
-                  setMsg('Pengaturan ongkir tersimpan.')
+                  toast('Pengaturan ongkir tersimpan.')
                 } catch (ex) {
                   setErr((ex as Error).message)
                 }
@@ -444,11 +443,25 @@ export default function SettingsPage(): ReactElement {
 
 /** Pengaturan printer thermal Bluetooth: pilih, tes cetak, lupa, auto-print. */
 function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; onAutoPrint: (v: boolean) => void; setErr: (s: string) => void }): ReactElement {
+  const { toast } = useToast()
   const [printer, setPrinter] = useState<SavedPrinter | null>(getSavedPrinter())
   const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState('')
+  const [reachable, setReachable] = useState<boolean | null>(null)
 
   const test = '*** TES CETAK ***\nSabana Drieischicken\nPrinter Bluetooth OK\n\n\n'
+
+  // Cek sambungan nyata ke printer tersimpan saat tab dibuka (tanpa dialog pair).
+  useEffect(() => {
+    let alive = true
+    if (printer && bluetoothAvailable()) {
+      void canReconnectSaved().then((ok) => {
+        if (alive) setReachable(ok)
+      })
+    }
+    return () => {
+      alive = false
+    }
+  }, [printer])
 
   return (
     <div className="card max-w-xl p-4">
@@ -462,15 +475,14 @@ function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; on
           <div className="flex items-center justify-between gap-2">
             <div>
               <p className="text-sm font-extrabold">{printer.name}</p>
-              <p className="text-xs text-brand-muted">Tersimpan — siap dipakai di kasir</p>
+              <p className="text-xs text-brand-muted">{reachable === false ? 'Tidak terjangkau saat ini, nyalakan printer lalu tes cetak' : 'Tersimpan dan siap dipakai di kasir'}</p>
             </div>
-            <span className="chip bg-brand-gold/30">Tersambung</span>
+            <span className={`chip ${reachable === false ? 'bg-brand-gold' : 'bg-brand-gold/30'}`}>{reachable === false ? 'Cek printer' : 'Tersambung'}</span>
           </div>
         ) : (
           <p className="text-sm font-bold text-brand-muted">Belum ada printer tersimpan.</p>
         )}
       </div>
-      {msg && <p role="status" className="mb-2 rounded-lg bg-brand-gold/25 px-3 py-2 text-sm font-bold">{msg}</p>}
       {autoPrint && !printer && (
         <p className="mb-2 rounded-lg bg-brand-gold/25 px-3 py-2 text-sm font-bold">Print otomatis aktif: pilih printer dulu supaya struk langsung tercetak tanpa dialog.</p>
       )}
@@ -489,8 +501,7 @@ function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; on
             try {
               const saved = await pickAndSavePrinter()
               setPrinter(saved)
-              setMsg('Printer tersimpan.')
-              window.setTimeout(() => setMsg(''), 1500)
+              toast('Printer tersimpan.')
             } catch (ex) {
               setErr((ex as Error).message || 'Gagal memilih printer')
             } finally {
@@ -510,8 +521,13 @@ function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; on
               setErr('')
               try {
                 const how = await printTextBluetooth(test)
-                setMsg(how === 'bt' ? 'Halaman tes terkirim ke printer.' : 'Bluetooth gagal — tes dikirim ke print dialog.')
-                window.setTimeout(() => setMsg(''), 2500)
+                if (how === 'bt') {
+                  toast('Halaman tes terkirim ke printer.')
+                } else if (how === 'reconnect-gagal') {
+                  toast('Printer tidak terjangkau. Nyalakan printer / pastikan dalam jangkauan, lalu coba lagi. Tidak perlu pair ulang.')
+                } else {
+                  toast('Bluetooth gagal — tes dikirim ke print dialog.')
+                }
               } catch (ex) {
                 setErr((ex as Error).message)
               } finally {
@@ -528,8 +544,7 @@ function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; on
             onClick={() => {
               forgetPrinter()
               setPrinter(null)
-              setMsg('Printer dihapus dari daftar.')
-              window.setTimeout(() => setMsg(''), 1500)
+              toast('Printer dihapus dari daftar.')
             }}
           >
             Lupakan Printer
@@ -649,6 +664,14 @@ function StoreForm({ settings, onSave }: { settings: Settings; onSave: (v: Setti
           Nama toko
         </label>
         <input id="sname" className="input" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} required />
+        <p className="mt-1 text-xs text-brand-muted">Tampil di halaman login &amp; sidebar kasir.</p>
+      </div>
+      <div>
+        <label className="lbl" htmlFor="stag">
+          Tagline (di bawah nama toko)
+        </label>
+        <input id="stag" className="input" value={v.tagline} onChange={(e) => setV({ ...v, tagline: e.target.value })} />
+        <p className="mt-1 text-xs text-brand-muted">Baris kecil di bawah nama, tampil di login &amp; sidebar.</p>
       </div>
       <div>
         <label className="lbl" htmlFor="saddr">

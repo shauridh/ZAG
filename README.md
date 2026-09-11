@@ -51,6 +51,12 @@ python scripts/make-icons.py   # regenerate ikon PWA (stdlib saja)
    );
    ```
 
+   > Catatan: kalau user dibuat **sebelum** migrasi `0001` dipasang, row `profiles`
+   > tidak terbentuk (trigger belum ada) dan semua tulis master data (produk,
+   > kategori, bahan, foto menu) ditolak RLS **tanpa pesan error**. Jalankan
+   > `supabase/migrations/0004_backfill_profiles.sql` untuk mengisi row yang
+   > hilang, lalu set `role = 'admin'` seperti di atas.
+
 5. **Edge Function email** (opsional, untuk laporan tutup shift):
 
    ```bash

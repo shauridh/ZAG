@@ -5,7 +5,7 @@ import { fmtRp, fmtRpPlain } from '../lib/money'
 import type { OrderType, Payment, Settings, Shift } from '../lib/types'
 import { Numpad } from '../components/Numpad'
 import { Modal } from '../components/Modal'
-import { beepRegister, startOrderAlert, stopOrderAlert } from '../lib/sound'
+import { beepRegister, startOrderAlert, stopOrderAlert, vibrateSuccess } from '../lib/sound'
 import { buildReceiptHtml, buildReceiptText, receiptFromTx, CHANNEL_LABEL } from '../lib/escpos'
 import { bluetoothAvailable, printTextBluetooth, printHtmlFallback } from '../lib/bluetooth-printer'
 
@@ -167,7 +167,13 @@ export default function Cashier(): ReactElement {
     const html = buildReceiptHtml(receiptFromTx(settings, done.tx, done.tx.items, done.tx.payments, ''), settings.receipt.width_mm)
     if (mode === 'bt') {
       const how = await printTextBluetooth(receiptText(done.tx))
-      if (how === 'fallback') printHtmlFallback(html)
+      if (how === 'bt') return
+      if (how === 'fallback') {
+        printHtmlFallback(html)
+        return
+      }
+      // printer tersimpan tapi tidak terjangkau: jangan buka dialog pair, cukup arahkan
+      setErr('Printer Bluetooth tidak terjangkau. Nyalakan printer, lalu coba lagi atau buka Pengaturan → Printer.')
     } else {
       printHtmlFallback(html)
     }
@@ -202,14 +208,22 @@ export default function Cashier(): ReactElement {
         itemsDisplay: cart.map((l) => ({ name: l.name, qty: l.qty, price: l.price }))
       })
       beepRegister()
+      vibrateSuccess()
       const change = payMethod === 'cash' ? Math.max(0, cashVal - total) : 0
       setDone({ tx, change })
       setCart([])
       setDiscount(0)
       setNote('')
       void reload()
-      // print otomatis bila diaktifkan di Pengaturan
-      if (settings?.printer.auto_print) void printTextBluetooth(receiptText(tx))
+      // print otomatis bila diaktifkan di Pengaturan; gagal sambung tidak
+      // menghentikan kasir dan tidak memunculkan dialog pair mendadak
+      if (settings?.printer.auto_print) {
+        void printTextBluetooth(receiptText(tx)).then((how) => {
+          if (how === 'reconnect-gagal') {
+            setErr('Print otomatis gagal: printer Bluetooth tidak terjangkau. Transaksi tetap tersimpan.')
+          }
+        })
+      }
     } catch (ex) {
       setErr((ex as Error).message)
     } finally {
@@ -243,8 +257,8 @@ export default function Cashier(): ReactElement {
 
   return (
     <div className="flex h-full flex-col lg:flex-row">
-      {/* Katalog */}
-      <section className="flex min-h-0 flex-1 flex-col p-3 lg:p-4">
+      {/* Katalog — min-h agar grid menu tak pernah gepeng saat keranjang tinggi (layout kolom <lg) */}
+      <section className="flex min-h-[300px] flex-1 flex-col p-3 lg:min-h-0 lg:p-4">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <input
             className="input max-w-56 flex-1"
@@ -306,19 +320,23 @@ export default function Cashier(): ReactElement {
                 type="button"
                 onClick={() => addToCart(p)}
                 disabled={tag === 'Habis'}
-                className={`card relative flex min-h-[92px] flex-col justify-between p-2.5 text-left ${tag === 'Habis' ? 'opacity-50' : 'hover:border-brand-btn'}`}
+                className={`card relative flex min-h-[92px] flex-col overflow-hidden p-0 text-left ${tag === 'Habis' ? 'opacity-50' : 'hover:border-brand-btn'}`}
               >
-                {p.photo && (
-                  <img src={p.photo} alt="" className="mb-1.5 h-20 w-full rounded-md object-cover" loading="lazy" />
+                {p.photo ? (
+                  <img src={p.photo} alt={p.name} className="h-20 w-full border-b-[1.5px] border-brand-line object-cover" loading="lazy" />
+                ) : (
+                  <div className="h-20 w-full border-b-[1.5px] border-brand-line bg-brand-paper" aria-hidden />
                 )}
-                <span className="text-sm font-bold leading-snug">{p.name}</span>
-                <span className="mt-1 flex items-baseline justify-between">
-                  <span className="text-base font-extrabold">{fmtRp(p.price)}</span>
-                  {tag && <span className={`chip ${tag === 'Habis' ? 'bg-brand-redtext text-white' : 'bg-brand-gold'}`}>{tag}</span>}
+                <span className="flex min-h-0 flex-1 flex-col justify-between gap-1 p-2.5">
+                  <span className="line-clamp-2 text-sm font-bold leading-snug">{p.name}</span>
+                  <span className="flex items-baseline justify-between">
+                    <span className="text-base font-extrabold">{fmtRp(p.price)}</span>
+                    {tag && <span className={`chip ${tag === 'Habis' ? 'bg-brand-redtext text-white' : 'bg-brand-gold'}`}>{tag}</span>}
+                  </span>
+                  {mg < settings.margin.warn_pct && tag !== 'Habis' && (
+                    <span className="chip w-fit bg-brand-paper text-[10px] font-bold text-brand-redtext">margin tipis {mg.toFixed(0)}%</span>
+                  )}
                 </span>
-                {mg < settings.margin.warn_pct && tag !== 'Habis' && (
-                  <span className="chip mt-1 w-fit bg-brand-paper text-[10px] font-bold text-brand-redtext">margin tipis {mg.toFixed(0)}%</span>
-                )}
               </button>
             )
           })}
@@ -327,7 +345,7 @@ export default function Cashier(): ReactElement {
       </section>
 
       {/* Keranjang */}
-      <aside className="flex min-h-0 w-full shrink-0 flex-col border-t-[1.5px] border-brand-line bg-brand-card lg:w-[340px] lg:border-l-[1.5px] lg:border-t-0 xl:w-[380px]">
+      <aside className="flex w-full shrink-0 flex-col border-t-[1.5px] border-brand-line bg-brand-card lg:w-[340px] lg:border-l-[1.5px] lg:border-t-0 xl:w-[380px]">
         <div className="strip px-4 pb-2 pt-3">
           <h2 className="font-extrabold">Pesanan Baru</h2>
           <div className="mt-2 flex flex-wrap gap-1" role="radiogroup" aria-label="Jenis pesanan">
@@ -345,7 +363,7 @@ export default function Cashier(): ReactElement {
             ))}
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+        <div className="max-h-[32vh] min-h-0 flex-1 overflow-y-auto px-3 py-2 lg:max-h-none">
           {cart.length === 0 && <p className="py-10 text-center text-sm text-brand-muted">Keranjang kosong. Ketuk menu di kiri.</p>}
           {cart.map((l) => (
             <div key={l.product_id} className="mb-2 rounded-lg border border-brand-line p-2">

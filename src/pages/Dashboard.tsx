@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { Link } from 'react-router-dom'
 import { loadCatalog, loadTransactions, loadFinance, loadSettings, loadFryers, type Catalog } from '../lib/db'
-import { totalsOf, byChannel, byItem, byHour } from '../lib/reports'
+import { totalsOf, byChannel, byItem, byHour, byPayment, methodLabel } from '../lib/reports'
 import { fmtRp, fmtQty } from '../lib/money'
 import { todayISO, addDaysISO, dayStart, dayEnd, fmtDate, localDateISO } from '../lib/dates'
 import type { Expense, OtherIncome, Settings, Transaction, OilCycle } from '../lib/types'
@@ -64,6 +64,38 @@ function rangeOf(p: Period, customFrom: string, customTo: string): { from: strin
 function spanDays(from: string, to: string): number {
   return Math.round((new Date(to + 'T00:00:00').getTime() - new Date(from + 'T00:00:00').getTime()) / 86400000) + 1
 }
+
+/**
+ * Deret omzet & laba per hari kalender dari `from`..`to`; hari kosong = 0.
+ * Dipakai untuk tren periode terpilih dan deret pembanding (sejajar hari kerja).
+ */
+function dailySeriesOf(txs: Transaction[], from: string, to: string): { hari: string; omzet: number; laba: number }[] {
+  const buckets = new Map<string, { omzet: number; laba: number }>()
+  for (const t of txs) {
+    // bukan slice UTC: transaksi jam 19+ tergeser ke hari sebelumnya
+    const iso = localDateISO(t.created_at)
+    const b = buckets.get(iso) ?? { omzet: 0, laba: 0 }
+    b.omzet += t.total
+    b.laba += t.total - t.hpp - t.channel_fee
+    buckets.set(iso, b)
+  }
+  const out: { hari: string; omzet: number; laba: number }[] = []
+  const d = new Date(from + 'T00:00:00')
+  const end = new Date(to + 'T00:00:00')
+  let guard = 0
+  while (d <= end && guard < 400) {
+    const iso = localDateISO(d)
+    const b = buckets.get(iso) ?? { omzet: 0, laba: 0 }
+    out.push({ hari: fmtDate(iso).slice(0, 6), omzet: b.omzet, laba: b.laba })
+    d.setDate(d.getDate() + 1)
+    guard++
+  }
+  // all time panjang: tampilkan 31 hari terakhir saja biar grafik terbaca
+  return out.length > 31 ? out.slice(-31) : out
+}
+
+// Warna metode pembayaran sesuai palet: tunai merah identitas, QRIS emas aksen, transfer abu hangat
+const PAY_COLOR: Record<string, string> = { cash: '#c4151b', qris: '#f5a302', transfer: '#6e6159' }
 
 /**
  * Periode pembanding: sama panjang dan SEJAJAR HARI KERJA (Senin vs Senin).
@@ -149,33 +181,16 @@ export default function Dashboard(): ReactElement {
   }, [cmp, sum.revenue, sumCmp.revenue])
 
   // tren harian mengikuti periode terpilih (maks 31 titik terakhir)
-  const dailySeries = useMemo(() => {
-    const buckets = new Map<string, { omzet: number; laba: number }>()
-    for (const t of txs) {
-      const iso = localDateISO(t.created_at) // bukan slice UTC: transaksi jam 19+ tergeser ke hari sebelumnya
-      const b = buckets.get(iso) ?? { omzet: 0, laba: 0 }
-      const tt = [t].reduce((s, x) => s + x.total, 0)
-      b.omzet += tt
-      b.laba += tt - t.hpp - t.channel_fee
-      buckets.set(iso, b)
-    }
-    const out: { hari: string; omzet: number; laba: number }[] = []
-    // bangun dari tanggal `from`..`to` supaya hari kosong tetap tampil sebagai 0
-    const d = new Date(from + 'T00:00:00')
-    const end = new Date(to + 'T00:00:00')
-    let guard = 0
-    while (d <= end && guard < 400) {
-      const iso = localDateISO(d)
-      const b = buckets.get(iso) ?? { omzet: 0, laba: 0 }
-      out.push({ hari: fmtDate(iso).slice(0, 6), omzet: b.omzet, laba: b.laba })
-      d.setDate(d.getDate() + 1)
-      guard++
-    }
-    // all time panjang: tampilkan 31 hari terakhir saja biar grafik terbaca
-    return out.length > 31 ? out.slice(-31) : out
-  }, [txs, from, to])
+  const dailySeries = useMemo(() => dailySeriesOf(txs, from, to), [txs, from, to])
+  const cmpSeries = useMemo(() => (cmp ? dailySeriesOf(txsCmp, cmp.from, cmp.to) : []), [txsCmp, cmp])
+  // pasangkan indeks: dua deret sama-sama urut penuh per hari, jadi posisi ke-i sejajar hari kerja
+  const pairedDaily = useMemo(
+    () => dailySeries.map((d, i) => ({ hari: d.hari, omzet: d.omzet, lalu: cmpSeries[i]?.omzet ?? 0 })),
+    [dailySeries, cmpSeries]
+  )
 
   const chans = useMemo(() => byChannel(txs), [txs])
+  const pays = useMemo(() => byPayment(txs), [txs])
   const topItems = useMemo(() => byItem(txs).slice(0, 6), [txs])
   const hours = useMemo(() => byHour(txs).filter((h) => h.revenue > 0), [txs])
 
@@ -208,7 +223,7 @@ export default function Dashboard(): ReactElement {
   return (
     <div className="p-3 lg:p-4">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h1 className="mr-auto text-xl font-extrabold">Dashboard</h1>
+        <h1 className="text-xl font-extrabold">Dashboard</h1>
         {oilAlert.length > 0 && (
           <Link to="/produksi" className="chip h-9 bg-brand-gold px-3">
             ⚠ {oilAlert.length} fryer wajib ganti minyak
@@ -219,11 +234,8 @@ export default function Dashboard(): ReactElement {
             {lowStock.length} bahan menipis
           </Link>
         )}
-      </div>
-
-      {/* Pemilih periode */}
-      <div className="card strip mb-3 flex flex-wrap items-center gap-2 p-3">
-        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Periode">
+        {/* Pemilih periode: di kanan header, bukan kartu sendiri */}
+        <div className="ml-auto flex flex-wrap justify-end gap-1" role="tablist" aria-label="Periode">
           {PERIODS.map(([k, lbl]) => (
             <button
               key={k}
@@ -237,18 +249,31 @@ export default function Dashboard(): ReactElement {
             </button>
           ))}
         </div>
-        {period === 'custom' && (
-          <div className="flex items-center gap-2">
-            <input type="date" className="input !h-9 !w-40" value={customFrom} onChange={(e) => { setCustomFrom(e.target.value); if (customTo < e.target.value) setCustomTo(e.target.value) }} aria-label="Dari tanggal" />
-            <span className="text-xs font-bold text-brand-muted">s/d</span>
-            <input type="date" className="input !h-9 !w-40" value={customTo} min={customFrom} onChange={(e) => setCustomTo(e.target.value)} aria-label="Sampai tanggal" />
-          </div>
-        )}
       </div>
+      {period === 'custom' && (
+        <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+          <input type="date" className="input !h-9 !w-40" value={customFrom} onChange={(e) => { setCustomFrom(e.target.value); if (customTo < e.target.value) setCustomTo(e.target.value) }} aria-label="Dari tanggal" />
+          <span className="text-xs font-bold text-brand-muted">s/d</span>
+          <input type="date" className="input !h-9 !w-40" value={customTo} min={customFrom} onChange={(e) => setCustomTo(e.target.value)} aria-label="Sampai tanggal" />
+        </div>
+      )}
       {err && (
         <p className="mb-2 rounded-lg bg-brand-redtext/10 px-3 py-2 text-sm font-bold text-brand-redtext" role="alert">
           {err}
         </p>
+      )}
+
+      {/* Gerai baru / sebelum buka: arahkan ke langkah nyata berikutnya */}
+      {period === 'today' && sum.count === 0 && (
+        <div className="card strip mb-3 flex flex-col items-start gap-3 p-4 sm:flex-row sm:items-center">
+          <div className="min-w-0">
+            <p className="text-base font-extrabold">Belum ada transaksi hari ini</p>
+            <p className="text-sm text-brand-muted">Buka shift lalu mulai jualan di Kasir. Transaksi pertama langsung muncul di dashboard ini.</p>
+          </div>
+          <Link to="/kasir" className="btn-primary shrink-0">
+            Buka Kasir
+          </Link>
+        </div>
       )}
 
       {/* Ringkasan periode terpilih */}
@@ -368,6 +393,40 @@ export default function Dashboard(): ReactElement {
           )}
         </div>
 
+        {/* Metode pembayaran: uang di drawer vs QRIS/transfer */}
+        <div className="card p-3">
+          <h2 className="mb-2 font-extrabold">Metode pembayaran · {label}</h2>
+          {pays.length === 0 ? (
+            <p className="py-10 text-center text-sm text-brand-muted">Belum ada pembayaran pada periode ini.</p>
+          ) : (
+            <>
+              <div className="h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pays} dataKey="amount" nameKey="method" innerRadius="55%" outerRadius="85%" paddingAngle={2}>
+                      {pays.map((p) => (
+                        <Cell key={p.method} fill={PAY_COLOR[p.method] ?? '#8a5a44'} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => fmtRp(v)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <ul className="mt-1 text-xs font-bold">
+                {pays.map((p) => (
+                  <li key={p.method} className="flex justify-between">
+                    <span>
+                      <span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm align-middle" style={{ background: PAY_COLOR[p.method] ?? '#8a5a44' }} />
+                      {methodLabel(p.method)}
+                    </span>
+                    <span className="tabular-nums">{fmtRp(p.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+
         {/* Target vs aktual */}
         <div className="card p-3">
           <h2 className="mb-2 font-extrabold">Target hari ini</h2>
@@ -392,18 +451,73 @@ export default function Dashboard(): ReactElement {
           </ul>
         </div>
 
-        {/* Peringatan stok */}
+        {/* Omzet vs periode pembanding (sejajar hari kerja) */}
+        <div className="card p-3 lg:col-span-2">
+          <h2 className="mb-2 font-extrabold">Omzet vs periode lalu · {label}</h2>
+          {!cmp ? (
+            <p className="py-10 text-center text-sm text-brand-muted">Pilih Hari ini, Kemarin, Bulan ini, atau tanggal tertentu untuk perbandingan.</p>
+          ) : (
+            <>
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={pairedDaily} margin={{ left: 8, right: 8 }}>
+                    <CartesianGrid stroke="#e8d9cd" vertical={false} />
+                    <XAxis dataKey="hari" tick={{ fontSize: 11 }} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}rb` : String(v))} tickLine={false} width={44} />
+                    <Tooltip formatter={(v: number) => fmtRp(v)} />
+                    <Bar dataKey="omzet" name="Periode ini" fill="#c4151b" radius={[4, 4, 0, 0]} barSize={10} />
+                    <Bar dataKey="lalu" name="Periode lalu" fill="#6e6159" radius={[4, 4, 0, 0]} barSize={10} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <ul className="mt-1 flex flex-wrap gap-3 text-xs font-bold">
+                <li>
+                  <span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-brand-btn align-middle" />
+                  Periode ini
+                </li>
+                <li>
+                  <span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm align-middle" style={{ background: '#6e6159' }} />
+                  Periode lalu · {cmp.label}
+                </li>
+              </ul>
+            </>
+          )}
+        </div>
+
+        {/* Peringatan stok: kartu per bahan, habis didahulukan */}
         <div className="card p-3 lg:col-span-3">
           <h2 className="mb-2 font-extrabold">Bahan menipis / habis</h2>
           {lowStock.length === 0 ? (
             <p className="text-sm text-brand-muted">Semua stok bahan di atas minimum. Aman.</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {lowStock.map((i) => (
-                <span key={i.id} className="chip h-8 border-[1.5px] border-brand-line bg-brand-paper px-3">
-                  {i.name}: {fmtQty(i.stock)} {i.buy_unit} (min {fmtQty(i.min_stock)})
-                </span>
-              ))}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+              {[...lowStock]
+                .sort((a, b) => {
+                  const ra = a.stock <= 0 ? -1 : a.min_stock > 0 ? a.stock / a.min_stock : 0
+                  const rb = b.stock <= 0 ? -1 : b.min_stock > 0 ? b.stock / b.min_stock : 0
+                  return ra - rb
+                })
+                .map((i) => {
+                  const habis = i.stock <= 0
+                  const pct = Math.min(100, Math.round((Math.max(i.stock, 0) / Math.max(i.min_stock, 1)) * 100))
+                  return (
+                    <div key={i.id} className="rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-2.5">
+                      <div className="flex items-start justify-between gap-1">
+                        <p className="line-clamp-2 text-xs font-bold leading-snug">{i.name}</p>
+                        <span className={`chip shrink-0 text-[10px] ${habis ? 'bg-brand-redtext text-white' : 'bg-brand-gold'}`}>
+                          {habis ? 'Habis' : 'Menipis'}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-lg font-extrabold tabular-nums">
+                        {fmtQty(i.stock)} <span className="text-[10px] font-bold text-brand-muted">{i.buy_unit}</span>
+                      </p>
+                      <div className="mt-1 h-1.5 overflow-hidden rounded bg-brand-line">
+                        <div className={`h-full rounded ${habis ? 'bg-brand-redtext' : 'bg-brand-gold'}`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <p className="mt-1 text-[10px] font-bold text-brand-muted">min {fmtQty(i.min_stock)} {i.buy_unit}</p>
+                    </div>
+                  )
+                })}
             </div>
           )}
         </div>

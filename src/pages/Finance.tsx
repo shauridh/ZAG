@@ -7,8 +7,10 @@ import type { Settings, Transaction } from '../lib/types'
 import { downloadCsv } from '../lib/csv'
 import { Modal } from '../components/Modal'
 import { Numpad } from '../components/Numpad'
+import { useToast } from '../components/Toast'
 
 export default function Finance(): ReactElement {
+  const { toast } = useToast()
   const [month, setMonth] = useState(todayISO().slice(0, 8) + '01')
   const [fin, setFin] = useState<{ expenses: { id: number; category_id: number | null; amount: number; note: string | null; spent_at: string }[]; expenseCats: { id: number; name: string }[]; otherIncome: { id: number; source: string; amount: number; note: string | null; earned_at: string }[] } | null>(null)
   const [txs, setTxs] = useState<Transaction[]>([])
@@ -16,7 +18,6 @@ export default function Finance(): ReactElement {
   const [expOpen, setExpOpen] = useState(false)
   const [incOpen, setIncOpen] = useState(false)
   const [err, setErr] = useState('')
-  const [msg, setMsg] = useState('')
 
   const endOfMonth = (m: string): string => {
     const d = new Date(parseInt(m.slice(0, 4), 10), parseInt(m.slice(5, 7), 10), 0)
@@ -62,7 +63,6 @@ export default function Finance(): ReactElement {
           {err}
         </p>
       )}
-      {msg && <p role="status" className="mb-2 rounded-lg bg-brand-gold/25 px-3 py-2 text-sm font-bold">{msg}</p>}
 
       <div className="grid gap-3 lg:grid-cols-2">
         {/* Laba rugi */}
@@ -140,7 +140,7 @@ export default function Finance(): ReactElement {
         onClose={() => setExpOpen(false)}
         onDone={async () => {
           setExpOpen(false)
-          setMsg('Pengeluaran tercatat.')
+          toast('Pengeluaran tercatat.')
           await reload()
         }}
         setErr={setErr}
@@ -150,7 +150,7 @@ export default function Finance(): ReactElement {
         onClose={() => setIncOpen(false)}
         onDone={async () => {
           setIncOpen(false)
-          setMsg('Pemasukan lain tercatat.')
+          toast('Pemasukan lain tercatat.')
           await reload()
         }}
         setErr={setErr}

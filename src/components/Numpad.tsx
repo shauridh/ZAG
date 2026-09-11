@@ -32,11 +32,11 @@ export function Numpad({
   return (
     <div>
       <div
-        className={`mb-3 rounded-lg border-[1.5px] px-3 py-2 text-right ${
+        className={`mb-2 rounded-lg border-[1.5px] px-3 py-1.5 text-right ${
           hasChange ? 'border-brand-btn bg-brand-gold/30' : 'border-brand-line bg-brand-paper'
         }`}
       >
-        <div className="text-2xl font-extrabold tabular-nums">{fmtRp(value)}</div>
+        <div className="text-xl font-extrabold tabular-nums">{fmtRp(value)}</div>
         {total !== undefined && (
           <div
             className={`font-extrabold ${hasChange ? 'text-lg text-brand-btn' : 'text-xs text-brand-muted'}`}
@@ -46,28 +46,28 @@ export function Numpad({
           </div>
         )}
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-1.5">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((k) => (
-          <button key={k} type="button" className="btn-ghost !py-3 text-xl" onClick={() => push(k)}>
+          <button key={k} type="button" className="btn-ghost !py-2 text-lg" onClick={() => push(k)}>
             {k}
           </button>
         ))}
-        <button type="button" className="btn-ghost !py-3 text-sm font-extrabold" onClick={() => onChange(0)} aria-label="Bersihkan">
+        <button type="button" className="btn-ghost !py-2 text-sm font-extrabold" onClick={() => onChange(0)} aria-label="Bersihkan">
           C
         </button>
-        <button type="button" className="btn-ghost !py-3 text-xl" onClick={() => push('0')}>
+        <button type="button" className="btn-ghost !py-2 text-lg" onClick={() => push('0')}>
           0
         </button>
-        <button type="button" className="btn-ghost !py-3 text-xl" onClick={() => onChange(Math.floor(value / 10))} aria-label="Hapus satu angka">
+        <button type="button" className="btn-ghost !py-2 text-lg" onClick={() => onChange(Math.floor(value / 10))} aria-label="Hapus satu angka">
           ⌫
         </button>
         {quick.map((q) => (
-          <button key={q} type="button" className="btn-gold !py-3 text-sm" onClick={() => onChange(value + q)}>
+          <button key={q} type="button" className="btn-gold !py-2 text-xs" onClick={() => onChange(value + q)}>
             +{q / 1000}rb
           </button>
         ))}
         {total !== undefined && (
-          <button type="button" className="btn-gold !py-3 text-sm" onClick={() => onChange(total)}>
+          <button type="button" className="btn-gold !py-2 text-xs" onClick={() => onChange(total)}>
             Uang Pas
           </button>
         )}
@@ -75,7 +75,7 @@ export function Numpad({
       {onSubmit && (
         <button
           type="button"
-          className="btn-primary mt-3 w-full !py-3 text-base"
+          className="btn-primary mt-2 w-full !py-2.5 text-sm"
           disabled={total !== undefined && value < total}
           onClick={onSubmit}
         >

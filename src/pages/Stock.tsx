@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useState, type ReactElement } from 're
 import { useSearchParams } from 'react-router-dom'
 import { loadCatalog, createPurchase, opname, logWaste, type Catalog } from '../lib/db'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { useToast } from '../components/Toast'
 import { fmtQty, parseNum } from '../lib/money'
 
 type Tab = 'pembelian' | 'opname' | 'waste'
 
 export default function StockPage(): ReactElement {
+  const { toast } = useToast()
   const [searchParams] = useSearchParams()
   const [catalog, setCatalog] = useState<Catalog | null>(null)
   const [tab, setTab] = useState<Tab>(() => {
@@ -14,7 +16,6 @@ export default function StockPage(): ReactElement {
     return t === 'opname' || t === 'waste' ? t : 'pembelian'
   })
   const [err, setErr] = useState('')
-  const [msg, setMsg] = useState('')
 
   const reload = useCallback(async () => {
     try {
@@ -56,11 +57,10 @@ export default function StockPage(): ReactElement {
         </div>
       </div>
       {err && <ErrorSummary err={err} label="Pembelian/opname gagal" />}
-      {msg && <p role="status" className="mb-2 rounded-lg bg-brand-gold/25 px-3 py-2 text-sm font-bold">{msg}</p>}
 
-      {tab === 'pembelian' && <PurchaseForm catalog={catalog} reload={reload} setErr={setErr} setMsg={setMsg} />}
-      {tab === 'opname' && <OpnameForm catalog={catalog} reload={reload} setErr={setErr} setMsg={setMsg} />}
-      {tab === 'waste' && <WasteForm catalog={catalog} reload={reload} setErr={setErr} setMsg={setMsg} />}
+      {tab === 'pembelian' && <PurchaseForm catalog={catalog} reload={reload} setErr={setErr} toast={toast} />}
+      {tab === 'opname' && <OpnameForm catalog={catalog} reload={reload} setErr={setErr} toast={toast} />}
+      {tab === 'waste' && <WasteForm catalog={catalog} reload={reload} setErr={setErr} toast={toast} />}
     </div>
   )
 }
@@ -69,12 +69,12 @@ function PurchaseForm({
   catalog,
   reload,
   setErr,
-  setMsg
+  toast
 }: {
   catalog: Catalog
   reload: () => Promise<void>
   setErr: (s: string) => void
-  setMsg: (s: string) => void
+  toast: (s: string) => void
 }): ReactElement {
   const raws = useMemo(() => catalog.ingredients.filter((i) => i.kind === 'raw' && i.active), [catalog])
   const [lines, setLines] = useState<{ ingredient_id: number; packs: string; unit_cost: string }[]>([{ ingredient_id: raws[0]?.id ?? 0, packs: '', unit_cost: '' }])
@@ -174,7 +174,7 @@ function PurchaseForm({
             setLines([{ ingredient_id: raws[0]?.id ?? 0, packs: '', unit_cost: '' }])
             setNote('')
             await reload()
-            setMsg('Pembelian tercatat, stok & harga bahan diperbarui.')
+            toast('Pembelian tercatat, stok & harga bahan diperbarui.')
           } catch (ex) {
             setErr((ex as Error).message)
           }
@@ -190,12 +190,12 @@ function OpnameForm({
   catalog,
   reload,
   setErr,
-  setMsg
+  toast
 }: {
   catalog: Catalog
   reload: () => Promise<void>
   setErr: (s: string) => void
-  setMsg: (s: string) => void
+  toast: (s: string) => void
 }): ReactElement {
   const [ingId, setIngId] = useState(catalog.ingredients[0]?.id ?? 0)
   const [qty, setQty] = useState('')
@@ -229,7 +229,7 @@ function OpnameForm({
             await opname(ingId, parseNum(qty))
             setQty('')
             await reload()
-            setMsg('Stok disesuaikan.')
+            toast('Stok disesuaikan.')
           } catch (ex) {
             setErr((ex as Error).message)
           }
@@ -245,12 +245,12 @@ function WasteForm({
   catalog,
   reload,
   setErr,
-  setMsg
+  toast
 }: {
   catalog: Catalog
   reload: () => Promise<void>
   setErr: (s: string) => void
-  setMsg: (s: string) => void
+  toast: (s: string) => void
 }): ReactElement {
   const [mode, setMode] = useState<'bahan' | 'produk'>('bahan')
   const [ingId, setIngId] = useState(catalog.ingredients[0]?.id ?? 0)
@@ -324,7 +324,7 @@ function WasteForm({
             setQty('')
             setNote('')
             await reload()
-            setMsg('Waste tercatat.')
+            toast('Waste tercatat.')
           } catch (ex) {
             setErr((ex as Error).message)
           }
