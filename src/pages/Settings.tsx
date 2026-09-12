@@ -496,6 +496,24 @@ function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; on
   const [busy, setBusy] = useState(false)
   const [reachable, setReachable] = useState<boolean | null>(null)
 
+  const pick = async (mode: 'strict' | 'all'): Promise<void> => {
+    if (!bluetoothAvailable()) {
+      setErr('Browser ini tidak mendukung Web Bluetooth. Pakai Chrome/Edge (Android, Windows, macOS), atau pakai aplikasi RawBT (panduan di bawah).')
+      return
+    }
+    setBusy(true)
+    setErr('')
+    try {
+      const saved = await pickAndSavePrinter(mode)
+      setPrinter(saved)
+      toast(mode === 'all' ? 'Perangkat tersimpan — kalau bukan printernya, tekan Ganti Printer.' : 'Printer tersimpan.')
+    } catch (ex) {
+      setErr((ex as Error).message || 'Gagal memilih printer')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const test = '*** TES CETAK ***\nSabana Drieischicken\nPrinter Bluetooth OK\n\n\n'
 
   // Cek sambungan nyata ke printer tersimpan saat tab dibuka (tanpa dialog pair).
@@ -516,14 +534,14 @@ function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; on
       <h2 className="mb-2 font-extrabold">Printer Struk Bluetooth</h2>
       <p className="mb-3 text-sm text-brand-muted">
         Sambungkan printer thermal sekali lewat Chrome/Edge (Android, Windows, macOS) — printer tersimpan dan dipakai ulang otomatis tanpa dialog lagi.
-        Safari/iOS belum mendukung Bluetooth; pindai struk otomatis jatuh ke print dialog.
+        Safari/iOS belum mendukung Bluetooth; struk otomatis jatuh ke print dialog. Bluetooth membandel? Lihat panduan <b>RawBT</b> di bawah.
       </p>
       <div className="mb-3 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3">
         {printer ? (
           <div className="flex items-center justify-between gap-2">
             <div>
               <p className="text-sm font-extrabold">{printer.name}</p>
-              <p className="text-xs text-brand-muted">{reachable === false ? 'Tidak terjangkau saat ini, nyalakan printer lalu tes cetak' : 'Tersimpan dan siap dipakai di kasir'}</p>
+              <p className="text-xs text-brand-muted">{reachable === false ? 'Cek otomatis tak tersedia di browser ini — jalankan Tes Cetak untuk memastikan printer siap' : 'Tersambung — jalankan Tes Cetak untuk memastikan struk bisa terkirim'}</p>
             </div>
             <span className={`chip ${reachable === false ? 'bg-brand-gold' : 'bg-brand-gold/30'}`}>{reachable === false ? 'Cek printer' : 'Tersambung'}</span>
           </div>
@@ -539,25 +557,17 @@ function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; on
           type="button"
           className="btn-primary"
           disabled={busy}
-          onClick={async () => {
-            if (!bluetoothAvailable()) {
-              setErr('Browser ini tidak mendukung Web Bluetooth. Pakai Chrome/Edge (Android, Windows, macOS).')
-              return
-            }
-            setBusy(true)
-            setErr('')
-            try {
-              const saved = await pickAndSavePrinter()
-              setPrinter(saved)
-              toast('Printer tersimpan.')
-            } catch (ex) {
-              setErr((ex as Error).message || 'Gagal memilih printer')
-            } finally {
-              setBusy(false)
-            }
-          }}
+          onClick={() => void pick('strict')}
         >
           {busy ? 'Menyambung...' : printer ? 'Ganti Printer' : 'Pilih & Sambungkan Printer'}
+        </button>
+        <button
+          type="button"
+          className="btn-ghost"
+          disabled={busy}
+          onClick={() => void pick('all')}
+        >
+          Printer tidak muncul di daftar? Cari semua perangkat Bluetooth
         </button>
         <div className="flex gap-2">
           <button
@@ -572,7 +582,9 @@ function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; on
                 if (how === 'bt') {
                   toast('Halaman tes terkirim ke printer.')
                 } else if (how === 'reconnect-gagal') {
-                  toast('Printer tidak terjangkau. Nyalakan printer / pastikan dalam jangkauan, lalu coba lagi. Tidak perlu pair ulang.')
+                  toast('Gagal sambung: printer mati/di luar jangkauan, atau dialog pair ditutup. Di Chrome stabil, dialog pair muncul sekali per sesi — ketuk printer yang sama. Tanpa dialog total: pakai RawBT.')
+                } else if (how === 'print-gagal') {
+                  toast('Printer tersambung, tapi tes gagal terkirim. Coba sekali lagi — kalau tetap gagal, printer mungkin bukan ESC/POS: pakai RawBT atau Dialog printer.')
                 } else {
                   toast('Bluetooth gagal — tes dikirim ke print dialog.')
                 }
@@ -603,6 +615,20 @@ function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; on
           Print otomatis setiap transaksi selesai
         </label>
       </div>
+      <details className="mt-3 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3 text-sm">
+        <summary className="cursor-pointer font-extrabold">Printer bandel? 3 cara alternatif</summary>
+        <ol className="mt-2 list-decimal space-y-2 pl-5">
+          <li>
+            <b>RawBT (paling andal, gratis)</b> — aplikasi Android yang menjadikan printer Bluetooth sebagai printer sistem. Pasang dari Play Store → buka RawBT → pilih printernya → izinkan lokasi &amp; selesaikan pairing di pengaturan Android → kembali ke sini, tombol cetak &amp; print otomatis langsung jalan.
+          </li>
+          <li>
+            <b>Printer tidak muncul saat pairing?</b> Pakai tombol <b>“Cari semua perangkat Bluetooth”</b> di atas — sebagian printer memakai nama/UUID tidak standar sehingga lolos dari filter. Kalau tersimpan tapi tetap gagal, tekan <b>Ganti Printer</b> lalu pilih ulang.
+          </li>
+          <li>
+            <b>Kabel USB / printer sistem</b> — pasang printer sebagai printer sistem (USB di Windows/Mac, atau pair Bluetooth lewat pengaturan OS), lalu di modal Lunas gunakan <b>Cetak (dialog)</b> dan pilih printer tersebut.
+          </li>
+        </ol>
+      </details>
     </div>
   )
 }

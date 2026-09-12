@@ -183,8 +183,13 @@ export default function Cashier(): ReactElement {
         printHtmlFallback(html)
         return
       }
-      // printer tersimpan tapi tidak terjangkau: jangan buka dialog pair, cukup arahkan
-      setErr('Printer Bluetooth tidak terjangkau. Nyalakan printer, lalu coba lagi atau buka Pengaturan → Printer.')
+      if (how === 'print-gagal') {
+        // printer TERsambung tapi data gagal terkirim — pesan jujur per tahap
+        setErr('Printer tersambung, tetapi struk gagal terkirim. Coba lagi sekali — kalau tetap gagal, kertas/kapasitas printer perlu dicek, atau pakai Dialog printer.')
+        return
+      }
+      // printer tak terjangkau / dialog pair ditutup / ditolak tanpa gesture
+      setErr('Printer Bluetooth tidak terjangkau (atau dialog pair ditutup). Nyalakan printer lalu ketuk Cetak lagi — atau pakai Dialog printer / RawBT (Pengaturan → Printer).')
     } else {
       printHtmlFallback(html)
     }
@@ -231,7 +236,9 @@ export default function Cashier(): ReactElement {
       if (settings?.printer.auto_print) {
         void printTextBluetooth(receiptText(tx)).then((how) => {
           if (how === 'reconnect-gagal') {
-            setErr('Print otomatis gagal: printer Bluetooth tidak terjangkau. Transaksi tetap tersimpan.')
+            setErr('Print otomatis gagal (dialog pair butuh ketukan — normal di Chrome stabil). Transaksi tetap tersimpan — tekan Cetak untuk buka dialog, atau pakai Dialog/RawBT.')
+          } else if (how === 'print-gagal') {
+            setErr('Print otomatis gagal: printer tersambung tapi struk gagal terkirim. Transaksi tetap tersimpan — tekan Cetak untuk coba lagi.')
           }
         })
       }
@@ -520,6 +527,9 @@ export default function Cashier(): ReactElement {
                   <div className="flex gap-2">
                     <button type="button" className="btn-ghost flex-1" onClick={() => void doPrint('bt')}>
                       Cetak{bluetoothAvailable() ? '' : ' (dialog)'}
+                    </button>
+                    <button type="button" className="btn-ghost flex-1" onClick={() => doPrint('dialog')} title="Kirim struk ke dialog cetak sistem — dipakai juga bila printer dipasang sebagai printer sistem / RawBT">
+                      Dialog
                     </button>
                     <button type="button" className="btn-ghost flex-1" onClick={() => void shareReceipt()}>
                       Bagikan
