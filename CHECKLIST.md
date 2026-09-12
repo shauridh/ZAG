@@ -39,10 +39,31 @@ Checklist operasional & teknis seluruh aplikasi. Centang yang sudah, sisakan yan
 - [ ] Buka URL produksi di Chrome/Edge → login kasir/admin
 - [ ] **Tambahkan ke layar utama** (install PWA) agar full-screen & offline-ready
 - [ ] Pengaturan → **Tablet & Layar**: Keep Awake ON, Fullscreen ON, pilih **Ukuran kartu** (Normal/Besar)
-- [ ] Pengaturan → **Printer**: pilih printer Bluetooth, tes cetak struk
+- [ ] Pengaturan → **Printer**: pilih printer Bluetooth, tes cetak struk *(kalau printer bandel → ikuti §2b RawBT)*
 - [ ] Pengaturan → **Halaman QRIS**: upload gambar QRIS asli (wajib sebelum pesanan portal bisa dibayar)
 - [ ] Coba 1 transaksi penuh + cetak struk thermal nyata
 - [ ] Pengaturan → **Toko & Operasional**: nama toko, alamat, telp, footer struk, float kembalian
+
+### 2b. Cetak Struk via RawBT (jalur andal — pakai ini kalau Web Bluetooth gagal)
+
+Kapan dipakai:
+- Printer **tersambung tapi kertas tidak keluar** (gejala khas karakteristik salah / firmware non-standar)
+- Dialog pair muncul **setiap sesi browser** dan mengganggu
+- Ingin cetak **tanpa dialog sama sekali** — RawBT menjadi printer sistem Android
+
+Setup (±5 menit, sekali per HP kasir):
+1. Install **RawBT** dari Play Store (gratis).
+2. Nyalakan printer; pastikan Bluetooth HP aktif.
+3. Buka RawBT → pilih perangkat → pilih printer → selesaikan pairing bila diminta (PIN umum: `0000` atau `1234`).
+4. Beri izin **Lokasi** bila Android memintanya (kebutuhan pemindaian Bluetooth).
+5. Tes cetak dari dalam RawBT → kertas keluar = RawBT siap.
+6. (Disarankan) Jadikan layanan cetak bawaan: Android **Pengaturan → Aplikasi → Aplikasi default → Aplikasi pencetakan → RawBT** (nama menu beda-beda antar merek HP).
+7. Di aplikasi kasir: transaksi → panel Lunas → ketuk **Dialog** → pilih **RawBT** → struk tercetak lewat printer sistem, tanpa Web Bluetooth.
+
+Catatan operasional:
+- Jalur ini **tidak tersentuh** batasan browser: tidak ada dialog per sesi, tidak butuh ketukan, tetap jalan walau PWA dibuka standalone.
+- Kalau RawBT punya opsi auto-start/default printer, aktifkan supaya kasir tidak perlu buka RawBT lagi.
+- Kalau RawBT **juga** gagal mencetak (kertas tetap diam): masalahnya di printer/thermaltanya/kertas — tes dengan aplikasi resmi vendor printer sebelum menyalahkan aplikasi kasir.
 
 ---
 
@@ -145,5 +166,6 @@ Checklist operasional & teknis seluruh aplikasi. Centang yang sudah, sisakan yan
 | Typecheck & 53/53 unit test | ✅ |
 | Migrasi 0006 dijalankan di Supabase produksi | ✅ (owner) |
 | Refund/hapus di **produksi** pasca-0006 | ⬜ uji 1x di live |
-| Printer thermal fisik (Bluetooth) | ⬜ uji di HP kasir |
+| Printer thermal fisik (Bluetooth) | ⬜ uji di HP kasir — Web Bluetooth dulu, kalau gagal jalur **RawBT §2b** |
+| RawBT di HP kasir terpasang & teruji | ⬜ (cadangan andal) |
 | QRIS asli terupload di produksi | ⬜ |
