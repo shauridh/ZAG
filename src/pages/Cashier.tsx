@@ -7,7 +7,7 @@ import { Numpad } from '../components/Numpad'
 import { Modal } from '../components/Modal'
 import { beepRegister, startOrderAlert, stopOrderAlert, vibrateSuccess } from '../lib/sound'
 import { buildReceiptHtml, buildReceiptText, receiptFromTx, CHANNEL_LABEL } from '../lib/escpos'
-import { bluetoothAvailable, printTextBluetooth, printHtmlFallback } from '../lib/bluetooth-printer'
+import { printTextBluetooth, printHtmlFallback, openRawBtReceipt } from '../lib/bluetooth-printer'
 
 interface CartLine {
   product_id: number
@@ -176,6 +176,11 @@ export default function Cashier(): ReactElement {
   const doPrint = async (mode: 'bt' | 'dialog'): Promise<void> => {
     if (!done || !settings) return
     const html = buildReceiptHtml(receiptFromTx(settings, done.tx, done.tx.items, done.tx.payments, ''), settings.receipt.width_mm)
+    // Mode RawBT: semua cetakan lewat dialog printer sistem (RawBT) — tanpa Web Bluetooth
+    if ((settings.printer.mode ?? 'bt') === 'rawbt') {
+      if (!openRawBtReceipt(html)) setErr('Popup terblokir browser. Izinkan popup untuk situs ini lalu ketuk Cetak lagi.')
+      return
+    }
     if (mode === 'bt') {
       const how = await printTextBluetooth(receiptText(done.tx))
       if (how === 'bt') return
@@ -233,7 +238,7 @@ export default function Cashier(): ReactElement {
       void reload()
       // print otomatis bila diaktifkan di Pengaturan; gagal sambung tidak
       // menghentikan kasir dan tidak memunculkan dialog pair mendadak
-      if (settings?.printer.auto_print) {
+      if (settings?.printer.auto_print && (settings.printer.mode ?? 'bt') === 'bt') {
         void printTextBluetooth(receiptText(tx)).then((how) => {
           if (how === 'reconnect-gagal') {
             setErr('Print otomatis gagal (dialog pair butuh ketukan — normal di Chrome stabil). Transaksi tetap tersimpan — tekan Cetak untuk buka dialog, atau pakai Dialog/RawBT.')
@@ -525,10 +530,15 @@ export default function Cashier(): ReactElement {
                     </div>
                   )}
                   <div className="flex gap-2">
-                    <button type="button" className="btn-ghost flex-1" onClick={() => void doPrint('bt')}>
-                      Cetak{bluetoothAvailable() ? '' : ' (dialog)'}
+                    <button
+                      type="button"
+                      className="btn-ghost flex-1"
+                      onClick={() => void doPrint('bt')}
+                      title={(settings.printer.mode ?? 'bt') === 'rawbt' ? 'Buka pratinjau cetak — satu ketuk CETAK, pilih RawBT' : 'Kirim struk ke printer Bluetooth tersimpan'}
+                    >
+                      {(settings.printer.mode ?? 'bt') === 'rawbt' ? 'Cetak (RawBT)' : 'Cetak'}
                     </button>
-                    <button type="button" className="btn-ghost flex-1" onClick={() => doPrint('dialog')} title="Kirim struk ke dialog cetak sistem — dipakai juga bila printer dipasang sebagai printer sistem / RawBT">
+                    <button type="button" className="btn-ghost flex-1" onClick={() => doPrint('dialog')} title="Kirim struk ke dialog cetak sistem">
                       Dialog
                     </button>
                     <button type="button" className="btn-ghost flex-1" onClick={() => void shareReceipt()}>
@@ -539,7 +549,7 @@ export default function Cashier(): ReactElement {
                     Transaksi Baru
                   </button>
                   <p className="text-center text-xs text-brand-muted">
-                    Print otomatis {settings.printer.auto_print ? 'aktif' : 'nonaktif'} — atur di Pengaturan → Printer
+                    Mode cetak {(settings.printer.mode ?? 'bt') === 'rawbt' ? 'RawBT — satu ketuk CETAK di jendela struk' : 'Bluetooth langsung'} · Print otomatis {settings.printer.auto_print ? 'aktif' : 'nonaktif'} · atur di Pengaturan → Printer
                   </p>
                 </div>
               ) : (

@@ -326,6 +326,33 @@ export function printHtmlFallback(html: string): void {
   win.document.close()
 }
 
+/**
+ * Mode RawBT: buka jendela struk dengan tombol "CETAK" — satu ketukan
+ * memicu print dialog sistem (RawBT terdaftar sebagai printer sistem).
+ * window.print() otomatis tanpa gerakan user sering diblokir Chrome,
+ * jadi ketukan kecil ini jalur paling pasti; RawBT lalu mencetak diam-diam.
+ * Return false bila popup diblokir browser.
+ */
+export function openRawBtReceipt(html: string): boolean {
+  const win = window.open('', '_blank', 'width=320,height=600')
+  if (!win) return false
+  win.document.write(
+    `<html><head><title>Struk — ketuk CETAK</title><style>` +
+      `body{margin:0;font-family:sans-serif;background:#f5f0e8}` +
+      `.btn{position:sticky;top:0;display:block;width:100%;padding:16px;border:0;background:#1a7f4b;color:#fff;font-size:18px;font-weight:800}` +
+      `.hint{padding:10px;text-align:center;font-size:12px;color:#666}` +
+      `@media print{.btn,.hint{display:none}body{background:#fff}}@page{margin:3mm}` +
+      `</style></head><body>` +
+      `<button class="btn" onclick="window.print()">🖨️ CETAK STRUK</button>` +
+      `<p class="hint">Pilih printer <b>RawBT</b> bila dialog bertanya. Jendela ini boleh ditutup setelah kertas keluar.</p>` +
+      html +
+      `<script>document.querySelector('.btn').addEventListener('click',function(){window.print()})<\\/script>` +
+      `</body></html>`
+  )
+  win.document.close()
+  return true
+}
+
 export interface DiagStep {
   step: string
   ok: boolean

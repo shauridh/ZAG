@@ -115,7 +115,7 @@ function defaultDemo(): DemoData {
       qris: { image: '' },
       portal: { secret: 'demo', outlet_note: 'Pesanan diproses setelah kasir mengonfirmasi.', delivery_enabled: true, delivery_schedule: null },
       owner_email: { email: '', whatsapp: '' },
-      printer: { auto_print: false },
+      printer: { auto_print: false, mode: 'bt' },
       tablet: { keep_awake: true, fullscreen: false, card_size: 'besar' },
       owner_pin_set: false,
       owner_pin_hash: undefined,

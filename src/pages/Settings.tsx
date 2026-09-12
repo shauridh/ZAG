@@ -275,7 +275,15 @@ export default function SettingsPage(): ReactElement {
 
       {tab === 'struk' && <ReceiptForm settings={settings} onSave={(v) => void upd('receipt', v)} />}
 
-      {tab === 'printer' && <PrinterTab autoPrint={settings.printer.auto_print} onAutoPrint={(v) => void upd('printer', { auto_print: v })} setErr={setErr} />}
+      {tab === 'printer' && (
+        <PrinterTab
+          autoPrint={settings.printer.auto_print}
+          onAutoPrint={(v) => void upd('printer', { auto_print: v })}
+          mode={settings.printer.mode ?? 'bt'}
+          onMode={(m) => void upd('printer', { mode: m })}
+          setErr={setErr}
+        />
+      )}
 
       {tab === 'qris' && (
         <div className="card max-w-xl p-4">
@@ -489,8 +497,8 @@ function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: 
   )
 }
 
-/** Pengaturan printer thermal Bluetooth: pilih, tes cetak, lupa, auto-print. */
-function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; onAutoPrint: (v: boolean) => void; setErr: (s: string) => void }): ReactElement {
+/** Pengaturan printer thermal Bluetooth: mode cetak, pilih, tes cetak, lupa, auto-print. */
+function PrinterTab({ autoPrint, onAutoPrint, mode, onMode, setErr }: { autoPrint: boolean; onAutoPrint: (v: boolean) => void; mode: 'bt' | 'rawbt'; onMode: (m: 'bt' | 'rawbt') => void; setErr: (s: string) => void }): ReactElement {
   const { toast } = useToast()
   const [printer, setPrinter] = useState<SavedPrinter | null>(getSavedPrinter())
   const [busy, setBusy] = useState(false)
@@ -547,6 +555,24 @@ function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; on
   return (
     <div className="card max-w-xl p-4">
       <h2 className="mb-2 font-extrabold">Printer Struk Bluetooth</h2>
+      <div className="mb-3 grid gap-2 sm:grid-cols-2">
+        <button
+          type="button"
+          className={`card p-3 text-left ${mode === 'bt' ? 'ring-2 ring-brand-btn' : 'opacity-75'}`}
+          onClick={() => onMode('bt')}
+        >
+          <p className="text-sm font-extrabold">Web Bluetooth (langsung)</p>
+          <p className="text-xs text-brand-muted">App mengirim struk sendiri ke printer. Dialog pair bisa muncul sekali per sesi — keterbatasan Chrome.</p>
+        </button>
+        <button
+          type="button"
+          className={`card p-3 text-left ${mode === 'rawbt' ? 'ring-2 ring-brand-btn' : 'opacity-75'}`}
+          onClick={() => onMode('rawbt')}
+        >
+          <p className="text-sm font-extrabold">RawBT (printer sistem) ★</p>
+          <p className="text-xs text-brand-muted">Paling andal: tanpa dialog Web Bluetooth sama sekali. Pasang RawBT dulu (panduan di bawah), struk dikirim ke dialog printer Android.</p>
+        </button>
+      </div>
       <p className="mb-3 text-sm text-brand-muted">
         Sambungkan printer thermal sekali lewat Chrome/Edge (Android, Windows, macOS) — printer tersimpan dan dipakai ulang otomatis tanpa dialog lagi.
         Safari/iOS belum mendukung Bluetooth; struk otomatis jatuh ke print dialog. Bluetooth membandel? Lihat panduan <b>RawBT</b> di bawah.

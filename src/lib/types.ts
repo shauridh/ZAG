@@ -130,7 +130,8 @@ export interface Settings {
   qris: { image: string }
   portal: { secret: string; outlet_note: string; delivery_enabled: boolean; delivery_schedule?: DeliveryWeek | null }
   owner_email: { email: string; whatsapp: string }
-  printer: { auto_print: boolean }
+  /** Mode cetak: 'bt' Web Bluetooth langsung, 'rawbt' lewat dialog printer sistem (RawBT). */
+  printer: { auto_print: boolean; mode?: 'bt' | 'rawbt' }
   tablet: { keep_awake: boolean; fullscreen: boolean; card_size?: 'normal' | 'besar' }
   fixed_costs: { name: string; amount: number }[]
   /** Kategori pengeluaran dikelola owner di menu Keuangan (bukan tabel terpisah). */
