@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { loadCatalog, loadSettings, createTx, currentShift, openShift, subscribeOrders, type Catalog, type TxResult } from '../lib/db'
-import { maxAvailableQty } from '../lib/hpp'
+import { ingIndex, maxAvailableQty } from '../lib/hpp'
 import { fmtRp, fmtRpPlain } from '../lib/money'
-import type { OrderType, Payment, Settings, Shift } from '../lib/types'
+import type { OrderType, Payment, Product, Settings, Shift } from '../lib/types'
 import { Numpad } from '../components/Numpad'
 import { Modal } from '../components/Modal'
 import { beepRegister, startOrderAlert, stopOrderAlert, vibrateSuccess } from '../lib/sound'
@@ -36,6 +36,7 @@ export default function Cashier(): ReactElement {
   const [openingShift, setOpeningShift] = useState(false)
   const [cat, setCat] = useState<number | 'all'>('all')
   const [q, setQ] = useState('')
+  const [hideSoldOut, setHideSoldOut] = useState(false)
   const [cart, setCart] = useState<CartLine[]>([])
   const [orderType, setOrderType] = useState<OrderType>('dinein')
   const [discount, setDiscount] = useState(0)
@@ -77,17 +78,7 @@ export default function Cashier(): ReactElement {
 
   const online = ORDER_TYPES.find((o) => o.key === orderType)?.online ?? false
 
-  const ingById = useMemo(() => new Map((catalog?.ingredients ?? []).map((i) => [i.id, i])), [catalog])
-
-  const products = useMemo(() => {
-    if (!catalog) return []
-    return catalog.products.filter(
-      (p) =>
-        p.is_active &&
-        (cat === 'all' || p.category_id === cat) &&
-        (q.trim() === '' || p.name.toLowerCase().includes(q.trim().toLowerCase()))
-    )
-  }, [catalog, cat, q])
+  const ingById = useMemo(() => ingIndex(catalog?.ingredients ?? []), [catalog])
 
   const maxOf = useCallback(
     (productId: number): number => {
@@ -96,6 +87,26 @@ export default function Cashier(): ReactElement {
     },
     [catalog, ingById]
   )
+
+  // Katalog dipartisi: yang siap jual selalu di depan, habis di ekor.
+  // Kasir scan yang ready dulu; item habis tetap ada utk menjawab pelanggan.
+  const { ready, soldOut } = useMemo(() => {
+    const readyL: Product[] = []
+    const soldOutL: Product[] = []
+    for (const p of catalog?.products ?? []) {
+      if (
+        !p.is_active ||
+        (cat !== 'all' && p.category_id !== cat) ||
+        (q.trim() !== '' && !p.name.toLowerCase().includes(q.trim().toLowerCase()))
+      )
+        continue
+      ;(maxOf(p.id) > 0 ? readyL : soldOutL).push(p)
+    }
+    return { ready: readyL, soldOut: soldOutL }
+  }, [catalog, cat, q, maxOf])
+  const products = hideSoldOut ? ready : [...ready, ...soldOut]
+  const totalMenu = ready.length + soldOut.length
+  const readyPct = totalMenu === 0 ? 0 : Math.round((ready.length / totalMenu) * 100)
 
   const addToCart = (p: { id: number; name: string; price: number }): void => {
     const max = maxOf(p.id)
@@ -261,12 +272,33 @@ export default function Cashier(): ReactElement {
       <section className="flex min-h-[300px] flex-1 flex-col p-3 lg:min-h-0 lg:p-4">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <input
-            className="input max-w-56 flex-1"
+            className="input min-w-40 max-w-56 flex-1"
             placeholder="Cari menu..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
             aria-label="Cari menu"
           />
+          {/* Tanda tangan: bar ketersediaan ala nota — kebenaran stok adalah kebenaran menu kasir */}
+          <div
+            className="flex min-w-36 items-center gap-2"
+            title={`${ready.length} dari ${totalMenu} menu siap dijual`}
+          >
+            <div className="flex h-2.5 flex-1 overflow-hidden rounded border border-brand-line bg-brand-card" role="img" aria-label={`${ready.length} dari ${totalMenu} menu siap dijual`}>
+              <div className="h-full bg-brand-btn" style={{ width: `${readyPct}%` }} />
+            </div>
+            <span className="text-[11px] font-extrabold tabular-nums text-brand-muted">
+              {ready.length}/{totalMenu} siap
+            </span>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={hideSoldOut}
+            onClick={() => setHideSoldOut(!hideSoldOut)}
+            className={`chip h-9 px-3 ${hideSoldOut ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+          >
+            {hideSoldOut ? 'Tampilkan habis' : 'Sembunyikan habis'}
+          </button>
           {newOrders && (
             <button
               type="button"
@@ -286,7 +318,7 @@ export default function Cashier(): ReactElement {
             </button>
           )}
         </div>
-        <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1" role="tablist" aria-label="Kategori">
+        <div className="no-scrollbar mb-3 flex gap-1.5 overflow-x-auto pb-1" role="tablist" aria-label="Kategori">
           <button
             type="button"
             role="tab"
@@ -311,32 +343,59 @@ export default function Cashier(): ReactElement {
         </div>
         <div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-2 overflow-y-auto sm:grid-cols-3 xl:grid-cols-4">
           {products.map((p) => {
+            const habis = maxOf(p.id) <= 0
             const tag = chipOf(p)
+            // preferensi ukuran kartu dari Pengaturan → Tablet & Layar (default besar)
+            const besar = (settings?.tablet?.card_size ?? 'besar') === 'besar'
             return (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => addToCart(p)}
-                disabled={tag === 'Habis'}
-                className={`card relative flex min-h-[92px] flex-col overflow-hidden p-0 text-left ${tag === 'Habis' ? 'opacity-50' : 'hover:border-brand-btn'}`}
+                disabled={habis}
+                title={p.name}
+                className={`card relative flex flex-col overflow-hidden p-0 text-left ${habis ? 'opacity-50' : 'hover:border-brand-btn'} ${besar ? 'min-h-[220px]' : 'min-h-[150px]'}`}
               >
+                {/* slot foto tinggi tetap: kartu dengan/tanpa foto selalu sama tinggi; contain agar foto tidak terpotong */}
                 {p.photo ? (
-                  <img src={p.photo} alt={p.name} className="h-20 w-full border-b-[1.5px] border-brand-line object-cover" loading="lazy" />
+                  <img
+                    src={p.photo}
+                    alt={p.name}
+                    className={`${besar ? 'h-[110px]' : 'h-[64px]'} w-full shrink-0 border-b-[1.5px] border-brand-line object-contain`}
+                    style={{ background: 'linear-gradient(135deg,#F6E7D8,#EFD9C4)' }}
+                    loading="lazy"
+                  />
                 ) : (
-                  <div className="h-20 w-full border-b-[1.5px] border-brand-line bg-brand-paper" aria-hidden />
+                  <div
+                    className={`${besar ? 'h-[110px]' : 'h-[64px]'} w-full shrink-0 border-b-[1.5px] border-brand-line`}
+                    style={{ background: 'linear-gradient(135deg,#F6E7D8,#EFD9C4)' }}
+                    aria-hidden
+                  />
                 )}
-                {/* chip stok menempel di pojok foto: mata kasir memindai gambar dulu */}
+                {/* chip stok menempel di pojok foto: status habis/sisa terlihat sekali lirik */}
                 {tag && (
                   <span className={`chip absolute right-1.5 top-1.5 ${tag === 'Habis' ? 'bg-brand-redtext text-white' : 'bg-brand-gold'}`}>{tag}</span>
                 )}
-                <span className="flex min-h-0 flex-1 flex-col justify-between gap-1 p-2.5">
-                  <span className="line-clamp-2 text-sm font-bold leading-snug">{p.name}</span>
-                  <span className="text-base font-extrabold">{fmtRp(p.price)}</span>
+                {/* nama & harga satu grup di tengah: tanpa celah kosong di antara keduanya */}
+                <span className="flex flex-1 flex-col items-start justify-center gap-0.5 p-2.5">
+                  <span className="line-clamp-2 text-base font-extrabold leading-snug">{p.name}</span>
+                  <span className="text-base font-extrabold tabular-nums">{fmtRp(p.price)}</span>
                 </span>
               </button>
             )
           })}
-          {products.length === 0 && <p className="col-span-full py-8 text-center text-sm text-brand-muted">Tidak ada menu yang cocok.</p>}
+          {products.length === 0 && (
+            <div className="col-span-full py-8 text-center">
+              <p className="text-sm font-bold text-brand-muted">
+                {hideSoldOut && soldOut.length > 0 && ready.length === 0
+                  ? 'Semua menu di filter ini sedang habis.'
+                  : 'Tidak ada menu yang cocok.'}
+              </p>
+              <button type="button" className="btn-ghost !min-h-0 mt-2 !py-1.5 text-xs" onClick={() => { setQ(''); setCat('all'); setHideSoldOut(false) }}>
+                Reset pencarian
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -344,7 +403,7 @@ export default function Cashier(): ReactElement {
       <aside className="flex w-full shrink-0 flex-col border-t-[1.5px] border-brand-line bg-brand-card lg:w-[340px] lg:border-l-[1.5px] lg:border-t-0 xl:w-[380px]">
         <div className="strip px-4 pb-2 pt-3">
           <h2 className="font-extrabold">Pesanan Baru</h2>
-          <div className="mt-2 flex flex-wrap gap-1" role="radiogroup" aria-label="Jenis pesanan">
+          <div className="no-scrollbar mt-2 flex flex-wrap gap-1" role="radiogroup" aria-label="Jenis pesanan">
             {ORDER_TYPES.map((o) => (
               <button
                 key={o.key}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { loadCatalog, loadTransactions, upsertIngredient, saveIngredientRecipe, type Catalog } from '../lib/db'
-import { preparedCost } from '../lib/hpp'
+import { ingIndex, preparedCost } from '../lib/hpp'
 import { buyPlanFromSales, buyPlanToText, dailySalesOf, type BuyPlan } from '../lib/forecast'
 import { fmtRp, fmtRpPlain, fmtQty, parseNum } from '../lib/money'
 import type { Ingredient, IngredientRecipe } from '../lib/types'
@@ -30,7 +30,7 @@ export default function Ingredients(): ReactElement {
     void reload()
   }, [reload])
 
-  const ingById = useMemo(() => new Map((catalog?.ingredients ?? []).map((i) => [i.id, i])), [catalog])
+  const ingById = useMemo(() => ingIndex(catalog?.ingredients ?? []), [catalog])
 
   if (!catalog) return <div className="p-6 text-sm font-bold text-brand-muted">Memuat...</div>
 
@@ -289,7 +289,7 @@ function BuyInsight({ catalog, setErr }: { catalog: Catalog; setErr: (s: string)
         const txs = await loadTransactions(from.toISOString(), to.toISOString())
         const names = new Map(catalog.products.map((p) => [p.id, p.name]))
         const daily = dailySalesOf(txs, catalog.products.map((p) => p.id), names)
-        setPlan(buyPlanFromSales(daily, d, hist, catalog.ingredients, catalog.recipeByProduct as never, catalog.ingRecipes as never))
+        setPlan(buyPlanFromSales(daily, d, hist, catalog.ingredients, catalog.recipeByProduct, catalog.ingRecipes))
       } catch (ex) {
         setErr((ex as Error).message)
       } finally {
@@ -442,7 +442,7 @@ function IngRecipeEditor({
 }): ReactElement {
   const existing = catalog.ingRecipes.get(ingredient.id) ?? []
   const [lines, setLines] = useState<IngredientRecipe[]>(existing.map((r) => ({ ...r })))
-  const ingById = useMemo(() => new Map(catalog.ingredients.map((i) => [i.id, i])), [catalog])
+  const ingById = useMemo(() => ingIndex(catalog.ingredients), [catalog])
 
   const rawTotal = useMemo(() => {
     let total = 0

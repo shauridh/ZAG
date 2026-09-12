@@ -128,7 +128,7 @@ export interface Settings {
   portal: { secret: string; outlet_note: string; delivery_enabled: boolean; delivery_schedule?: DeliveryWeek | null }
   owner_email: { email: string; whatsapp: string }
   printer: { auto_print: boolean }
-  tablet: { keep_awake: boolean; fullscreen: boolean }
+  tablet: { keep_awake: boolean; fullscreen: boolean; card_size?: 'normal' | 'besar' }
   fixed_costs: { name: string; amount: number }[]
 }
 

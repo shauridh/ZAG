@@ -22,7 +22,7 @@ export function OfflineIndicator({ className = '' }: { className?: string }): Re
   if (online && pending === 0) {
     return (
       <span className={`chip bg-brand-paper text-[11px] font-bold text-brand-muted ${className}`} role="status" title="Tersambung ke server">
-        <span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-500" />
+        <span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full bg-brand-ink" />
         Online
       </span>
     )
@@ -43,7 +43,7 @@ export function OfflineIndicator({ className = '' }: { className?: string }): Re
       disabled={syncing}
       title={online ? 'Kirim transaksi tertahan ke server sekarang' : 'Jualan tetap jalan — transaksi terkirim otomatis saat online kembali'}
     >
-      <span aria-hidden className={`mr-1 inline-block h-2 w-2 rounded-full ${online ? 'bg-emerald-500' : 'bg-brand-redtext'}`} />
+      <span aria-hidden className={`mr-1 inline-block h-2 w-2 rounded-full ${online ? 'bg-brand-ink' : 'bg-brand-redtext'}`} />
       {online ? (syncing ? 'Sinkron...' : `${pending} antre — kirim`) : `Offline${pending ? ` — ${pending} antre` : ''}`}
     </button>
   )

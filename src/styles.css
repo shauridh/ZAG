@@ -93,3 +93,11 @@ body {
 .leaflet-container {
   z-index: 0;
 }
+
+/* Baris kategori kasir digulir dengan jari, bukan roda: scrollbarnya sembunyi */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

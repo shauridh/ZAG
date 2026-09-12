@@ -156,7 +156,7 @@ export default function ShiftPage(): ReactElement {
                 <td className="text-right tabular-nums">{s.closing_cash !== null ? fmtRp(s.closing_cash) : '—'}</td>
                 <td className={`text-right tabular-nums ${s.cash_diff !== null && s.cash_diff < 0 ? 'text-brand-redtext' : ''}`}>
                   {s.cash_diff === null ? '—' : s.cash_diff === 0 ? (
-                    <span className="chip bg-emerald-700/10 text-emerald-800">Rp0</span>
+                    <span className="chip bg-brand-gold/30">pas — Rp0</span>
                   ) : s.cash_diff > 0 ? (
                     <span className="chip bg-brand-gold/30">+{fmtRp(s.cash_diff)}</span>
                   ) : (
@@ -213,7 +213,7 @@ export default function ShiftPage(): ReactElement {
               ? 'border-brand-redtext bg-brand-redtext/10'
               : closeDiff > 0
                 ? 'border-brand-gold bg-brand-gold/15'
-                : 'border-emerald-700/40 bg-emerald-700/10'
+                : 'border-brand-line bg-brand-gold/15'
           }`}
           role="status"
         >

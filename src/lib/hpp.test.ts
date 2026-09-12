@@ -4,10 +4,15 @@ import {
   hppLines,
   hppTotal,
   ingredientNeeds,
+  ingIndex,
+  ingRecipeIndexBy,
   marginPct,
   maxAvailableQty,
   preparedCost,
-  productNeeds
+  productNeeds,
+  rawNeedsCost,
+  rawProductNeeds,
+  recipeIndexBy
 } from './hpp'
 
 const ing = (id: number, name: string, price: number, stock: number): Ingredient => ({
@@ -93,6 +98,61 @@ describe('maxAvailableQty', () => {
   })
 })
 
+describe('rawProductNeeds / rawNeedsCost', () => {
+  // Sambal (30) diproduksi dari minyak (12) — prepared diekspansi ke mentah.
+  const sambal = new Map<number, IngredientRecipe[]>([
+    [30, [{ id: 1, ingredient_id: 30, component_id: 12, qty: 0.5 }]]
+  ])
+  const ingsSambal = new Map<number, Ingredient>([
+    ...ings,
+    [30, { ...ing(30, 'Sambal Geprek', 15000, 0), kind: 'prepared' as const }]
+  ])
+  // Produk 3: 1x produk 1 (nested) + 0.2 cup sambal (prepared).
+  const withPrepared = new Map<number, RecipeItem[]>([
+    ...recipeByProduct,
+    [3, [
+      { product_id: 3, kind: 'product', component_id: 1, qty: 1 },
+      { product_id: 3, kind: 'ingredient', component_id: 30, qty: 0.2 }
+    ]]
+  ])
+
+  it('expands prepared components into raw ingredients', () => {
+    const needs = rawProductNeeds(3, 2, withPrepared, sambal, ingsSambal)
+    // 2 porsi = 2x produk 1 (0.4 ayam + 0.1 tepung) + 0.4 cup sambal → 0.2 minyak
+    expect(needs.get(10)).toBeCloseTo(0.4)
+    expect(needs.get(11)).toBeCloseTo(0.1)
+    expect(needs.get(12)).toBeCloseTo(0.2)
+    expect(needs.has(30)).toBe(false) // prepared tidak pernah jadi daun
+  })
+
+  it('costs raw needs at per-unit price with per-line rounding', () => {
+    // produk 1, 2 porsi: 0.4 ayam (25000) + 0.1 tepung (12000)
+    expect(rawNeedsCost(1, 2, recipeByProduct, noIngRecipes, ings)).toBe(0.4 * 25000 + 0.1 * 12000)
+  })
+
+  it('ignores unknown ingredients instead of crashing', () => {
+    expect(rawNeedsCost(99, 5, recipeByProduct, noIngRecipes, ings)).toBe(0)
+  })
+})
+
+describe('indeks katalog (ingIndex / recipeIndexBy / ingRecipeIndexBy)', () => {
+  it('ingIndex maps ingredients by id', () => {
+    expect(ingIndex([...ings.values()]).get(10)?.name).toBe('Ayam')
+  })
+
+  it('recipeIndexBy groups recipe rows per product', () => {
+    const rows = [...recipeByProduct.get(1)!, ...recipeByProduct.get(2)!]
+    const idx = recipeIndexBy(rows)
+    expect(idx.get(1)).toHaveLength(2)
+    expect(idx.get(2)).toHaveLength(2)
+  })
+
+  it('ingRecipeIndexBy groups production recipes per ingredient', () => {
+    const idx = ingRecipeIndexBy([{ id: 1, ingredient_id: 30, component_id: 12, qty: 0.5 }])
+    expect(idx.get(30)).toHaveLength(1)
+  })
+})
+
 describe('marginPct', () => {
   it('computes margin percentage', () => {
     expect(marginPct(89000, 63710)).toBeCloseTo(28.42, 1)
@@ -100,5 +160,9 @@ describe('marginPct', () => {
 
   it('is 0 for zero price', () => {
     expect(marginPct(0, 5000)).toBe(0)
+  })
+
+  it('is negative when selling below cost', () => {
+    expect(marginPct(5000, 8000)).toBeLessThan(0)
   })
 })

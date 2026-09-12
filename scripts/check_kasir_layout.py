@@ -50,6 +50,7 @@ with sync_playwright() as p:
                 gridH: grid?.offsetHeight ?? 0,
                 cols: grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').length : 0,
                 cardH: card?.offsetHeight ?? 0,
+                gridScrollable: grid ? grid.scrollHeight > grid.clientHeight : false,
                 asideH: aside?.offsetHeight ?? 0,
                 pageScrollX: document.documentElement.scrollWidth > window.innerWidth
               };
@@ -57,12 +58,15 @@ with sync_playwright() as p:
         )
         path = os.path.join("screenshots", f"layout_{name}.png")
         page.screenshot(path=path, full_page=True)
-        status = "PASS" if (m["gridH"] >= 100 and m["cardH"] >= 80 and not m["pageScrollX"]) else "FAIL"
+        # Kartu kini 160px (slot foto 72 + nama + harga) — tinggi itu tercapai
+        # hanya jika harga ikut termuat dalam kartu. Layar pendek boleh saja
+        # tanpa scroll (isi demo sedikit), jadi scrollability cuma info.
+        status = "PASS" if (m["cardH"] >= 156 and not m["pageScrollX"]) else "FAIL"
         if status == "FAIL":
             ok = False
         print(
             f"  {status} {name} ({w}x{h}): katalog={m['secH']}px grid={m['gridH']}px "
-            f"kolom={m['cols']} kartu={m['cardH']}px keranjang={m['asideH']}px "
+            f"kolom={m['cols']} kartu={m['cardH']}px scrollY={m['gridScrollable']} keranjang={m['asideH']}px "
             f"scrollX={m['pageScrollX']} -> {path}"
         )
         page.close()

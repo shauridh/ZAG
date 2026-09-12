@@ -13,7 +13,7 @@
  * keseluruhan (proyeksi kembali flat — jujur pada data yang ada).
  */
 import type { Transaction } from './types'
-import { productNeeds, ingredientNeeds } from './hpp'
+import { rawProductNeeds, type RecipeByProduct, type IngRecipeBy } from './hpp'
 import { fmtQty } from './money'
 
 export interface BuySuggestion {
@@ -107,25 +107,21 @@ export function buyPlanFromSales(
   days: number,
   coveredDays: number,
   ingredients: IngLite[],
-  recipeByProduct: Map<number, { kind: 'ingredient' | 'product'; component_id: number; qty: number }[]>,
-  ingRecipes: Map<number, { ingredient_id: number; component_id: number; qty: number }[]>
+  recipeByProduct: RecipeByProduct,
+  ingRecipes: IngRecipeBy,
+  /** basis kalender (default hari ini) — diinjeksikan agar test deterministik */
+  base: Date = new Date()
 ): BuyPlan {
+  // IngLite assignable ke IngKindById (rawProductNeeds hanya pakai id & kind);
+  // map penuh tetap dipakai di bawah utk stok, harga, dan satuan beli.
   const ingById = new Map(ingredients.map((i) => [i.id, i]))
 
   // ekspansi resep: penjualan produk hari itu → pemakaian bahan mentah
   const expand = (daySales: Map<number, number>): Map<number, number> => {
     const used = new Map<number, number>()
     for (const [pid, soldQty] of daySales) {
-      for (const [iid, q] of productNeeds(pid, soldQty, recipeByProduct as never, ingById as never)) {
-        const ing = ingById.get(iid)
-        if (!ing) continue
-        if (ing.kind === 'prepared') {
-          for (const [cid, cq] of ingredientNeeds(iid, q, ingRecipes as never)) {
-            used.set(cid, (used.get(cid) ?? 0) + cq)
-          }
-        } else {
-          used.set(iid, (used.get(iid) ?? 0) + q)
-        }
+      for (const [iid, q] of rawProductNeeds(pid, soldQty, recipeByProduct, ingRecipes, ingById)) {
+        used.set(iid, (used.get(iid) ?? 0) + q)
       }
     }
     return used
@@ -134,7 +130,6 @@ export function buyPlanFromSales(
   // pemakaian per hari kalender dalam rentang historis (hari tanpa jualan = 0)
   const span = Math.max(1, coveredDays)
   const perDay: { iso: string; weekend: boolean; used: Map<number, number> }[] = []
-  const base = new Date()
   for (let i = span - 1; i >= 0; i--) {
     const d = new Date(base)
     d.setDate(d.getDate() - i)

@@ -11,9 +11,11 @@ export interface HppLine {
   cost: number // qty * harga per satuan dasar
 }
 
-type IngById = Map<number, Ingredient>
-type RecipeByProduct = Map<number, RecipeItem[]>
-type IngRecipeBy = Map<number, IngredientRecipe[]>
+export type IngById = Map<number, Ingredient>
+/** Pemanggil kalkulus resep kadang hanya punya bahan terpotong (forecast); yang dipakai hanya id & kind. */
+export type IngKindById = Map<number, Pick<Ingredient, 'id' | 'kind'>>
+export type RecipeByProduct = Map<number, RecipeItem[]>
+export type IngRecipeBy = Map<number, IngredientRecipe[]>
 
 /**
  * Kebutuhan bahan mentah untuk qty unit produk. Resep produk boleh
@@ -24,7 +26,7 @@ export function productNeeds(
   productId: number,
   qty: number,
   recipeByProduct: RecipeByProduct,
-  ings: IngById
+  ings: IngKindById
 ): Map<number, number> {
   const out = new Map<number, number>()
   const visit = (pid: number, q: number, depth: number) => {
@@ -73,22 +75,9 @@ export function hppLines(
   ingRecipes: IngRecipeBy,
   ings: IngById
 ): HppLine[] {
-  const needs = productNeeds(productId, 1, recipeByProduct, ings)
   // Bahan prepared (mis. Sambal Geprek) diekspansi lagi ke bahan mentahnya
   // supaya HPP = biaya bahan dasar, persis struktur Excel.
-  const raw = new Map<number, number>()
-  for (const [iid, qty] of needs) {
-    const ing = ings.get(iid)
-    if (!ing) continue
-    const rec = ingRecipes.get(iid)
-    if (ing.kind === 'prepared' && rec && rec.length > 0) {
-      for (const [cid, cq] of ingredientNeeds(iid, qty, ingRecipes)) {
-        raw.set(cid, (raw.get(cid) ?? 0) + cq)
-      }
-    } else {
-      raw.set(iid, (raw.get(iid) ?? 0) + qty)
-    }
-  }
+  const raw = rawProductNeeds(productId, 1, recipeByProduct, ingRecipes, ings)
   const lines: HppLine[] = []
   for (const [iid, qty] of raw) {
     const ing = ings.get(iid)
@@ -149,3 +138,79 @@ export function marginPct(price: number, hpp: number): number {
 
 export const fmtHppQty = (l: HppLine): string =>
   `${fmtQty(l.qty)} ${l.buyUnit}${l.packContent > 1 ? ` (1 ${l.buyUnit} = ${fmtQty(l.packContent)})` : ''}`
+
+/** Indeks bahan berdasar id — derivasi katalog yang sebelumnya ditulis ulang di 9 halaman/modul. */
+export function ingIndex(ings: Ingredient[]): IngById {
+  return new Map(ings.map((i) => [i.id, i]))
+}
+
+/** Kelompokkan baris resep menurut produk — satu struktur RecipeByProduct untuk semua pemanggil. */
+export function recipeIndexBy(rows: RecipeItem[]): RecipeByProduct {
+  const out = new Map<number, RecipeItem[]>()
+  for (const r of rows) {
+    const arr = out.get(r.product_id) ?? []
+    arr.push(r)
+    out.set(r.product_id, arr)
+  }
+  return out
+}
+
+/** Kelompokkan resep produksi menurut bahan — satu struktur IngRecipeBy untuk semua pemanggil. */
+export function ingRecipeIndexBy(rows: IngredientRecipe[]): IngRecipeBy {
+  const out = new Map<number, IngredientRecipe[]>()
+  for (const r of rows) {
+    const arr = out.get(r.ingredient_id) ?? []
+    arr.push(r)
+    out.set(r.ingredient_id, arr)
+  }
+  return out
+}
+
+/**
+ * Kebutuhan bahan MENTAH total untuk qty unit produk: resep produk diurai
+ * (termasuk produk setengah jadi), lalu bahan prepared diurai lagi ke bahan
+ * mentahnya. Inilah satu tempat aturan "produk → bahan mentah"; dipakai HPP
+ * nota, ketersediaan kasir, forecast belanja, dan tren stok supaya aturan
+ * resep tidak pernah ditulis ulang di pemanggil.
+ */
+export function rawProductNeeds(
+  productId: number,
+  qty: number,
+  recipeByProduct: RecipeByProduct,
+  ingRecipes: IngRecipeBy,
+  ings: IngKindById
+): Map<number, number> {
+  const out = new Map<number, number>()
+  for (const [iid, need] of productNeeds(productId, qty, recipeByProduct, ings)) {
+    const ing = ings.get(iid)
+    if (!ing) continue
+    if (ing.kind === 'prepared') {
+      for (const [cid, cq] of ingredientNeeds(iid, need, ingRecipes)) {
+        out.set(cid, (out.get(cid) ?? 0) + cq)
+      }
+    } else {
+      out.set(iid, (out.get(iid) ?? 0) + need)
+    }
+  }
+  return out
+}
+
+/**
+ * Total biaya bahan MENTAH untuk qty unit produk: kebutuhan mentah × harga
+ * per satuan dasar, dibulatkan per baris (aturan pembulatan nota).
+ * Dipakai createTx & editTx supaya aturan biaya hanya ada di satu tempat.
+ */
+export function rawNeedsCost(
+  productId: number,
+  qty: number,
+  recipeByProduct: RecipeByProduct,
+  ingRecipes: IngRecipeBy,
+  ings: IngById
+): number {
+  let total = 0
+  for (const [iid, need] of rawProductNeeds(productId, qty, recipeByProduct, ingRecipes, ings)) {
+    const ing = ings.get(iid)
+    if (ing) total += Math.round(need * ing.price)
+  }
+  return total
+}

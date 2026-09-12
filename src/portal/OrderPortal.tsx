@@ -114,8 +114,9 @@ function PortalLogin({
   return (
     <div className="flex min-h-full items-center justify-center p-4">
       <div className="card w-full max-w-sm overflow-hidden">
-        <div className="strip px-5 pb-5 pt-7 text-center">
-          <p className="text-2xl font-extrabold text-white drop-shadow">{storeName}</p>
+        {/* Latar merah penuh (mockup .brandbar): teks putih butuh latar gelap, bukan cuma strip garis */}
+        <div className="border-b-[3px] border-brand-gold bg-brand-btn px-5 pb-5 pt-7 text-center">
+          <p className="text-2xl font-extrabold text-white">{storeName}</p>
           <p className="mt-1 text-sm font-bold text-white/90">Pesan online, ambil atau diantar</p>
         </div>
         <form className="flex flex-col gap-3 p-5" onSubmit={submit}>
@@ -365,9 +366,17 @@ function PortalMain({
                   const inCart = cart.find((x) => x.product_id === p.id)?.qty ?? 0
                   return (
                     <div key={p.id} className={`card overflow-hidden p-2.5 ${max <= 0 ? 'opacity-50' : ''}`}>
-                      {p.photo && <img src={p.photo} alt="" className="mb-1.5 -mx-2.5 -mt-2.5 h-24 w-[calc(100%+20px)] object-cover" loading="lazy" />}
-                      <p className="text-sm font-bold leading-snug">{p.name}</p>
-                      <div className="mt-1 flex items-center justify-between">
+                      {p.photo && (
+                        <img
+                          src={p.photo}
+                          alt=""
+                          className="mb-1 -mx-2.5 -mt-2.5 h-28 w-[calc(100%+20px)] object-contain"
+                          style={{ background: 'linear-gradient(135deg,#F6E7D8,#EFD9C4)' }}
+                          loading="lazy"
+                        />
+                      )}
+                      <p className="text-[15px] font-extrabold leading-snug">{p.name}</p>
+                      <div className="mt-0.5 flex items-center justify-between">
                         <span className="text-sm font-extrabold">{fmtRp(p.price)}</span>
                         {max <= 0 ? (
                           <span className="chip bg-brand-redtext text-white text-[10px]">Habis</span>

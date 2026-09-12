@@ -11,7 +11,7 @@
  * daysLeft dari pemakaian rata-rata harian, dan chip status.
  */
 import type { Ingredient, Transaction } from './types'
-import { productNeeds, ingredientNeeds } from './hpp'
+import { rawProductNeeds, type RecipeByProduct, type IngRecipeBy } from './hpp'
 import { localDateISO } from './dates'
 
 export interface StockTrendPoint {
@@ -34,8 +34,8 @@ export interface StockTrend {
 export function stockTrends(
   txs: Transaction[],
   ingredients: Ingredient[],
-  recipeByProduct: Map<number, { kind: 'ingredient' | 'product'; component_id: number; qty: number }[]>,
-  ingRecipes: Map<number, { ingredient_id: number; component_id: number; qty: number }[]>,
+  recipeByProduct: RecipeByProduct,
+  ingRecipes: IngRecipeBy,
   productIdsByName: Map<string, number>,
   days = 7
 ): StockTrend[] {
@@ -51,16 +51,8 @@ export function stockTrends(
       // items hanya menyimpan nama; pemetaan nama → product_id dari katalog
       const pid = productIdsByName.get(item.name)
       if (pid === undefined) continue
-      for (const [iid, need] of productNeeds(pid, item.qty, recipeByProduct as never, ingById as never)) {
-        const ing = ingById.get(iid)
-        if (!ing) continue
-        if (ing.kind === 'prepared') {
-          for (const [cid, cq] of ingredientNeeds(iid, need, ingRecipes as never)) {
-            day.set(cid, (day.get(cid) ?? 0) + cq)
-          }
-        } else {
-          day.set(iid, (day.get(iid) ?? 0) + need)
-        }
+      for (const [iid, need] of rawProductNeeds(pid, item.qty, recipeByProduct, ingRecipes, ingById)) {
+        day.set(iid, (day.get(iid) ?? 0) + need)
       }
     }
     if (day.size > 0) usedPerDay.set(iso, day)
@@ -120,8 +112,8 @@ export function stockTrendsFrom(
   txs: Transaction[],
   products: { id: number; name: string }[],
   ingredients: Ingredient[],
-  recipeByProduct: Map<number, { kind: 'ingredient' | 'product'; component_id: number; qty: number }[]>,
-  ingRecipes: Map<number, { ingredient_id: number; component_id: number; qty: number }[]>,
+  recipeByProduct: RecipeByProduct,
+  ingRecipes: IngRecipeBy,
   days = 7
 ): StockTrend[] {
   const byName = new Map(products.map((p) => [p.name, p.id]))

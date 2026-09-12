@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { ingIndex } from '../lib/hpp'
 import { loadCatalog, createPurchase, opname, logWaste, type Catalog } from '../lib/db'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useToast } from '../components/Toast'
@@ -162,7 +163,7 @@ function PurchaseForm({
   const raws = useMemo(() => catalog.ingredients.filter((i) => i.kind === 'raw' && i.active), [catalog])
   const [lines, setLines] = useState<{ ingredient_id: number; packs: string; unit_cost: string }[]>([{ ingredient_id: raws[0]?.id ?? 0, packs: '', unit_cost: '' }])
   const [note, setNote] = useState('')
-  const ingById = useMemo(() => new Map(catalog.ingredients.map((i) => [i.id, i])), [catalog])
+  const ingById = useMemo(() => ingIndex(catalog.ingredients), [catalog])
 
   const total = lines.reduce((s, l) => s + parseNum(l.packs) * (parseInt(l.unit_cost, 10) || 0), 0)
 

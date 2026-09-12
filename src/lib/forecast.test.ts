@@ -12,7 +12,7 @@ const ingredients = [
 ]
 
 // 1 ekor = 9 potong; marinasi 1 potong butuh 1 potong ayam
-const recipeByProduct = new Map([[10, [{ kind: 'ingredient' as const, component_id: 50, qty: 1 }]]])
+const recipeByProduct = new Map([[10, [{ product_id: 10, kind: 'ingredient' as const, component_id: 50, qty: 1 }]]])
 const ingRecipes = new Map([[50, [{ ingredient_id: 50, component_id: 1, qty: 1 }]]])
 
 /** tanggal ISO offset dari hari ini (pakai toISOString supaya konsisten dgn engine) */
@@ -44,11 +44,14 @@ describe('buyPlanFromSales', () => {
   })
 
   it('rata-rata harian dibagi panjang periode kalender (hari kosong = 0)', () => {
-    // 9 potong hari ini dalam window 3 hari → rata-rata 3 potong/hari
-    const daily = new Map([[isoOffset(0), new Map([[10, 9]])]])
-    const plan = buyPlanFromSales(daily, 2, 3, ingredients, recipeByProduct, ingRecipes)
+    // basis kalender disuntik (Rabu 2026-09-09, tengah hari UTC) supaya test
+    // deterministik — tanpa ini profil weekday/weekend berubah tiap hari uji.
+    const base = new Date('2026-09-09T12:00:00Z')
+    // 9 potong pada hari basis dalam window 3 hari → rata-rata 3 potong/hari
+    const daily = new Map([['2026-09-09', new Map([[10, 9]])]])
+    const plan = buyPlanFromSales(daily, 2, 3, ingredients, recipeByProduct, ingRecipes, base)
     const ayam = plan.items.find((i) => i.ingredientId === 1)!
-    // horizon 2 hari: profil weekday/weekend jatuh ke overall (5/3/5/3,5/3,5/3) — total = 3×2=6
+    // horizon 2 hari (Kamis+Jumat = hari kerja): profil weekday 3/hari — total = 3×2=6
     expect(ayam.dailyUse).toBe(3)
     expect(ayam.need).toBe(6)
     expect(ayam.buyQty).toBe(1)

@@ -333,7 +333,7 @@ export default function Dashboard(): ReactElement {
             {sum.count} transaksi · rata-rata {fmtRp(sum.avg)}
           </p>
           {revDelta && cmp && (
-            <p className={`mt-0.5 text-xs font-extrabold ${revDelta.pct > 0 ? 'text-emerald-700' : revDelta.pct < 0 ? 'text-brand-redtext' : 'text-brand-muted'}`}>
+            <p className={`mt-0.5 text-xs font-extrabold ${revDelta.pct > 0 ? 'text-brand-ink' : revDelta.pct < 0 ? 'text-brand-redtext' : 'text-brand-muted'}`}>
               {revDelta.pct > 0 ? '▲' : revDelta.pct < 0 ? '▼' : '■'} {Math.abs(revDelta.pct)}% vs {cmp.label} ({fmtRp(revDelta.prev)})
             </p>
           )}

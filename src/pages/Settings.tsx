@@ -244,6 +244,31 @@ export default function SettingsPage(): ReactElement {
                 </span>
               </span>
             </label>
+            <div>
+              <span className="lbl">Ukuran kartu menu kasir</span>
+              <div className="flex gap-2" role="radiogroup" aria-label="Ukuran kartu menu kasir">
+                {([
+                  { v: 'normal', label: 'Normal', desc: 'Kompak, lebih banyak menu terlihat' },
+                  { v: 'besar', label: 'Besar', desc: 'Foto dominan, mudah dipindai' }
+                ] as const).map((o) => {
+                  const aktif = (settings.tablet?.card_size ?? 'besar') === o.v
+                  return (
+                    <button
+                      key={o.v}
+                      type="button"
+                      role="radio"
+                      aria-checked={aktif}
+                      onClick={() => void upd('tablet', { ...(settings.tablet ?? { keep_awake: true, fullscreen: false }), card_size: o.v })}
+                      className={`flex-1 rounded-lg border-[1.5px] p-3 text-left ${aktif ? 'border-brand-btn bg-brand-btn text-white' : 'border-brand-line bg-white hover:bg-brand-paper'}`}
+                    >
+                      <span className="block text-sm font-extrabold">{o.label}</span>
+                      <span className={`block text-xs ${aktif ? 'text-white/85' : 'text-brand-muted'}`}>{o.desc}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="mt-1 text-xs text-brand-muted">Langsung berlaku di halaman Kasir di semua perangkat yang memakai setting ini.</p>
+            </div>
           </div>
         </div>
       )}

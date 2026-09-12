@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { loadCatalog, loadSettings, upsertProduct, upsertCategory, saveRecipe, saveTargets, saveBundle, saveBundleItems, deleteBundle, uploadProductPhoto, removeProductPhoto, type Catalog } from '../lib/db'
-import { hppLines, hppTotal, marginPct, maxAvailableQty, fmtHppQty } from '../lib/hpp'
+import { fmtHppQty, hppLines, hppTotal, ingIndex, marginPct, maxAvailableQty } from '../lib/hpp'
 import { fmtRp, fmtRpPlain, parseNum } from '../lib/money'
 import type { Product } from '../lib/types'
 import { Modal } from '../components/Modal'
@@ -32,7 +32,7 @@ export default function Products(): ReactElement {
       .catch(() => {})
   }, [reload])
 
-  const ingById = useMemo(() => new Map((catalog?.ingredients ?? []).map((i) => [i.id, i])), [catalog])
+  const ingById = useMemo(() => ingIndex(catalog?.ingredients ?? []), [catalog])
 
   if (!catalog) return <div className="p-6 text-sm font-bold text-brand-muted">Memuat...</div>
 
@@ -124,9 +124,15 @@ function ProductsTab({
                 onClick={() => setEditProd(p)}
               >
                 {p.photo ? (
-                  <img src={p.photo} alt={p.name} className="h-28 w-full object-cover" loading="lazy" />
+                  <img
+                    src={p.photo}
+                    alt={p.name}
+                    className="h-36 w-full object-contain"
+                    style={{ background: 'linear-gradient(135deg,#F6E7D8,#EFD9C4)' }}
+                    loading="lazy"
+                  />
                 ) : (
-                  <div className="h-28 w-full bg-brand-paper" aria-hidden />
+                  <div className="h-36 w-full bg-brand-paper" aria-hidden />
                 )}
                 {avail <= 0 ? (
                   <span className="chip absolute right-1.5 top-1.5 bg-brand-redtext text-white">Habis</span>
@@ -134,10 +140,11 @@ function ProductsTab({
                   <span className="chip absolute right-1.5 top-1.5 bg-brand-gold">sisa {avail}</span>
                 ) : null}
               </button>
-              <div className="flex min-h-0 flex-1 flex-col gap-1 p-2.5">
+              <div className="flex min-h-0 flex-1 flex-col gap-0.5 p-2.5">
                 <span className="line-clamp-2 text-sm font-bold leading-snug">{p.name}</span>
                 <span className="text-xs font-semibold text-brand-muted">{catName(p.category_id)}</span>
-                <span className="mt-auto flex flex-wrap items-center justify-between gap-1 pt-1">
+                {/* harga menempel di bawah kategori, bukan di dasar kartu, supaya tidak ada celah kosong */}
+                <span className="flex flex-wrap items-center justify-between gap-1 pt-1">
                   <span className="text-base font-extrabold tabular-nums">{fmtRp(p.price)}</span>
                   {hpp > 0 ? (
                     <span className={`chip ${mg < warnPct ? 'bg-brand-redtext text-white' : 'bg-brand-gold/30'}`}>margin {mg.toFixed(0)}%</span>
@@ -146,7 +153,7 @@ function ProductsTab({
                   )}
                 </span>
                 {!p.is_active && <span className="chip w-fit bg-brand-line">Nonaktif</span>}
-                <span className="mt-1.5 flex gap-1.5">
+                <span className="mt-auto flex gap-1.5 pt-1.5">
                   <button
                     type="button"
                     className={`btn-ghost flex-1 !min-h-0 !py-1.5 text-xs ${hpp <= 0 ? '!border-brand-redtext !text-brand-redtext' : ''}`}

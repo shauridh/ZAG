@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { loadCatalog, loadFryers, createBatch, fillFryer, endOilCycle, saveFryer, type Catalog } from '../lib/db'
-import { ingredientNeeds, maxAvailableQty } from '../lib/hpp'
+import { ingIndex, ingredientNeeds, maxAvailableQty } from '../lib/hpp'
 import { fmtRp, fmtQty, parseNum } from '../lib/money'
 import type { Fryer, Ingredient, OilCycle, Settings } from '../lib/types'
 import { loadSettings } from '../lib/db'
@@ -35,7 +35,7 @@ export default function Production(): ReactElement {
 
   if (!catalog || !settings) return <div className="p-6 text-sm font-bold text-brand-muted">Memuat...</div>
 
-  const ingById = new Map(catalog.ingredients.map((i) => [i.id, i]))
+  const ingById = ingIndex(catalog.ingredients)
   const prepared = catalog.ingredients.filter((i) => i.kind === 'prepared' && i.active)
   // Banner siklus minyak: keputusan rasa & biaya, jadi tampil di atas — bukan catatan sekunder
   const bannerCycle = cycles.find((c) => c.status === 'aktif')
@@ -117,7 +117,7 @@ function BatchForm({
   const [outputs, setOutputs] = useState<{ ingredient_id: number; qty: number }[]>(prepared.length ? [{ ingredient_id: prepared[0].id, qty: 9 }] : [])
   const [fryerId, setFryerId] = useState<number | ''>('')
   const [grams, setGrams] = useState('')
-  const ingById = useMemo(() => new Map(catalog.ingredients.map((i) => [i.id, i])), [catalog])
+  const ingById = useMemo(() => ingIndex(catalog.ingredients), [catalog])
 
   const needs = useMemo(() => {
     const total = new Map<number, number>()
