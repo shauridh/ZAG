@@ -567,6 +567,11 @@ function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; on
       {autoPrint && !printer && (
         <p className="mb-2 rounded-lg bg-brand-gold/25 px-3 py-2 text-sm font-bold">Print otomatis aktif: pilih printer dulu supaya struk langsung tercetak tanpa dialog.</p>
       )}
+      {printer && (
+        <p className="mb-2 rounded-lg bg-brand-gold/20 px-3 py-2 text-xs font-bold text-brand-muted">
+          Kenapa dialog pair kadang muncul? Chrome stabil belum mengizinkan web mengingat perangkat Bluetooth antar sesi (keterbatasan browser, bukan printer rusak). Sejak dipilih sekali, cetak berikutnya <b>dalam sesi yang sama</b> sudah tanpa dialog. Tanpa dialog total → pakai RawBT (panduan di bawah).
+        </p>
+      )}
       <div className="flex flex-col gap-2">
         <button
           type="button"

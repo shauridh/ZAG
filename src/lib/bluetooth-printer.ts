@@ -111,7 +111,16 @@ function savePrinter(p: SavedPrinter): void {
 
 export function forgetPrinter(): void {
   localStorage.removeItem(LS_PRINTER)
+  activeDevice = null
 }
+
+/**
+ * Objek printer yang terakhir tersambung, disimpan DI MEMORI (bukan localStorage).
+ * Selama halaman hidup, cetak berikutnya langsung pakai ini tanpa dialog —
+ * penting di Chrome stabil yang tidak punya getDevices(): tanpa cache, SETIAP
+ * cetak membuka dialog pair. Dialog kini maksimal sekali per sesi halaman.
+ */
+let activeDevice: BtDevice | null = null
 
 /**
  * Cari karakteristik tulis. URUTAN PENTING: printer mini sering punya BEBERAPA
@@ -237,9 +246,21 @@ export async function printTextBluetooth(text: string): Promise<'bt' | 'fallback
   const saved = getSavedPrinter()
 
   if (saved) {
+    // 0) cetak lewat objek yang masih hidup di sesi ini — tanpa dialog
+    if (activeDevice) {
+      try {
+        await printToDevice(activeDevice, text)
+        return 'bt'
+      } catch (ex) {
+        console.warn('Printer cache gagal, coba jalur lain:', ex)
+        activeDevice = null
+      }
+    }
+
     // 1) jalur tanpa dialog — sebagian besar browser tidak punya getDevices()
     const found = await findSavedDevice(bt, saved)
     if (found) {
+      activeDevice = found
       try {
         await printToDevice(found, text)
         return 'bt'
@@ -260,6 +281,7 @@ export async function printTextBluetooth(text: string): Promise<'bt' | 'fallback
       return 'reconnect-gagal'
     }
     if (device.id !== saved.id) savePrinter({ id: device.id, name: device.name ?? saved.name })
+    activeDevice = device
     try {
       await printToDevice(device, text)
       return 'bt'
@@ -288,6 +310,7 @@ export async function pickAndSavePrinter(mode: 'strict' | 'all' = 'strict'): Pro
   const device = await bt.requestDevice(requestOpts(mode))
   // tes koneksi langsung supaya user tahu printer-nya benar
   await connectDevice(device)
+  activeDevice = device
   const saved = { id: device.id, name: device.name ?? 'Printer Bluetooth' }
   savePrinter(saved)
   return saved
