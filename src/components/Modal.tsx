@@ -34,10 +34,12 @@ export function Modal({
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
-    // fokus masuk ke panel (atau elemen fokusabel pertama di dalamnya)
+    // fokus masuk ke panel: input pertama kalau ada (langsung bisa ketik),
+    // kalau tidak ada baru ke tombol pertama / panel itu sendiri
     const panel = panelRef.current
     if (panel) {
-      const first = panel.querySelector<HTMLElement>(FOCUSABLE)
+      const focusable = [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.offsetParent !== null)
+      const first = focusable.find((el) => el.matches('input, select, textarea')) ?? focusable[0]
       ;(first ?? panel).focus()
     }
 

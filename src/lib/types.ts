@@ -68,6 +68,9 @@ export interface Shift {
   cash_diff: number | null
   note: string | null
   status: 'buka' | 'tutup'
+  /** Uang non-penjualan: modal disetor ke drawer / belanja mendadak dari drawer. */
+  cash_in?: number
+  cash_out?: number
 }
 
 export interface Payment { method: 'cash' | 'qris' | 'transfer'; amount: number }
@@ -130,6 +133,12 @@ export interface Settings {
   printer: { auto_print: boolean }
   tablet: { keep_awake: boolean; fullscreen: boolean; card_size?: 'normal' | 'besar' }
   fixed_costs: { name: string; amount: number }[]
+  /** Kategori pengeluaran dikelola owner di menu Keuangan (bukan tabel terpisah). */
+  expense_categories?: { id: number; name: string }[]
+  /** True setelah owner menetapkan PIN (PIN-nya sendiri tidak pernah dikirim ke client). */
+  owner_pin_set?: boolean
+  /** Hanya ada di mode demo: hash SHA-256 PIN untuk verifikasi lokal. */
+  owner_pin_hash?: string
 }
 
 export interface Availability { productId: number; maxQty: number }

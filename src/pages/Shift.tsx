@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactElement } from 'react'
-import { currentShift, loadShifts, loadTransactions, openShift, closeShift, loadSettings } from '../lib/db'
+import { currentShift, loadShifts, loadTransactions, openShift, closeShift, shiftCashMovement, loadSettings } from '../lib/db'
 import { fmtRp, fmtRpPlain } from '../lib/money'
 import type { Shift, Transaction, Settings } from '../lib/types'
 import { Numpad } from '../components/Numpad'
@@ -20,6 +20,9 @@ export default function ShiftPage(): ReactElement {
   const [closeCash, setCloseCash] = useState(0)
   const [note, setNote] = useState('')
   const [xReport, setXReport] = useState(false)
+  const [drawerDir, setDrawerDir] = useState<'in' | 'out' | null>(null)
+  const [drawerAmount, setDrawerAmount] = useState(0)
+  const [drawerNote, setDrawerNote] = useState('')
   const [eodOpen, setEodOpen] = useState(false)
   const [txs, setTxs] = useState<Transaction[]>([])
   const [eodTxs, setEodTxs] = useState<Transaction[]>([])
@@ -47,9 +50,13 @@ export default function ShiftPage(): ReactElement {
 
   const cashSales = (t: Shift): number =>
     (txs ?? []).filter((x) => x.shift_id === t.id).reduce((sum, x) => sum + (x.payments ?? []).filter((p) => p.method === 'cash').reduce((a, p) => a + p.amount, 0), 0)
+  // uang non-penjualan: setoran modal ke drawer / belanja mendadak dari drawer
+  const cashInOf = (t: Shift): number => t.cash_in ?? 0
+  const cashOutOf = (t: Shift): number => t.cash_out ?? 0
+  const expectedOf = (t: Shift): number => t.opening_cash + cashSales(t) + cashInOf(t) - cashOutOf(t)
 
   // selisih kas hidup di modal tutup shift (modal hanya terbuka saat shift ada)
-  const closeDiff = shift ? closeCash - shift.opening_cash - cashSales(shift) : 0
+  const closeDiff = shift ? closeCash - expectedOf(shift) : 0
 
   return (
     <div className="p-3 lg:p-4">
@@ -76,8 +83,17 @@ export default function ShiftPage(): ReactElement {
               <dd className="font-extrabold tabular-nums">{fmtRp(cashSales(shift))}</dd>
             </div>
             <div className="rounded-lg bg-brand-paper p-2">
+              <dt className="text-xs font-bold text-brand-muted">Uang masuk / keluar drawer</dt>
+              <dd className="font-extrabold tabular-nums">
+                {cashInOf(shift) > 0 && <span className="text-brand-btn">+{fmtRp(cashInOf(shift))}</span>}
+                {cashInOf(shift) > 0 && cashOutOf(shift) > 0 && ' · '}
+                {cashOutOf(shift) > 0 && <span className="text-brand-redtext">−{fmtRp(cashOutOf(shift))}</span>}
+                {cashInOf(shift) === 0 && cashOutOf(shift) === 0 && <span className="text-brand-muted">belum ada</span>}
+              </dd>
+            </div>
+            <div className="rounded-lg bg-brand-paper p-2">
               <dt className="text-xs font-bold text-brand-muted">Seharusnya di drawer</dt>
-              <dd className="font-extrabold tabular-nums">{fmtRp(shift.opening_cash + cashSales(shift))}</dd>
+              <dd className="font-extrabold tabular-nums">{fmtRp(expectedOf(shift))}</dd>
             </div>
             <div className="rounded-lg bg-brand-paper p-2">
               <dt className="text-xs font-bold text-brand-muted">Float wajib</dt>
@@ -85,6 +101,12 @@ export default function ShiftPage(): ReactElement {
             </div>
           </dl>
           <div className="mt-3 flex gap-2">
+            <button type="button" className="btn-ghost flex-1" onClick={() => { setDrawerDir('in'); setDrawerAmount(0); setDrawerNote('') }}>
+              Uang Masuk
+            </button>
+            <button type="button" className="btn-ghost flex-1" onClick={() => { setDrawerDir('out'); setDrawerAmount(0); setDrawerNote('') }}>
+              Uang Keluar
+            </button>
             <button type="button" className="btn-ghost flex-1" onClick={() => setXReport(true)}>
               Laporan X
             </button>
@@ -96,13 +118,13 @@ export default function ShiftPage(): ReactElement {
                 void loadTransactions(todayISO() + 'T00:00:00', new Date().toISOString()).then(setEodTxs).catch((ex) => setErr((ex as Error).message))
               }}
             >
-              Laporan Akhir Hari
+              Akhir Hari
             </button>
             <button
               type="button"
               className="btn-primary flex-1"
               onClick={() => {
-                setCloseCash(shift.opening_cash + cashSales(shift))
+                setCloseCash(expectedOf(shift))
                 setCloseModal(true)
               }}
             >
@@ -136,12 +158,13 @@ export default function ShiftPage(): ReactElement {
 
       <h2 className="mt-5 mb-2 font-extrabold">Riwayat shift</h2>
       <div className="card max-w-3xl overflow-x-auto">
-        <table className="tbl min-w-[560px]">
+        <table className="tbl min-w-[640px]">
           <thead>
             <tr>
               <th>Dibuka</th>
               <th>Ditutup</th>
               <th className="whitespace-nowrap text-right">Modal</th>
+              <th className="whitespace-nowrap text-right">Masuk/Keluar</th>
               <th className="whitespace-nowrap text-right">Kas fisik</th>
               <th className="whitespace-nowrap text-right">Selisih</th>
               <th>Catatan</th>
@@ -153,6 +176,17 @@ export default function ShiftPage(): ReactElement {
                 <td>{fmtDateTime(s.opened_at)}</td>
                 <td>{s.closed_at ? fmtDateTime(s.closed_at) : '—'}</td>
                 <td className="text-right tabular-nums">{fmtRp(s.opening_cash)}</td>
+                <td className="whitespace-nowrap text-right text-xs tabular-nums">
+                  {(s.cash_in ?? 0) > 0 || (s.cash_out ?? 0) > 0 ? (
+                    <>
+                      {(s.cash_in ?? 0) > 0 && <span className="text-brand-btn">+{fmtRp(s.cash_in ?? 0)}</span>}
+                      {(s.cash_in ?? 0) > 0 && (s.cash_out ?? 0) > 0 && <br />}
+                      {(s.cash_out ?? 0) > 0 && <span className="text-brand-redtext">−{fmtRp(s.cash_out ?? 0)}</span>}
+                    </>
+                  ) : (
+                    '—'
+                  )}
+                </td>
                 <td className="text-right tabular-nums">{s.closing_cash !== null ? fmtRp(s.closing_cash) : '—'}</td>
                 <td className={`text-right tabular-nums ${s.cash_diff !== null && s.cash_diff < 0 ? 'text-brand-redtext' : ''}`}>
                   {s.cash_diff === null ? '—' : s.cash_diff === 0 ? (
@@ -168,7 +202,7 @@ export default function ShiftPage(): ReactElement {
             ))}
             {history.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center text-brand-muted">
+                <td colSpan={7} className="text-center text-brand-muted">
                   belum ada riwayat
                 </td>
               </tr>
@@ -261,6 +295,40 @@ export default function ShiftPage(): ReactElement {
           </label>
           <textarea id="cnote" className="input !h-20" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Contoh: ada kembalian kurang Rp5.000 karena..." />
         </div>
+      </Modal>
+
+      {/* Modal uang masuk/keluar drawer */}
+      <Modal open={drawerDir !== null} title={drawerDir === 'out' ? 'Uang Keluar dari Drawer' : 'Uang Masuk ke Drawer'} onClose={() => setDrawerDir(null)}>
+        <p className="mb-3 text-sm text-brand-muted">
+          {drawerDir === 'in'
+            ? 'Uang ditambahkan ke drawer di luar penjualan — contoh: setoran modal tambahan, kembalian dari pembelian bahan.'
+            : 'Uang diambil dari drawer di luar penjualan — contoh: belanja mendadak, bayar kurir, setor ke aman. Float kembalian wajib tetap tersisa.'}
+        </p>
+        <Numpad value={drawerAmount} onChange={setDrawerAmount} quick={[10000, 20000, 50000]} />
+        <div className="mt-3">
+          <label className="lbl" htmlFor="dnote">
+            Keterangan
+          </label>
+          <input id="dnote" className="input" value={drawerNote} onChange={(e) => setDrawerNote(e.target.value)} placeholder={drawerDir === 'in' ? 'contoh: setoran modal siang' : 'contoh: beli gas 3kg'} />
+        </div>
+        <button
+          type="button"
+          className="btn-primary mt-3 w-full"
+          disabled={drawerAmount <= 0}
+          onClick={async () => {
+            if (!drawerDir) return
+            try {
+              await shiftCashMovement(drawerDir, drawerAmount, drawerNote)
+              setDrawerDir(null)
+              toast(drawerDir === 'in' ? `Uang masuk ${fmtRp(drawerAmount)} tercatat.` : `Uang keluar ${fmtRp(drawerAmount)} tercatat.`)
+              await reload()
+            } catch (ex) {
+              setErr((ex as Error).message)
+            }
+          }}
+        >
+          Simpan
+        </button>
       </Modal>
 
       {/* Modal laporan X */}

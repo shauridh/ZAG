@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactElement } from 'react'
-import { loadFinance, loadTransactions, loadSettings, addExpense, addOtherIncome } from '../lib/db'
+import { loadFinance, loadTransactions, loadSettings, addExpense, addOtherIncome, saveSetting, setOwnerPin, verifyOwnerPin } from '../lib/db'
 import { fmtRp, fmtRpPlain } from '../lib/money'
 import { todayISO, fmtDate } from '../lib/dates'
 import { profitLoss, totalsOf } from '../lib/reports'
@@ -17,6 +17,8 @@ export default function Finance(): ReactElement {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [expOpen, setExpOpen] = useState(false)
   const [incOpen, setIncOpen] = useState(false)
+  const [pinOpen, setPinOpen] = useState(false)
+  const [catsOpen, setCatsOpen] = useState(false)
   const [err, setErr] = useState('')
 
   const endOfMonth = (m: string): string => {
@@ -56,6 +58,12 @@ export default function Finance(): ReactElement {
         </button>
         <button type="button" className="btn-ghost" onClick={() => setIncOpen(true)}>
           + Pemasukan Lain
+        </button>
+        <button type="button" className="btn-ghost" onClick={() => setCatsOpen(true)}>
+          Kategori
+        </button>
+        <button type="button" className="btn-ghost" onClick={() => setPinOpen(true)}>
+          {settings.owner_pin_set ? 'Ganti PIN Owner' : 'Atur PIN Owner'}
         </button>
       </div>
       {err && (
@@ -176,7 +184,130 @@ export default function Finance(): ReactElement {
         }}
         setErr={setErr}
       />
+      <OwnerPinModal
+        open={pinOpen}
+        pinSet={settings.owner_pin_set ?? false}
+        onClose={() => {
+          setPinOpen(false)
+          void reload()
+        }}
+        setErr={setErr}
+      />
+      <CategoriesModal
+        open={catsOpen}
+        settings={settings}
+        onClose={() => {
+          setCatsOpen(false)
+          void reload()
+        }}
+        setErr={setErr}
+      />
     </div>
+  )
+}
+
+/** Owner menetapkan/mengganti PIN. Verifikasi PIN lama dulu bila sudah pernah diatur. */
+function OwnerPinModal({ open, pinSet, onClose, setErr }: { open: boolean; pinSet: boolean; onClose: () => void; setErr: (s: string) => void }): ReactElement {
+  const { toast } = useToast()
+  const [oldPin, setOldPin] = useState('')
+  const [pin, setPin] = useState('')
+  const [busy, setBusy] = useState(false)
+  const ok = pin.length >= 4 && (!pinSet || oldPin.length >= 4)
+  return (
+    <Modal open={open} title={pinSet ? 'Ganti PIN Owner' : 'Atur PIN Owner'} onClose={onClose}>
+      <p className="mb-3 text-sm text-brand-muted">
+        PIN dipakai membuka aksi sensitif: hapus/refund nota di Riwayat Transaksi. Simpan PIN ini untuk owner, jangan dibagikan ke kasir.
+      </p>
+      {pinSet && (
+        <div className="mb-3">
+          <label className="lbl" htmlFor="oldpin">
+            PIN lama
+          </label>
+          <input id="oldpin" className="input" type="password" inputMode="numeric" autoComplete="off" value={oldPin} onChange={(e) => setOldPin(e.target.value.replace(/\D/g, ''))} />
+        </div>
+      )}
+      <div className="mb-3">
+        <label className="lbl" htmlFor="newpin">
+          PIN baru (4+ digit angka)
+        </label>
+        <input id="newpin" className="input" type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} placeholder="contoh: 2711" />
+      </div>
+      <button
+        type="button"
+        className="btn-primary w-full"
+        disabled={!ok || busy}
+        onClick={async () => {
+          setBusy(true)
+          try {
+            if (pinSet) {
+              if (!(await verifyOwnerPin(oldPin))) throw new Error('PIN lama salah')
+            }
+            await setOwnerPin(pin)
+            toast('PIN owner tersimpan.')
+            onClose()
+          } catch (ex) {
+            setErr((ex as Error).message)
+          } finally {
+            setBusy(false)
+          }
+        }}
+      >
+        {busy ? 'Menyimpan...' : 'Simpan PIN'}
+      </button>
+    </Modal>
+  )
+}
+
+/** Kelola kategori pengeluaran (tersimpan di settings, admin saja). */
+function CategoriesModal({ open, settings, onClose, setErr }: { open: boolean; settings: Settings; onClose: () => void; setErr: (s: string) => void }): ReactElement {
+  const { toast } = useToast()
+  const [cats, setCats] = useState(settings.expense_categories ?? [])
+  const [busy, setBusy] = useState(false)
+  return (
+    <Modal open={open} title="Kategori Pengeluaran" onClose={onClose}>
+      <p className="mb-3 text-sm text-brand-muted">Dipakai saat mencatat pengeluaran di halaman ini.</p>
+      {cats.map((c, i) => (
+        <div key={c.id ?? i} className="mb-2 flex items-center gap-2">
+          <input
+            className="input !h-10"
+            value={c.name}
+            onChange={(e) => setCats(cats.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+            aria-label="Nama kategori"
+          />
+          <button type="button" className="font-extrabold text-brand-redtext" onClick={() => setCats(cats.filter((_, j) => j !== i))} aria-label="Hapus kategori">
+            ✕
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="btn-ghost !min-h-0 !py-1.5 text-xs"
+        onClick={() => setCats([...cats, { id: -Date.now(), name: '' }])}
+      >
+        + Kategori
+      </button>
+      <button
+        type="button"
+        className="btn-primary mt-3 w-full"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true)
+          try {
+            // id negatif = baris baru: nomori ulang di sisi server (1..n) saat simpan
+            const cleaned = cats.filter((c) => c.name.trim()).map((c, i) => ({ id: c.id > 0 ? c.id : i + 1, name: c.name.trim() }))
+            await saveSetting('expense_categories', cleaned)
+            toast('Kategori tersimpan.')
+            onClose()
+          } catch (ex) {
+            setErr((ex as Error).message)
+          } finally {
+            setBusy(false)
+          }
+        }}
+      >
+        Simpan Kategori
+      </button>
+    </Modal>
   )
 }
 

@@ -10,7 +10,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { OrderType, Settings, Shift, Transaction } from './types'
 import { endOfDayReport } from './reports'
-import { type Catalog, type TxResult, type SessionInfo, type RefundResult, type PortalAddress, currentOnline, setOnline, emit, onSyncStateChange, txIsEditable, TX_STATUS_LABEL, MENU_BUCKET } from './db-shared'
+import { type Catalog, type TxResult, type SessionInfo, type RefundResult, type PortalAddress, currentOnline, setOnline, emit, onSyncStateChange, txIsEditable, TX_STATUS_LABEL, MENU_BUCKET, requireOwnerPin, hashPin } from './db-shared'
 import * as demo from './db-demo'
 import * as live from './db-live'
 
@@ -28,7 +28,7 @@ export { currentOnline, onSyncStateChange, txIsEditable, TX_STATUS_LABEL, MENU_B
 export { queueCount, QUEUE_EVENT } from './offline'
 export { resetDemoData } from './db-demo'
 
-type ShiftReport = { cash_sales: number; expected_cash: number; cash_diff: number; opening_cash: number }
+type ShiftReport = { cash_sales: number; expected_cash: number; cash_diff: number; opening_cash: number; cash_in?: number; cash_out?: number }
 
 // ================= Katalog & settings =================
 
@@ -87,16 +87,18 @@ export async function createTx(p: {
 
 // ================= Riwayat transaksi: ubah, hapus, refund =================
 
-/** Refund: uang kembali, stok kembali, nota asli berstatus 'refund'. */
-export async function refundTx(txId: number, reason: string): Promise<RefundResult> {
-  if (isDemo) return demo.demoRefundTx(txId, reason)
-  return live.liveRefundTx(sb!, txId, reason)
+/** Refund: uang kembali, stok kembali, nota asli berstatus 'refund'. Wajib PIN owner. */
+export async function refundTx(txId: number, reason: string, ownerPin: string): Promise<RefundResult> {
+  requireOwnerPin(ownerPin)
+  if (isDemo) return demo.demoRefundTx(txId, reason, ownerPin)
+  return live.liveRefundTx(sb!, txId, reason, ownerPin)
 }
 
-/** Hapus (batal): salah input, tanpa pergerakan uang, stok kembali. */
-export async function deleteTx(txId: number, reason: string): Promise<void> {
-  if (isDemo) return demo.demoDeleteTx(txId, reason)
-  return live.liveDeleteTx(sb!, txId, reason)
+/** Hapus (batal): salah input, tanpa pergerakan uang, stok kembali. Wajib PIN owner. */
+export async function deleteTx(txId: number, reason: string, ownerPin: string): Promise<void> {
+  requireOwnerPin(ownerPin)
+  if (isDemo) return demo.demoDeleteTx(txId, reason, ownerPin)
+  return live.liveDeleteTx(sb!, txId, reason, ownerPin)
 }
 
 /**
@@ -170,6 +172,34 @@ export async function closeShift(closingCash: number, note: string): Promise<Shi
   const rep = await live.liveCloseShift(sb!, closingCash, note)
   await maybeEmailShiftReport(null, 0, rep)
   return rep
+}
+
+/** Uang non-penjualan masuk/keluar drawer (modal disetor, belanja mendadak). */
+export async function shiftCashMovement(direction: 'in' | 'out', amount: number, note: string): Promise<void> {
+  if (isDemo) return demo.demoShiftCashMovement(direction, amount, note)
+  return live.liveShiftCashMovement(sb!, direction, amount, note)
+}
+
+/** Owner menetapkan/mengganti PIN (disimpan ter-hash; nilainya tidak pernah balik ke client). */
+export async function setOwnerPin(pin: string): Promise<void> {
+  const p = pin.trim()
+  if (p.length < 4 || !/^\d{4,}$/.test(p)) throw new Error('PIN minimal 4 digit angka')
+  if (isDemo) return demo.demoSetOwnerPin(p)
+  return live.liveSetOwnerPin(sb!, p)
+}
+
+/** Cek PIN owner tanpa mengubah apa pun — dipakai membuka kunci aksi sensitif. */
+export async function verifyOwnerPin(pin: string): Promise<boolean> {
+  const p = pin.trim()
+  if (!/^\d{4,}$/.test(p)) return false
+  if (isDemo) {
+    const s = demo.demoLoadSettings()
+    if (!s.owner_pin_set || !s.owner_pin_hash) return false
+    return (await hashPin(p)) === s.owner_pin_hash
+  }
+  const { data, error } = await sb!.rpc('check_owner_pin', { p_pin: p })
+  if (error) return false
+  return data === true
 }
 
 /** Demo: unduhan HTML; live: edge function email. Perilaku sama dengan sebelum pemisahan. */
@@ -318,6 +348,17 @@ export async function upsertCategory(c: { id?: number; name: string; sort: numbe
 export async function upsertIngredient(i: { id?: number; name: string; code: string | null; kind: 'raw' | 'prepared'; buy_unit: string; pack_content: number; price: number; min_stock: number; active: boolean }): Promise<void> {
   if (isDemo) return demo.demoUpsertIngredient(i)
   return live.liveUpsertIngredient(sb!, i)
+}
+
+/** Hapus master: server menolak bila masih terpakai (riwayat/resep/paket). */
+export async function deleteProduct(id: number): Promise<void> {
+  if (isDemo) return demo.demoDeleteProduct(id)
+  return live.liveDeleteProduct(sb!, id)
+}
+
+export async function deleteIngredient(id: number): Promise<void> {
+  if (isDemo) return demo.demoDeleteIngredient(id)
+  return live.liveDeleteIngredient(sb!, id)
 }
 
 export async function saveRecipe(productId: number, lines: { kind: 'ingredient' | 'product'; component_id: number; qty: number }[]): Promise<void> {

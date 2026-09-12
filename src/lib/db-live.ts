@@ -127,6 +127,7 @@ function defaultSettingsShape(): Settings {
     owner_email: { email: '', whatsapp: '' },
     printer: { auto_print: false },
     tablet: { keep_awake: true, fullscreen: false, card_size: 'besar' },
+    owner_pin_set: false,
     fixed_costs: []
   }
 }
@@ -136,7 +137,10 @@ export async function liveLoadSettings(sb: Sb, online: boolean): Promise<Setting
     const c = cacheGet<Settings>('sabana-cache-settings')
     if (c) return c
   }
-  const { data, error } = await sb.from('settings').select('key, value')
+  const [{ data, error }, catsRes] = await Promise.all([
+    sb.from('settings').select('key, value'),
+    sb.rpc('get_expense_categories')
+  ])
   if (error) {
     if (isNetworkError(new Error(error.message))) {
       const c = cacheGet<Settings>('sabana-cache-settings')
@@ -144,6 +148,8 @@ export async function liveLoadSettings(sb: Sb, online: boolean): Promise<Setting
     }
     throw new Error(error.message)
   }
+  // Kategori beban: settings → RPC fallback ke tabel seed → default kosong
+  const cats = (catsRes.error ? null : (catsRes.data as { id: number; name: string }[] | null)) ?? null
   const map = new Map((data ?? []).map((r) => [r.key, r.value]))
   const demo = defaultSettingsShape()
   const s: Settings = {
@@ -165,6 +171,8 @@ export async function liveLoadSettings(sb: Sb, online: boolean): Promise<Setting
     owner_email: (map.get('owner_email') as Settings['owner_email']) ?? demo.owner_email,
     printer: (map.get('printer') as Settings['printer']) ?? demo.printer,
     tablet: (map.get('tablet') as Settings['tablet']) ?? demo.tablet,
+    owner_pin_set: Boolean((map.get('owner_pin') as { pin_hash?: string } | undefined)?.pin_hash),
+    expense_categories: (map.get('expense_categories') as Settings['expense_categories'] | undefined) ?? cats ?? [],
     fixed_costs: (map.get('fixed_costs') as Settings['fixed_costs']) ?? demo.fixed_costs
   }
   cachePut('sabana-cache-settings', s)
@@ -299,14 +307,14 @@ export async function liveFlushQueue(sb: Sb): Promise<number> {
 
 // ================= Riwayat: refund / batal / revisi (live) =================
 
-export async function liveRefundTx(sb: Sb, txId: number, reason: string): Promise<{ refund_id: number; receipt_no: string; amount: number; method: string }> {
-  const { data, error } = await sb.rpc('refund_transaction', { p_tx_id: txId, p_reason: reason.trim() || null })
+export async function liveRefundTx(sb: Sb, txId: number, reason: string, ownerPin: string): Promise<{ refund_id: number; receipt_no: string; amount: number; method: string }> {
+  const { data, error } = await sb.rpc('refund_transaction', { p_tx_id: txId, p_reason: reason.trim() || null, p_owner_pin: ownerPin || null })
   if (error) throw new Error(error.message)
   return data as { refund_id: number; receipt_no: string; amount: number; method: string }
 }
 
-export async function liveDeleteTx(sb: Sb, txId: number, reason: string): Promise<void> {
-  const { error } = await sb.rpc('delete_transaction', { p_tx_id: txId, p_reason: reason.trim() || null })
+export async function liveDeleteTx(sb: Sb, txId: number, reason: string, ownerPin: string): Promise<void> {
+  const { error } = await sb.rpc('delete_transaction', { p_tx_id: txId, p_reason: reason.trim() || null, p_owner_pin: ownerPin || null })
   if (error) throw new Error(error.message)
 }
 
@@ -324,10 +332,21 @@ export async function liveOpenShift(sb: Sb, openingCash: number): Promise<number
   return data as number
 }
 
-export async function liveCloseShift(sb: Sb, closingCash: number, note: string): Promise<{ cash_sales: number; expected_cash: number; cash_diff: number; opening_cash: number }> {
+export async function liveCloseShift(sb: Sb, closingCash: number, note: string): Promise<{ cash_sales: number; expected_cash: number; cash_diff: number; opening_cash: number; cash_in: number; cash_out: number }> {
   const { data, error } = await sb.rpc('close_shift', { p_closing_cash: closingCash, p_note: note || null })
   if (error) throw new Error(error.message)
-  return data as { cash_sales: number; expected_cash: number; cash_diff: number; opening_cash: number }
+  return data as { cash_sales: number; expected_cash: number; cash_diff: number; opening_cash: number; cash_in: number; cash_out: number }
+}
+
+/** Uang non-penjualan masuk/keluar drawer selama shift (RPC shift_cash_movement). */
+export async function liveShiftCashMovement(sb: Sb, direction: 'in' | 'out', amount: number, note: string): Promise<void> {
+  const { error } = await sb.rpc('shift_cash_movement', { p_direction: direction, p_amount: amount, p_note: note || null })
+  if (error) throw new Error(error.message)
+}
+
+export async function liveSetOwnerPin(sb: Sb, pin: string): Promise<void> {
+  const { error } = await sb.rpc('set_owner_pin', { p_pin: pin })
+  if (error) throw new Error(error.message)
 }
 
 export async function liveCurrentShift(sb: Sb, online: boolean): Promise<Shift | null> {
@@ -422,15 +441,17 @@ export async function liveLoadTransactions(sb: Sb, fromISO: string, toISO: strin
 }
 
 export async function liveLoadFinance(sb: Sb, fromISO: string, toISO: string): Promise<{ expenses: Expense[]; expenseCats: ExpenseCategory[]; otherIncome: OtherIncome[] }> {
-  const [e, c, i] = await Promise.all([
+  const [e, c, i, s] = await Promise.all([
     sb.from('expenses').select('*').gte('spent_at', fromISO).lte('spent_at', toISO).order('spent_at', { ascending: false }),
     sb.from('expense_categories').select('*').order('name'),
-    sb.from('other_income').select('*').gte('earned_at', fromISO).lte('earned_at', toISO).order('earned_at', { ascending: false })
+    sb.from('other_income').select('*').gte('earned_at', fromISO).lte('earned_at', toISO).order('earned_at', { ascending: false }),
+    sb.from('settings').select('value').eq('key', 'expense_categories').maybeSingle()
   ])
   if (e.error) throw new Error(e.error.message)
   return {
     expenses: (e.data ?? []) as Expense[],
-    expenseCats: (c.data ?? []) as ExpenseCategory[],
+    // kategori dari settings (dikelola owner di Keuangan) menang; tabel seed cuma fallback
+    expenseCats: ((s.data?.value as ExpenseCategory[] | undefined) ?? (c.data ?? [])) as ExpenseCategory[],
     otherIncome: (i.data ?? []) as OtherIncome[]
   }
 }
@@ -442,6 +463,17 @@ export async function liveAddExpense(sb: Sb, categoryId: number | null, amount: 
 
 export async function liveAddOtherIncome(sb: Sb, source: string, amount: number, note: string): Promise<void> {
   const { error } = await sb.from('other_income').insert({ source, amount, note: note || null })
+  if (error) throw new Error(error.message)
+}
+
+/** Hapus master via RPC: server menolak bila masih terpakai (riwayat/resep). */
+export async function liveDeleteProduct(sb: Sb, id: number): Promise<void> {
+  const { error } = await sb.rpc('delete_product', { p_product_id: id })
+  if (error) throw new Error(error.message)
+}
+
+export async function liveDeleteIngredient(sb: Sb, id: number): Promise<void> {
+  const { error } = await sb.rpc('delete_ingredient', { p_ingredient_id: id })
   if (error) throw new Error(error.message)
 }
 

@@ -29,6 +29,7 @@ export default function History(): ReactElement {
   const [detail, setDetail] = useState<Transaction | null>(null)
   const [confirm, setConfirm] = useState<{ tx: Transaction; act: 'refund' | 'delete' } | null>(null)
   const [reason, setReason] = useState('')
+  const [ownerPin, setOwnerPin] = useState('')
   const [edit, setEdit] = useState<Transaction | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -68,14 +69,15 @@ export default function History(): ReactElement {
     setErr('')
     try {
       if (confirm.act === 'refund') {
-        const r = await refundTx(confirm.tx.id, reason)
+        const r = await refundTx(confirm.tx.id, reason, ownerPin)
         toast(`Refund ${fmtRp(r.amount)} tercatat, nota ${r.receipt_no}.`)
       } else {
-        await deleteTx(confirm.tx.id, reason)
+        await deleteTx(confirm.tx.id, reason, ownerPin)
         toast(`Nota ${confirm.tx.receipt_no ?? confirm.tx.id} dibatalkan, stok sudah kembali.`)
       }
       setConfirm(null)
       setReason('')
+      setOwnerPin('')
       await reload(date)
     } catch (ex) {
       setErr((ex as Error).message)
@@ -229,6 +231,7 @@ export default function History(): ReactElement {
         onClose={() => {
           setConfirm(null)
           setReason('')
+          setOwnerPin('')
         }}
       >
         {confirm && (
@@ -251,11 +254,24 @@ export default function History(): ReactElement {
               Alasan {confirm.act === 'delete' ? '(opsional)' : '(opsional)'}
             </label>
             <input id="reason" className="input mb-3" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Contoh: pelanggan batal, salah input menu" />
+            <label className="lbl" htmlFor="ownerpin">
+              PIN Owner (wajib)
+            </label>
+            <input
+              id="ownerpin"
+              className="input mb-3"
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              value={ownerPin}
+              onChange={(e) => setOwnerPin(e.target.value.replace(/\D/g, ''))}
+              placeholder="PIN 4 digit owner"
+            />
             <div className="flex gap-2">
               <button
                 type="button"
                 className="btn-primary flex-1"
-                disabled={busy}
+                disabled={busy || ownerPin.trim().length < 4}
                 onClick={() => void act()}
               >
                 {busy ? 'Memproses...' : confirm.act === 'refund' ? 'Ya, Refund' : 'Ya, Batalkan Nota'}
@@ -266,6 +282,7 @@ export default function History(): ReactElement {
                 onClick={() => {
                   setConfirm(null)
                   setReason('')
+                  setOwnerPin('')
                 }}
               >
                 Batal

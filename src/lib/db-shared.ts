@@ -121,3 +121,21 @@ export const TX_STATUS_LABEL: Record<TxStatus, string> = {
 }
 
 export const MENU_BUCKET = 'menu-photos'
+
+// ================= PIN owner =================
+
+/**
+ * Aksi sensitif (hapus/refund nota, kelola beban tetap) diminta PIN owner.
+ * PIN disimpan ter-hash di server/demo — nilainya tidak pernah dikirim ke client.
+ */
+export function requireOwnerPin(pin: string | null | undefined): void {
+  const p = (pin ?? '').trim()
+  if (p.length < 4 || !/\d{4,}/.test(p)) err('PIN owner wajib diisi (minimal 4 digit angka)')
+}
+
+/** Hash PIN sederhana utk penyimpanan demo (bukan kriminal-grade; live pakai pgcrypto). */
+export async function hashPin(pin: string): Promise<string> {
+  const data = new TextEncoder().encode('sabana-owner-pin:' + pin)
+  const buf = await crypto.subtle.digest('SHA-256', data)
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}

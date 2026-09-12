@@ -509,9 +509,13 @@ export default function Cashier(): ReactElement {
                     </p>
                   </div>
                   {err && (
-                    <p className="rounded-lg bg-brand-redtext/10 px-3 py-2 text-center text-sm font-bold text-brand-redtext" role="alert">
-                      {err}
-                    </p>
+                    <div className="rounded-lg bg-brand-redtext/10 px-3 py-2 text-center text-sm font-bold text-brand-redtext" role="alert">
+                      <p>{err}</p>
+                      {/* err di panel lunas hanya berasal dari kegagalan print — kasir bisa coba ulang tanpa cari tombol */}
+                      <button type="button" className="btn-ghost mt-2 !min-h-0 !py-1.5 text-xs" onClick={() => void doPrint('bt')}>
+                        Coba Cetak Lagi
+                      </button>
+                    </div>
                   )}
                   <div className="flex gap-2">
                     <button type="button" className="btn-ghost flex-1" onClick={() => void doPrint('bt')}>

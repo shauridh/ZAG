@@ -41,7 +41,7 @@ python scripts/make-icons.py   # regenerate ikon PWA (stdlib saja)
 
 1. Buat project di [supabase.com](https://supabase.com), catat **Project URL** & **anon key** (Settings → API).
 2. **SQL Editor** → jalankan `supabase/migrations/0001_init.sql` (skema, RLS, RPC atomik).
-   - Upgrade dari versi lama? Jalankan juga `supabase/migrations/0002_delivery_schedule.sql` (jadwal antar otomatis di sisi server).
+   - Upgrade dari versi lama? Jalankan juga `0002_delivery_schedule.sql` (jadwal antar), `0003_tx_history.sql` (riwayat), `0004_backfill_profiles.sql` (profil lama), `0005_menu_photo_storage.sql` (foto menu), dan **`0006_drawer_pin_delete.sql`** (wajib: perbaiki refund `stock_movements_kind_check`, tambah uang masuk/keluar drawer, PIN owner, hapus bahan/menu).
 3. Masih di SQL Editor → jalankan `supabase/seed.sql` (menu, resep & harga dari file HPP Excel + price list supplier).
 4. Buat user pertama di **Authentication → Users** (mis. `admin@sabana.id`). Row `profiles` dibuat otomatis; set `role = 'admin'`:
 

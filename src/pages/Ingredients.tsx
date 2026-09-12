@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { loadCatalog, loadTransactions, upsertIngredient, saveIngredientRecipe, type Catalog } from '../lib/db'
+import { loadCatalog, loadTransactions, upsertIngredient, saveIngredientRecipe, deleteIngredient, type Catalog } from '../lib/db'
 import { ingIndex, preparedCost } from '../lib/hpp'
 import { buyPlanFromSales, buyPlanToText, dailySalesOf, type BuyPlan } from '../lib/forecast'
 import { fmtRp, fmtRpPlain, fmtQty, parseNum } from '../lib/money'
 import type { Ingredient, IngredientRecipe } from '../lib/types'
 import { Modal } from '../components/Modal'
 import { useToast } from '../components/Toast'
+
+/** Pilihan satuan beli yang umum — bukan hardcode mati: ada opsi "Lainnya" untuk ketik sendiri. */
+const BUY_UNITS = ['pack', 'kg', 'gram', 'liter', 'pcs', 'ekor', 'potong', 'cup', 'tabung', 'ikat', 'dus', 'porsi']
 
 export default function Ingredients(): ReactElement {
   const { toast } = useToast()
@@ -16,6 +19,7 @@ export default function Ingredients(): ReactElement {
   const [recipeFor, setRecipeFor] = useState<Ingredient | null>(null)
   const [q, setQ] = useState('')
   const [dirty, setDirty] = useState<Record<number, number>>({})
+  const [deleting, setDeleting] = useState<Ingredient | null>(null)
 
   const reload = useCallback(async () => {
     try {
@@ -137,6 +141,9 @@ export default function Ingredients(): ReactElement {
                     )}{' '}
                     <button type="button" className="btn-ghost !min-h-0 !px-2 !py-1 text-xs" onClick={() => setEditing(i)}>
                       Edit
+                    </button>{' '}
+                    <button type="button" className="btn-ghost !min-h-0 !px-2 !py-1 text-xs font-bold text-brand-redtext" onClick={() => setDeleting(i)}>
+                      Hapus
                     </button>
                   </td>
                 </tr>
@@ -204,7 +211,24 @@ export default function Ingredients(): ReactElement {
                 <label className="lbl" htmlFor="iunit">
                   Satuan beli
                 </label>
-                <input id="iunit" className="input" value={editing.buy_unit ?? ''} onChange={(e) => setEditing({ ...editing, buy_unit: e.target.value })} placeholder="pack / kg / ekor" required />
+                <select id="iunit" className="input" value={BUY_UNITS.includes(editing.buy_unit ?? '') ? editing.buy_unit : '__custom__'} onChange={(e) => setEditing({ ...editing, buy_unit: e.target.value === '__custom__' ? '' : e.target.value })}>
+                  {BUY_UNITS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                  <option value="__custom__">Lainnya (ketik sendiri)…</option>
+                </select>
+                {editing.buy_unit === '' && (
+                  <input
+                    className="input mt-2"
+                    value=""
+                    onChange={(e) => setEditing({ ...editing, buy_unit: e.target.value })}
+                    placeholder="contoh: dus / tray / slop"
+                    autoFocus
+                    required
+                  />
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -222,7 +246,7 @@ export default function Ingredients(): ReactElement {
               </div>
               <div>
                 <label className="lbl" htmlFor="iprice">
-                  Harga beli per {editing.buy_unit || 'satuan'} (Rp)
+                  Harga beli per {editing.buy_unit || 'kemasan'} (Rp)
                 </label>
                 <input
                   id="iprice"
@@ -231,6 +255,10 @@ export default function Ingredients(): ReactElement {
                   value={editing.price ? fmtRpPlain(editing.price) : ''}
                   onChange={(e) => setEditing({ ...editing, price: parseInt(e.target.value.replace(/\D/g, ''), 10) || 0 })}
                 />
+                {/* Klarifikasi konvensi harga: yang diketik = harga kemasan utuh; per satuan dasar dihitung otomatis (dipakai HPP). */}
+                <p className="mt-1 text-xs text-brand-muted">
+                  Harga per satuan dasar: <b>{fmtRpPlain(Math.round((editing.price ?? 0) / (editing.pack_content || 1)))}</b> — ini yang dipakai hitung HPP.
+                </p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -257,6 +285,42 @@ export default function Ingredients(): ReactElement {
               Simpan Bahan
             </button>
           </form>
+        )}
+      </Modal>
+
+      {/* Modal konfirmasi hapus bahan */}
+      <Modal open={deleting !== null} title="Hapus Bahan" onClose={() => setDeleting(null)}>
+        {deleting && (
+          <div>
+            <p className="mb-2 text-sm">
+              Hapus bahan <b>{deleting.name}</b>?
+            </p>
+            <p className="mb-3 text-xs font-bold text-brand-muted">
+              Bahan yang sudah pernah dipakai di resep tidak bisa dihapus — cukup nonaktifkan lewat tombol Edit supaya riwayat stok tetap rapi.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="btn-primary flex-1"
+                onClick={async () => {
+                  try {
+                    await deleteIngredient(deleting.id)
+                    setDeleting(null)
+                    await reload()
+                    toast('Bahan dihapus.')
+                  } catch (ex) {
+                    setDeleting(null)
+                    setErr((ex as Error).message)
+                  }
+                }}
+              >
+                Ya, Hapus
+              </button>
+              <button type="button" className="btn-ghost flex-1" onClick={() => setDeleting(null)}>
+                Batal
+              </button>
+            </div>
+          </div>
         )}
       </Modal>
 

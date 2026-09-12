@@ -28,7 +28,7 @@ import { ingredientNeeds, maxAvailableQty, productNeeds, rawNeedsCost, ingIndex,
 import { feeForDistance, haversineKm } from './geo'
 import { fmtRpPlain } from './money'
 import { todayISO } from './dates'
-import { type Catalog, type TxResult, type SessionInfo, type RefundResult, type PortalAddress, err, txIsEditable } from './db-shared'
+import { type Catalog, type TxResult, type SessionInfo, type RefundResult, type PortalAddress, err, txIsEditable, hashPin } from './db-shared'
 
 // ================= Penyimpanan demo =================
 
@@ -117,6 +117,15 @@ function defaultDemo(): DemoData {
       owner_email: { email: '', whatsapp: '' },
       printer: { auto_print: false },
       tablet: { keep_awake: true, fullscreen: false, card_size: 'besar' },
+      owner_pin_set: false,
+      owner_pin_hash: undefined,
+      expense_categories: [
+        { id: 1, name: 'Bahan Baku' },
+        { id: 2, name: 'Gas & Listrik' },
+        { id: 3, name: 'Gaji' },
+        { id: 4, name: 'Sewa' },
+        { id: 5, name: 'Lainnya' }
+      ],
       fixed_costs: [
         { name: 'Listrik', amount: 200000 },
         { name: 'Karyawan', amount: 1500000 },
@@ -368,6 +377,14 @@ export function demoSaveSetting(key: string, value: unknown): void {
   saveDemo(d)
 }
 
+/** Owner menetapkan PIN: disimpan hanya sebagai hash + flag (PIN tak pernah tersimpan mentah). */
+export async function demoSetOwnerPin(pin: string): Promise<void> {
+  const d = loadDemo()
+  d.settings.owner_pin_hash = await hashPin(pin)
+  d.settings.owner_pin_set = true
+  saveDemo(d)
+}
+
 // ================= Auth (demo) =================
 
 export function demoSignIn(email: string, password: string): SessionInfo {
@@ -471,8 +488,10 @@ export function demoCreateTx(p: {
 
 // ================= Riwayat: refund / batal / revisi (demo) =================
 
-export function demoRefundTx(txId: number, reason: string): RefundResult {
+export async function demoRefundTx(txId: number, reason: string, ownerPin: string): Promise<RefundResult> {
   const d = loadDemo()
+  if (!(d.settings.owner_pin_set ?? false) || !d.settings.owner_pin_hash) err('PIN owner belum diatur di menu Keuangan')
+  if ((await hashPin(ownerPin)) !== d.settings.owner_pin_hash) err('PIN owner salah')
   const tx = d.txs.find((t) => t.id === txId) ?? err('Transaksi tidak ditemukan')
   if (!txIsEditable(tx)) err('Transaksi sudah diproses sebelumnya')
   const method = tx.payments?.[0]?.method ?? 'qris'
@@ -505,8 +524,10 @@ export function demoRefundTx(txId: number, reason: string): RefundResult {
   return { refund_id: id, receipt_no: refundTx.receipt_no!, amount, method }
 }
 
-export function demoDeleteTx(txId: number, reason: string): void {
+export async function demoDeleteTx(txId: number, reason: string, ownerPin: string): Promise<void> {
   const d = loadDemo()
+  if (!(d.settings.owner_pin_set ?? false) || !d.settings.owner_pin_hash) err('PIN owner belum diatur di menu Keuangan')
+  if ((await hashPin(ownerPin)) !== d.settings.owner_pin_hash) err('PIN owner salah')
   const tx = d.txs.find((t) => t.id === txId) ?? err('Transaksi tidak ditemukan')
   if (!txIsEditable(tx)) err('Transaksi sudah diproses sebelumnya')
   returnStockOfTxItems(d, tx.items ?? [])
@@ -589,12 +610,28 @@ export function demoOpenShift(openingCash: number): number {
   const floatCash = d.settings.shift.float_cash
   if (openingCash < floatCash) err(`Modal awal kurang dari float kembalian wajib ${floatCash.toLocaleString('id-ID')}`)
   const id = ++d.seq
-  d.shifts.push({ id, user_id: null, opened_at: new Date().toISOString(), closed_at: null, opening_cash: openingCash, closing_cash: null, expected_cash: null, cash_diff: null, note: null, status: 'buka' })
+  d.shifts.push({ id, user_id: null, opened_at: new Date().toISOString(), closed_at: null, opening_cash: openingCash, closing_cash: null, expected_cash: null, cash_diff: null, note: null, status: 'buka', cash_in: 0, cash_out: 0 })
   saveDemo(d)
   return id
 }
 
-export function demoCloseShift(closingCash: number, note: string): { cash_sales: number; expected_cash: number; cash_diff: number; opening_cash: number } {
+/** Uang non-penjualan masuk/keluar drawer selama shift (setoran modal, belanja mendadak). */
+export function demoShiftCashMovement(direction: 'in' | 'out', amount: number, note = ''): void {
+  void note // dicatat hanya di UI; penyimpanan demo tidak punya tabel jurnal kas
+  const d = loadDemo()
+  const shift = d.shifts.find((s) => s.status === 'buka') ?? err('Tidak ada shift terbuka')
+  if (!Number.isFinite(amount) || amount <= 0) err('Nominal harus lebih dari 0')
+  if (direction === 'in') {
+    shift.cash_in = (shift.cash_in ?? 0) + amount
+  } else {
+    const drawerNow = shift.opening_cash + (shift.cash_in ?? 0) - (shift.cash_out ?? 0)
+    if (drawerNow - amount < d.settings.shift.float_cash) err('Drawer akan kurang dari float kembalian wajib, tidak bisa keluarkan uang')
+    shift.cash_out = (shift.cash_out ?? 0) + amount
+  }
+  saveDemo(d)
+}
+
+export function demoCloseShift(closingCash: number, note: string): { cash_sales: number; expected_cash: number; cash_diff: number; opening_cash: number; cash_in: number; cash_out: number } {
   const d = loadDemo()
   const shift = d.shifts.find((s) => s.status === 'buka') ?? err('Tidak ada shift terbuka')
   const floatCash = d.settings.shift.float_cash
@@ -603,7 +640,9 @@ export function demoCloseShift(closingCash: number, note: string): { cash_sales:
     .filter((t) => t.shift_id === shift.id)
     .filter((t) => (t.status ?? 'normal') === 'normal' || t.status === 'refund')
     .reduce((s, t) => s + (t.payments ?? []).filter((p) => p.method === 'cash').reduce((a, p) => a + p.amount, 0), 0)
-  const expected = shift.opening_cash + cashSales
+  const cashIn = shift.cash_in ?? 0
+  const cashOut = shift.cash_out ?? 0
+  const expected = shift.opening_cash + cashSales + cashIn - cashOut
   const diff = closingCash - expected
   if (diff < 0 && !note.trim()) err(`Kas kurang Rp ${(-diff).toLocaleString('id-ID')}, wajib isi catatan kejadian`)
   shift.closed_at = new Date().toISOString()
@@ -613,7 +652,7 @@ export function demoCloseShift(closingCash: number, note: string): { cash_sales:
   shift.note = note
   shift.status = 'tutup'
   saveDemo(d)
-  return { cash_sales: cashSales, expected_cash: expected, cash_diff: diff, opening_cash: shift.opening_cash }
+  return { cash_sales: cashSales, expected_cash: expected, cash_diff: diff, opening_cash: shift.opening_cash, cash_in: cashIn, cash_out: cashOut }
 }
 
 export function demoCurrentShift(): Shift | null {
@@ -755,7 +794,8 @@ export function demoLoadFinance(fromISO: string, toISO: string): { expenses: Exp
   const d = loadDemo()
   return {
     expenses: d.expenses.filter((e) => e.spent_at >= fromISO && e.spent_at <= toISO),
-    expenseCats: d.expenseCats,
+    // kategori dari settings (dikelola owner di Keuangan) menang; seed lama cuma fallback
+    expenseCats: d.settings.expense_categories ?? d.expenseCats,
     otherIncome: d.otherIncome.filter((i) => i.earned_at >= fromISO && i.earned_at <= toISO)
   }
 }
@@ -816,6 +856,29 @@ export function demoUpsertIngredient(i: { id?: number; name: string; code: strin
   } else {
     d.ingredients.push({ ...i, stock: 0, id: ++d.seq })
   }
+  saveDemo(d)
+}
+
+/** Hapus bahan; ditolak bila sudah dipakai resep — suruh nonaktifkan. */
+export function demoDeleteIngredient(id: number): void {
+  const d = loadDemo()
+  const ing = d.ingredients.find((x) => x.id === id) ?? err('Bahan tidak ditemukan')
+  const used = d.recipeItems.some((r) => r.kind === 'ingredient' && r.component_id === id) || d.ingRecipes.some((r) => r.component_id === id)
+  if (used) err(`Bahan ${ing.name} sudah terpakai di resep. Nonaktifkan saja lewat tombol Edit.`)
+  d.ingredients = d.ingredients.filter((x) => x.id !== id)
+  d.ingRecipes = d.ingRecipes.filter((r) => r.ingredient_id !== id)
+  saveDemo(d)
+}
+
+/** Hapus menu; ditolak bila sudah pernah terjual/dipakai resep/paket — suruh nonaktifkan. */
+export function demoDeleteProduct(id: number): void {
+  const d = loadDemo()
+  const prod = d.products.find((x) => x.id === id) ?? err('Menu tidak ditemukan')
+  const used = d.recipeItems.some((r) => r.component_id === id) || d.bundles.some((b) => (b.items ?? []).some((it) => it.product_id === id))
+  if (used) err(`Menu ${prod.name} sudah terpakai di resep/paket. Nonaktifkan saja lewat tombol Edit.`)
+  d.products = d.products.filter((x) => x.id !== id)
+  d.recipeItems = d.recipeItems.filter((r) => r.product_id !== id)
+  d.targets = d.targets.filter((t) => t.product_id !== id)
   saveDemo(d)
 }
 

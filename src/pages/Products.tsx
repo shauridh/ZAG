@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
-import { loadCatalog, loadSettings, upsertProduct, upsertCategory, saveRecipe, saveTargets, saveBundle, saveBundleItems, deleteBundle, uploadProductPhoto, removeProductPhoto, type Catalog } from '../lib/db'
+import { loadCatalog, loadSettings, upsertProduct, upsertCategory, saveRecipe, saveTargets, saveBundle, saveBundleItems, deleteBundle, deleteProduct, uploadProductPhoto, removeProductPhoto, type Catalog } from '../lib/db'
 import { fmtHppQty, hppLines, hppTotal, ingIndex, marginPct, maxAvailableQty } from '../lib/hpp'
 import { fmtRp, fmtRpPlain, parseNum } from '../lib/money'
 import type { Product } from '../lib/types'
@@ -92,6 +92,7 @@ function ProductsTab({
   const [editProd, setEditProd] = useState<Partial<Product> | null>(null)
   const [editCat, setEditCat] = useState<{ id?: number; name: string; sort: number } | null>(null)
   const [recipeFor, setRecipeFor] = useState<Product | null>(null)
+  const [deleting, setDeleting] = useState<Product | null>(null)
   const [q, setQ] = useState('')
 
   const prods = catalog.products.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()))
@@ -164,6 +165,13 @@ function ProductsTab({
                   <button type="button" className="btn-ghost flex-1 !min-h-0 !py-1.5 text-xs" onClick={() => setEditProd(p)}>
                     Edit
                   </button>
+                  <button
+                    type="button"
+                    className="btn-ghost flex-1 !min-h-0 !py-1.5 text-xs font-bold text-brand-redtext"
+                    onClick={() => setDeleting(p)}
+                  >
+                    Hapus
+                  </button>
                 </span>
               </div>
             </article>
@@ -186,6 +194,42 @@ function ProductsTab({
             setErr={setErr}
             catalog={catalog}
           />
+        )}
+      </Modal>
+
+      {/* Modal konfirmasi hapus menu */}
+      <Modal open={deleting !== null} title="Hapus Menu" onClose={() => setDeleting(null)}>
+        {deleting && (
+          <div>
+            <p className="mb-2 text-sm">
+              Hapus menu <b>{deleting.name}</b>?
+            </p>
+            <p className="mb-3 text-xs font-bold text-brand-muted">
+              Menu yang sudah pernah terjual / dipakai di resep atau paket tidak bisa dihapus — cukup matikan lewat Edit (Nonaktif) supaya laporan tetap akurat.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="btn-primary flex-1"
+                onClick={async () => {
+                  try {
+                    await deleteProduct(deleting.id)
+                    setDeleting(null)
+                    await reload()
+                    toast('Menu dihapus.')
+                  } catch (ex) {
+                    setDeleting(null)
+                    setErr((ex as Error).message)
+                  }
+                }}
+              >
+                Ya, Hapus
+              </button>
+              <button type="button" className="btn-ghost flex-1" onClick={() => setDeleting(null)}>
+                Batal
+              </button>
+            </div>
+          </div>
         )}
       </Modal>
 
