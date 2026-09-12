@@ -4,7 +4,7 @@ import { fmtRp, fmtRpPlain } from '../lib/money'
 import type { Shift, Transaction, Settings } from '../lib/types'
 import { Numpad } from '../components/Numpad'
 import { Modal } from '../components/Modal'
-import { fmtDateTime, todayISO } from '../lib/dates'
+import { fmtDateTime, todayISO, dayStart } from '../lib/dates'
 import { byChannel, byItem, byPayment, totalsOf, endOfDayReport, endOfDayText } from '../lib/reports'
 import { downloadCsv } from '../lib/csv'
 import { useToast } from '../components/Toast'
@@ -115,7 +115,7 @@ export default function ShiftPage(): ReactElement {
               className="btn-ghost flex-1"
               onClick={() => {
                 setEodOpen(true)
-                void loadTransactions(todayISO() + 'T00:00:00', new Date().toISOString()).then(setEodTxs).catch((ex) => setErr((ex as Error).message))
+                void loadTransactions(dayStart(todayISO()), new Date().toISOString()).then(setEodTxs).catch((ex) => setErr((ex as Error).message))
               }}
             >
               Akhir Hari
@@ -147,7 +147,7 @@ export default function ShiftPage(): ReactElement {
               className="btn-ghost flex-1"
               onClick={() => {
                 setEodOpen(true)
-                void loadTransactions(todayISO() + 'T00:00:00', new Date().toISOString()).then(setEodTxs).catch((ex) => setErr((ex as Error).message))
+                void loadTransactions(dayStart(todayISO()), new Date().toISOString()).then(setEodTxs).catch((ex) => setErr((ex as Error).message))
               }}
             >
               Laporan Akhir Hari
@@ -272,7 +272,7 @@ export default function ShiftPage(): ReactElement {
               const notes: string[] = [`Shift ditutup. Selisih kas ${fmtRp(rep.cash_diff)}.`]
               notes.push(settings.owner_email.email ? 'Laporan email terkirim ke pemilik.' : 'Email pemilik belum diatur.')
               try {
-                const todayTxs = await loadTransactions(todayISO() + 'T00:00:00', new Date().toISOString())
+                const todayTxs = await loadTransactions(dayStart(todayISO()), new Date().toISOString())
                 const eodText = endOfDayText(endOfDayReport(todayTxs, settings.channels), settings.store.name, todayISO())
                 const wa = settings.owner_email.whatsapp.replace(/\D/g, '')
                 if (wa) {

@@ -31,6 +31,7 @@ const todayFrom = (d: Date): string => {
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10)
 }
 
-/** Awal hari (lokal) sebagai ISO utk filter created_at. */
-export const dayStart = (iso: string): string => iso + 'T00:00:00'
-export const dayEnd = (iso: string): string => iso + 'T23:59:59'
+/** Awal hari lokal sebagai UTC ISO — aman utk string-compare created_at.
+ *  Dulu 'T00:00:00' polos dibaca UTC: transaksi 00.00–06.59 WIB melompat hari. */
+export const dayStart = (iso: string): string => new Date(iso + 'T00:00:00').toISOString()
+export const dayEnd = (iso: string): string => new Date(iso + 'T23:59:59.999').toISOString()

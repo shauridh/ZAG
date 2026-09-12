@@ -3,7 +3,7 @@ import { loadTransactions, loadCatalog, refundTx, deleteTx, editTx, txIsEditable
 import { fmtRp, fmtRpPlain } from '../lib/money'
 import type { Transaction, TxStatus } from '../lib/types'
 import { Modal } from '../components/Modal'
-import { fmtDate, fmtDateTime, todayISO } from '../lib/dates'
+import { fmtDate, fmtDateTime, todayISO, dayStart, dayEnd } from '../lib/dates'
 import { CHANNEL_LABEL } from '../lib/escpos'
 import { buildReceiptHtml, receiptFromTx } from '../lib/escpos'
 import { loadSettings } from '../lib/db'
@@ -36,7 +36,8 @@ export default function History(): ReactElement {
   const reload = useCallback(async (d: string) => {
     setTxs(null)
     try {
-      const rows = await loadTransactions(d + 'T00:00:00', d + 'T23:59:59', true)
+      // UTC ISO agar string-compare created_at benar untuk transaksi dini hari
+      const rows = await loadTransactions(dayStart(d), dayEnd(d), true)
       setTxs([...rows].reverse())
       setErr('')
     } catch (ex) {

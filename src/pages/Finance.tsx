@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactElement } from 'react'
 import { loadFinance, loadTransactions, loadSettings, addExpense, addOtherIncome, saveSetting, setOwnerPin, verifyOwnerPin } from '../lib/db'
 import { fmtRp, fmtRpPlain } from '../lib/money'
-import { todayISO, fmtDate } from '../lib/dates'
+import { todayISO, fmtDate, dayStart, dayEnd } from '../lib/dates'
 import { profitLoss, totalsOf } from '../lib/reports'
 import type { Settings, Transaction } from '../lib/types'
 import { downloadCsv } from '../lib/csv'
@@ -28,7 +28,7 @@ export default function Finance(): ReactElement {
 
   const reload = useCallback(async () => {
     try {
-      const [f, t, s] = await Promise.all([loadFinance(month, endOfMonth(month)), loadTransactions(month + 'T00:00:00', endOfMonth(month) + 'T23:59:59'), loadSettings()])
+      const [f, t, s] = await Promise.all([loadFinance(month, endOfMonth(month)), loadTransactions(dayStart(month), dayEnd(endOfMonth(month))), loadSettings()])
       setFin(f)
       setTxs(t)
       setSettings(s)
