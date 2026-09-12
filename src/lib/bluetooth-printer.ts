@@ -13,6 +13,7 @@
 
 interface BtCharacteristic {
   writeValue(value: BufferSource): Promise<void>
+  writeValueWithoutResponse?(value: BufferSource): Promise<void>
 }
 
 interface BtCharInfo {
@@ -48,11 +49,12 @@ interface BtApi {
 // Makin panjang daftar, makin besar peluang printer terdeteksi di dialog pair.
 const PRINTER_SERVICES = [
   '000018f0-0000-1000-8000-00805f9b34fb',
-  'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
   '0000ff00-0000-1000-8000-00805f9b34fb',
   '0000ffe0-0000-1000-8000-00805f9b34fb',
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
   '0000ffe5-0000-1000-8000-00805f9b34fb',
   '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+  '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
   '0000fee7-0000-1000-8000-00805f9b34fb'
 ]
 
@@ -112,12 +114,25 @@ export function forgetPrinter(): void {
 }
 
 /**
- * Cari karakteristik tulis dengan memindai SEMUA service yang boleh diakses.
- * Dulu hanya dicek 3 UUID standar — printer dengan UUID tidak standar konek
- * GATT tapi gagal di tahap ini, sehingga keliru dilaporkan "tidak terjangkau".
+ * Cari karakteristik tulis. URUTAN PENTING: printer mini sering punya BEBERAPA
+ * karakteristik tulis (cetak, OTA/DFU, dll) — menulis ke yang salah = koneksi
+ * berhasil tapi kertas tidak keluar tanpa error. Maka service printer yang
+ * dikenal dicoba dulu, baru pindai sisanya sebagai fallback.
  */
 async function getCharacteristic(device: BtDevice): Promise<BtCharacteristic> {
   if (!device.gatt) throw new Error('GATT tidak tersedia')
+  // 1) service printer yang dikenal, sesuai urutan prioritas
+  for (const svc of PRINTER_SERVICES) {
+    try {
+      const service = await device.gatt.getPrimaryService(svc)
+      const chars = await service.getCharacteristics()
+      const c = chars.find((x) => x.properties.write || x.properties.writeWithoutResponse)
+      if (c) return service.getCharacteristic(c.uuid)
+    } catch {
+      // printer tak punya service ini, lanjut
+    }
+  }
+  // 2) fallback: pindai semua service yang bisa diakses
   const services = await device.gatt.getPrimaryServices()
   for (const service of services) {
     try {
@@ -134,7 +149,17 @@ async function getCharacteristic(device: BtDevice): Promise<BtCharacteristic> {
 async function writeBytes(ch: BtCharacteristic, bytes: number[]): Promise<void> {
   // kirim per 180 byte, beberapa printer patah di paket besar
   for (let i = 0; i < bytes.length; i += 180) {
-    await ch.writeValue(new Uint8Array(bytes.slice(i, i + 180)))
+    const buf = new Uint8Array(bytes.slice(i, i + 180))
+    try {
+      await ch.writeValue(buf)
+    } catch (ex) {
+      // sebagian firmware hanya menerima write-without-response — coba jalur itu
+      if (ch.writeValueWithoutResponse) {
+        await ch.writeValueWithoutResponse(buf)
+      } else {
+        throw ex
+      }
+    }
     await new Promise((r) => setTimeout(r, 40))
   }
 }
@@ -276,4 +301,103 @@ export function printHtmlFallback(html: string): void {
     `<html><head><title>Struk</title><style>@media print{body{margin:0}}@page{margin:3mm}</style></head><body>${html}<script>window.onload=()=>{window.print()}<\\/script></body></html>`
   )
   win.document.close()
+}
+
+export interface DiagStep {
+  step: string
+  ok: boolean
+  info?: string
+}
+
+/**
+ * Diagnostik langkah-per-langkah untuk printer bandel: coba konek GATT
+ * (wajib user pilih di dialog), petakan semua service + karakteristik yang
+ * terlihat, lalu kirim payload tes ESC/POS. Semua temuan dikembalikan supaya
+ * UI bisa menampilkannya — tak perlu menebak lagi gagal di mana.
+ */
+export async function diagnosePrinter(onLog?: (s: string) => void): Promise<DiagStep[]> {
+  const log = (s: string): void => onLog?.(s)
+  const steps: DiagStep[] = []
+  const bt = (navigator as unknown as { bluetooth: BtApi }).bluetooth
+  const push = (step: string, ok: boolean, info?: string): void => {
+    steps.push({ step, ok, info })
+    log(`${ok ? '✓' : '✗'} ${step}${info ? ' — ' + info : ''}`)
+  }
+
+  push('Browser mendukung Web Bluetooth', bluetoothAvailable())
+  if (!bluetoothAvailable()) return steps
+
+  let device: BtDevice
+  try {
+    device = await bt.requestDevice(requestOpts('all'))
+    push('Pilih perangkat di dialog', true, `${device.name ?? '(tanpa nama)'} · id ${device.id.slice(0, 8)}…`)
+  } catch (ex) {
+    push('Pilih perangkat di dialog', false, (ex as Error).message)
+    return steps
+  }
+
+  try {
+    await device.gatt!.connect()
+    push('GATT connect', true)
+  } catch (ex) {
+    push('GATT connect', false, (ex as Error).message)
+    return steps
+  }
+
+  let chosen: BtCharacteristic | null = null
+  let chosenUuid = ''
+  let chosenKnown = false
+  const knownSet = new Set(PRINTER_SERVICES)
+  try {
+    const services = await device.gatt!.getPrimaryServices()
+    push('Baca daftar service', true, `${services.length} service`)
+    for (const service of services) {
+      try {
+        const chars = await service.getCharacteristics()
+        const su = (service as unknown as { uuid?: string }).uuid ?? ''
+        const isKnown = knownSet.has(su)
+        for (const c of chars) {
+          const w = c.properties.write || c.properties.writeWithoutResponse
+          // pilih karakteristik dari service printer yang dikenal dulu, baru fallback
+          if (w && (!chosen || (isKnown && !chosenKnown))) {
+            chosenUuid = c.uuid
+            chosen = await service.getCharacteristic(c.uuid)
+            chosenKnown = isKnown
+          }
+        }
+        push(
+          `Service ${serviceUuidShort(service)}: ${chars.length} karakteristik`,
+          true,
+          chars.map((c) => `${shortUuid(c.uuid)}${c.properties.write ? '[W]' : c.properties.writeWithoutResponse ? '[Wnr]' : ''}`).join(' ') || '(kosong)'
+        )
+      } catch (ex) {
+        push(`Service ${serviceUuidShort(service)}: baca karakteristik`, false, (ex as Error).message)
+      }
+    }
+    if (chosen) push('Karakteristik tulis ditemukan', true, `${shortUuid(chosenUuid)}${chosenKnown ? ' (service prioritas)' : ' (fallback)'}`)
+    else push('Karakteristik tulis ditemukan', false, 'tidak ada yang bisa ditulisi')
+  } catch (ex) {
+    push('Baca daftar service', false, (ex as Error).message)
+    return steps
+  }
+
+  if (!chosen) return steps
+
+  try {
+    const bytes = [...initCmd(), ...Array.from(encoder.encode('TES DIAGNOSTIK SABANA\n\n\n')), ...feedCut()]
+    await writeBytes(chosen, bytes)
+    push('Kirim data tes ESC/POS', true, 'cek kertas di printer')
+  } catch (ex) {
+    push('Kirim data tes ESC/POS', false, (ex as Error).message)
+  }
+  return steps
+}
+
+function shortUuid(u: string): string {
+  const m = /^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/i.exec(u)
+  return m ? `0x${m[1]}` : u.slice(0, 8)
+}
+
+function serviceUuidShort(s: BtService & { uuid?: string }): string {
+  return shortUuid((s as unknown as { uuid?: string }).uuid ?? '?')
 }

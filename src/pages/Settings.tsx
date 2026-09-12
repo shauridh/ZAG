@@ -5,7 +5,7 @@ import { normalizeSchedule, DAY_LABELS, DAY_ORDER, type DeliveryWeek } from '../
 import type { Settings } from '../lib/types'
 import { MapPicker } from '../components/MapPicker'
 import { useToast } from '../components/Toast'
-import { bluetoothAvailable, getSavedPrinter, forgetPrinter, pickAndSavePrinter, printTextBluetooth, canReconnectSaved, type SavedPrinter } from '../lib/bluetooth-printer'
+import { bluetoothAvailable, getSavedPrinter, forgetPrinter, pickAndSavePrinter, printTextBluetooth, canReconnectSaved, diagnosePrinter, type SavedPrinter, type DiagStep } from '../lib/bluetooth-printer'
 
 type Tab = 'toko' | 'struk' | 'printer' | 'qris' | 'outlet' | 'tablet' | 'biaya'
 
@@ -495,6 +495,21 @@ function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; on
   const [printer, setPrinter] = useState<SavedPrinter | null>(getSavedPrinter())
   const [busy, setBusy] = useState(false)
   const [reachable, setReachable] = useState<boolean | null>(null)
+  const [diag, setDiag] = useState<DiagStep[]>([])
+
+  const runDiag = async (): Promise<void> => {
+    setBusy(true)
+    setErr('')
+    setDiag([])
+    try {
+      const steps = await diagnosePrinter((s) => setDiag((prev) => [...prev, { step: s.replace(/^[✓✗] /, ''), ok: s.startsWith('✓'), info: undefined }]))
+      setDiag(steps)
+    } catch (ex) {
+      setErr((ex as Error).message || 'Diagnostik gagal')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const pick = async (mode: 'strict' | 'all'): Promise<void> => {
     if (!bluetoothAvailable()) {
@@ -615,6 +630,30 @@ function PrinterTab({ autoPrint, onAutoPrint, setErr }: { autoPrint: boolean; on
           Print otomatis setiap transaksi selesai
         </label>
       </div>
+      <details className="mt-3 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3 text-sm">
+        <summary className="cursor-pointer font-extrabold">Masih gagal juga? Jalankan Diagnostik</summary>
+        <p className="mt-2">Menyambung ke printer lewat dialog lalu memetakan semua service/karakteristik dan mengirim tes cetak — hasilnya diperlihatkan persis gagal di tahap mana. Jalankan saat printer nyala. Salin hasilnya dan kirim ke saya bila masih buntu.</p>
+        <button type="button" className="btn-ghost mt-2" disabled={busy} onClick={() => void runDiag()}>
+          {busy ? 'Menjalankan diagnostik...' : 'Jalankan Diagnostik Printer'}
+        </button>
+        {diag.length > 0 && (
+          <div className="mt-2 rounded-lg bg-black/85 p-3 font-mono text-[11px] leading-relaxed text-green-200">
+            {diag.map((d, i) => (
+              <p key={i} className={d.ok ? '' : 'text-red-300'}>
+                {d.ok ? '✓' : '✗'} {d.step}
+                {d.info ? ` — ${d.info}` : ''}
+              </p>
+            ))}
+            <button
+              type="button"
+              className="btn-ghost mt-2 !py-1 text-xs"
+              onClick={() => void navigator.clipboard.writeText(diag.map((d) => `${d.ok ? 'OK' : 'GAGAL'}: ${d.step}${d.info ? ' — ' + d.info : ''}`).join('\n')).then(() => toast('Hasil diagnostik disalin.'))}
+            >
+              Salin hasil
+            </button>
+          </div>
+        )}
+      </details>
       <details className="mt-3 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3 text-sm">
         <summary className="cursor-pointer font-extrabold">Printer bandel? 3 cara alternatif</summary>
         <ol className="mt-2 list-decimal space-y-2 pl-5">
