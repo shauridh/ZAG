@@ -278,9 +278,9 @@ export default function SettingsPage(): ReactElement {
       {tab === 'printer' && (
         <PrinterTab
           autoPrint={settings.printer.auto_print}
-          onAutoPrint={(v) => void upd('printer', { auto_print: v })}
+          onAutoPrint={(v) => void upd('printer', { ...settings.printer, auto_print: v })}
           mode={settings.printer.mode ?? 'bt'}
-          onMode={(m) => void upd('printer', { mode: m })}
+          onMode={(m) => void upd('printer', { ...settings.printer, mode: m })}
           setErr={setErr}
         />
       )}
@@ -590,7 +590,10 @@ function PrinterTab({ autoPrint, onAutoPrint, mode, onMode, setErr }: { autoPrin
           <p className="text-sm font-bold text-brand-muted">Belum ada printer tersimpan.</p>
         )}
       </div>
-      {autoPrint && !printer && (
+      {autoPrint && mode === 'rawbt' && (
+        <p className="mb-2 rounded-lg bg-brand-gold/25 px-3 py-2 text-sm font-bold">Print otomatis aktif: setiap transaksi selesai langsung membuka jendela struk — kasir cukup satu ketuk CETAK, lalu pilih RawBT di dialog printer Android.</p>
+      )}
+      {autoPrint && mode === 'bt' && !printer && (
         <p className="mb-2 rounded-lg bg-brand-gold/25 px-3 py-2 text-sm font-bold">Print otomatis aktif: pilih printer dulu supaya struk langsung tercetak tanpa dialog.</p>
       )}
       {printer && (

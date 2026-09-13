@@ -236,16 +236,25 @@ export default function Cashier(): ReactElement {
       setDiscount(0)
       setNote('')
       void reload()
-      // print otomatis bila diaktifkan di Pengaturan; gagal sambung tidak
-      // menghentikan kasir dan tidak memunculkan dialog pair mendadak
-      if (settings?.printer.auto_print && (settings.printer.mode ?? 'bt') === 'bt') {
-        void printTextBluetooth(receiptText(tx)).then((how) => {
-          if (how === 'reconnect-gagal') {
-            setErr('Print otomatis gagal (dialog pair butuh ketukan — normal di Chrome stabil). Transaksi tetap tersimpan — tekan Cetak untuk buka dialog, atau pakai Dialog/RawBT.')
-          } else if (how === 'print-gagal') {
-            setErr('Print otomatis gagal: printer tersambung tapi struk gagal terkirim. Transaksi tetap tersimpan — tekan Cetak untuk coba lagi.')
+      // Print otomatis bila diaktifkan di Pengaturan; gagal sambung tidak
+      // menghentikan kasir dan tidak memunculkan dialog pair mendadak.
+      // Mode RawBT: auto-print membuka jendela struk (1 ketuk CETAK) — bila
+      // popup diblokir, pesannya jujur dan tombol Cetak tinggal ditekan lagi.
+      if (settings?.printer.auto_print) {
+        if ((settings.printer.mode ?? 'bt') === 'rawbt') {
+          const html = buildReceiptHtml(receiptFromTx(settings, tx, tx.items, tx.payments, ''), settings.receipt.width_mm)
+          if (!openRawBtReceipt(html)) {
+            setErr('Print otomatis terblokir popup browser. Transaksi tetap tersimpan — izinkan popup lalu tekan Cetak.')
           }
-        })
+        } else {
+          void printTextBluetooth(receiptText(tx)).then((how) => {
+            if (how === 'reconnect-gagal') {
+              setErr('Print otomatis gagal (dialog pair butuh ketukan — normal di Chrome stabil). Transaksi tetap tersimpan — tekan Cetak untuk buka dialog, atau pakai Dialog/RawBT.')
+            } else if (how === 'print-gagal') {
+              setErr('Print otomatis gagal: printer tersambung tapi struk gagal terkirim. Transaksi tetap tersimpan — tekan Cetak untuk coba lagi.')
+            }
+          })
+        }
       }
     } catch (ex) {
       setErr((ex as Error).message)
