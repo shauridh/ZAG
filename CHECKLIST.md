@@ -163,8 +163,16 @@ Catatan operasional:
 | Keuangan: laba rugi, kategori & PIN di halaman Keuangan | ✅ (baru) |
 | Offline queue + sync ulang | ✅ (unit test) |
 | PWA precache + foto demo offline | ✅ |
-| Typecheck & 53/53 unit test | ✅ |
+| Typecheck & 94/94 unit test | ✅ |
+| E2E tutup shift demo (`test_shift_e2e.py`): kembalian bukan penjualan, guard float, guard catatan, selisih minus tercatat | ✅ 5/5 |
+| E2E Simpan Pesanan/Bill demo (`test_bill_e2e.py`): simpan, guard uang kurang, bayar+kembalian, hilang dari daftar, void | ✅ 5/5 |
 | Migrasi 0006 dijalankan di Supabase produksi | ✅ (owner) |
+| **Migrasi 0007 dijalankan di Supabase produksi** | ⬜ wajib sebelum go-live (`supabase/migrations/0007_price_list_reset.sql` — kolom satuan kecil + impor price list + reset mulai-dari-nol + hapus PIN) |
+| **Migrasi 0008 dijalankan di Supabase produksi** | ✅ versi awal punya bug (`create_tx` tidak ada); **fix v2 `fix_pay_held_order.sql` dijalankan 14 Sep** (drop overload + create_transaction + reload schema; diagnosa: bill_uji_ada=1, SUDAH BARU) |
+| **Migrasi 0009 dijalankan di Supabase produksi** | ⬜ penjaga transisi status pesanan portal + kasir bisa menolak pesanan yang sudah bayar tapi belum diverifikasi (`supabase/migrations/0009_portal_status_guard.sql`) |
+| **Migrasi 0010 dijalankan di Supabase produksi** | ⬜ koreksi kas drawer: kembalian tunai tidak lagi dihitung penjualan (`supabase/migrations/0010_close_shift_change_fix.sql` — WAJIB, tanpa ini expected_cash tergelembung sebesar kembalian; **terbukti di live 14 Sep**: Laporan X shift #5 cash Rp199.000 vs omzet Rp112.000 = selisih kembalian Rp87.000. Sisi frontend sudah diperbaiki via `byPayment`, sisi `close_shift` server masih menunggu migrasi) |
+| Simpan Pesanan (Bill) di **produksi**: simpan → bayar → struk + stok terpotong | ✅ teruji penuh live 14 Sep: simpan ✓ → bayar tunai Rp20rb utk Rp5rb → struk SB260914-0034 + kembalian Rp15rb ✓ → Riwayat kas net Rp5rb ✓ → Shift penjualan tunai +Rp5rb ✓ (cek stok terpotong saat opname berikutnya) |
+| Go-live: Pengaturan → **Hapus Semua Data (mulai dari nol)**, lalu **Impor Price List** | ⬜ (produksi mulai bersih; stok diisi via Pembelian) |
 | Refund/hapus di **produksi** pasca-0006 | ⬜ uji 1x di live |
 | Printer thermal fisik (Bluetooth) | ⬜ uji di HP kasir — Web Bluetooth dulu, kalau gagal jalur **RawBT §2b** |
 | RawBT di HP kasir terpasang & teruji | ⬜ (cadangan andal) |
