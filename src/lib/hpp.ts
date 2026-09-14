@@ -48,7 +48,11 @@ export function productNeeds(
   return out
 }
 
-/** Kebutuhan bahan mentah untuk memproduksi qty unit bahan prepared. */
+/**
+ * Kebutuhan bahan mentah untuk memproduksi qty unit bahan prepared.
+ * Bahan TANPA resep produksi = output langsung (pemotongan/persiapan):
+ * tidak mengonsumsi apa pun — stoknya bertambah apa adanya saat batch produksi.
+ */
 export function ingredientNeeds(
   ingredientId: number,
   qty: number,
@@ -64,7 +68,9 @@ export function ingredientNeeds(
     if (depth > 20) throw new Error('Resep produksi bersarang terlalu dalam')
     for (const r of rec) visit(r.component_id, q * r.qty, depth + 1)
   }
-  visit(ingredientId, qty, 0)
+  const seed = ingRecipes.get(ingredientId)
+  if (!seed || seed.length === 0) return out // output langsung: tanpa konsumsi
+  for (const r of seed) visit(r.component_id, qty * r.qty, 1)
   return out
 }
 

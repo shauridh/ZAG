@@ -446,8 +446,12 @@ $$;
 create or replace function ingredient_needs(p_ingredient_id bigint, p_qty numeric)
 returns table (ingredient_id bigint, need numeric)
 language sql stable as $$
+  -- Bahan tanpa resep produksi = output langsung (pemotongan/persiapan): TIDAK
+  -- mengonsumsi apa pun (lihat 0011_flexible_production_output.sql). Tanpa filter
+  -- exists ini, bahan tanpa resep dianggap memakai dirinya sendiri -> stok +qty lalu -qty (net 0).
   with recursive expand as (
     select p_ingredient_id as iid, p_qty as qty
+    where exists (select 1 from ingredient_recipes r where r.ingredient_id = p_ingredient_id)
     union all
     select r.component_id, e.qty * r.qty
     from expand e

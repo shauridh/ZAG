@@ -72,9 +72,12 @@ describe('hppLines / hppTotal', () => {
 })
 
 describe('ingredientNeeds / preparedCost', () => {
-  it('falls back to the ingredient itself when it has no production recipe', () => {
+  it('recipe-less ingredient = output langsung: tanpa konsumsi apa pun (0011)', () => {
+    // Regresi 0011: sebelumnya bahan tanpa resep dianggap mengonsumsi dirinya
+    // sendiri (needs = dirinya × qty) -> batch produksi stok +qty lalu -qty (net 0)
+    // dan validasi menolak bila stok < qty. Kini: kosong.
     const needs = ingredientNeeds(11, 2, noIngRecipes)
-    expect(needs.get(11)).toBe(2)
+    expect(needs.size).toBe(0)
   })
 
   it('expands production recipes of prepared ingredients', () => {

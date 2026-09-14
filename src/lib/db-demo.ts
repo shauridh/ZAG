@@ -724,6 +724,8 @@ export function demoCreateBatch(p: { outputs: { ingredient_id: number; qty: numb
   const d = loadDemo()
   const { ingRecipes } = mapsOf(d)
   for (const o of p.outputs)
+    // Bahan output TANPA resep = output langsung: stok bertambah tanpa memotong apa pun.
+    // (Sebelumnya dihitung mengonsumsi dirinya sendiri → net nol / ditolak "bahan kurang".)
     for (const [iid, need] of ingredientNeeds(o.ingredient_id, o.qty, ingRecipes)) {
       const ing = d.ingredients.find((i) => i.id === iid)
       if (ing && ing.stock < need) err(`Bahan kurang: ${ing.name} (butuh ${need.toFixed(2)}, tersedia ${ing.stock.toFixed(2)})`)

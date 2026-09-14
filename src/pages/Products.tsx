@@ -94,14 +94,64 @@ function ProductsTab({
   const [recipeFor, setRecipeFor] = useState<Product | null>(null)
   const [deleting, setDeleting] = useState<Product | null>(null)
   const [q, setQ] = useState('')
+  // filter status menu: semua / aktif / nonaktif
+  const [activeFilter, setActiveFilter] = useState<'all' | 'on' | 'off'>('all')
+  // menu yang sedang di-toggle (mencegah dobel-klik saat RPC jalan)
+  const [toggling, setToggling] = useState<number | null>(null)
 
-  const prods = catalog.products.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()))
+  const prods = catalog.products.filter(
+    (p) => p.name.toLowerCase().includes(q.toLowerCase()) && (activeFilter === 'all' || (activeFilter === 'on' ? p.is_active : !p.is_active))
+  )
+
+  /** Nonaktifkan/aktifkan menu tanpa buka form Edit — menu nonaktif hilang dari kasir & portal customer. */
+  const toggleActive = async (p: Product): Promise<void> => {
+    setToggling(p.id)
+    setErr('')
+    try {
+      await upsertProduct({
+        id: p.id,
+        name: p.name,
+        category_id: p.category_id,
+        price: p.price,
+        unit: p.unit,
+        is_active: !p.is_active,
+        sort: p.sort,
+        photo: p.photo
+      })
+      await reload()
+    } catch (ex) {
+      setErr((ex as Error).message)
+    } finally {
+      setToggling(null)
+    }
+  }
   const catName = (id: number | null): string => catalog.categories.find((c) => c.id === id)?.name ?? 'Tanpa kategori'
 
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <input className="input max-w-56" placeholder="Cari produk..." value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari produk" />
+        {/* filter status menu: menu nonaktif disembunyikan dari kasir & portal */}
+        <div className="flex gap-1" role="radiogroup" aria-label="Filter status menu">
+          {(
+            [
+              ['all', 'Semua'],
+              ['on', 'Aktif'],
+              ['off', 'Nonaktif']
+            ] as ['all' | 'on' | 'off', string][]
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              role="radio"
+              aria-checked={activeFilter === k}
+              className={`chip h-9 px-3 ${activeFilter === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+              onClick={() => setActiveFilter(k)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <button type="button" className="btn-primary" onClick={() => setEditProd({ unit: 'porsi', is_active: true, sort: 99 })}>
           + Produk Baru
         </button>
@@ -164,6 +214,16 @@ function ProductsTab({
                   </button>
                   <button type="button" className="btn-ghost flex-1 !min-h-0 !py-1.5 text-xs" onClick={() => setEditProd(p)}>
                     Edit
+                  </button>
+                  {/* toggle aktif langsung di kartu: menu kosong/habis musiman cukup dimatikan */}
+                  <button
+                    type="button"
+                    className={`btn-ghost flex-1 !min-h-0 !py-1.5 text-xs ${p.is_active ? '' : '!border-brand-gold !text-brand-btn'}`}
+                    disabled={toggling === p.id}
+                    title={p.is_active ? 'Matikan: hilang dari kasir & portal customer' : 'Nyalakan lagi: menu kembali tampil di kasir & portal'}
+                    onClick={() => void toggleActive(p)}
+                  >
+                    {toggling === p.id ? '…' : p.is_active ? 'Matikan' : 'Nyalakan'}
                   </button>
                   <button
                     type="button"

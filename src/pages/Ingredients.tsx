@@ -35,6 +35,10 @@ export default function Ingredients(): ReactElement {
   const [q, setQ] = useState('')
   const [dirty, setDirty] = useState<Record<number, number>>({})
   const [deleting, setDeleting] = useState<Ingredient | null>(null)
+  // filter tampil: semua / aktif saja / nonaktif saja
+  const [activeFilter, setActiveFilter] = useState<'all' | 'on' | 'off'>('all')
+  // bahan yang sedang di-toggle (mencegah dobel-klik saat RPC jalan)
+  const [toggling, setToggling] = useState<number | null>(null)
   // keranjang pembelian: id bahan tercentang di tabel bahan
   const [checked, setChecked] = useState<Set<number>>(new Set())
 
@@ -60,7 +64,9 @@ export default function Ingredients(): ReactElement {
 
   const list = catalog.ingredients.filter((i) => {
     const s = q.toLowerCase()
-    return !s || i.name.toLowerCase().includes(s) || (i.code ?? '').toLowerCase().includes(s)
+    const matchQ = !s || i.name.toLowerCase().includes(s) || (i.code ?? '').toLowerCase().includes(s)
+    const matchActive = activeFilter === 'all' || (activeFilter === 'on' ? i.active : !i.active)
+    return matchQ && matchActive
   })
   const dirtyCount = Object.keys(dirty).length
   // ringkasan atas: nilai stok (stok × harga per satuan dasar) & jumlah bahan di bawah minimum
@@ -88,6 +94,31 @@ export default function Ingredients(): ReactElement {
       else n.delete(id)
       return n
     })
+  }
+
+  /** Nonaktifkan/aktifkan bahan tanpa buka modal Edit — bahan nonaktif hilang dari dropdown produksi, resep, & saran beli. */
+  const toggleActive = async (ing: Ingredient): Promise<void> => {
+    setToggling(ing.id)
+    setErr('')
+    try {
+      await upsertIngredient({
+        id: ing.id,
+        name: ing.name,
+        code: ing.code,
+        kind: ing.kind,
+        buy_unit: ing.buy_unit,
+        small_unit: ing.small_unit,
+        pack_content: ing.pack_content,
+        price: ing.price,
+        min_stock: ing.min_stock,
+        active: !ing.active
+      })
+      await reload()
+    } catch (ex) {
+      setErr((ex as Error).message)
+    } finally {
+      setToggling(null)
+    }
   }
 
   return (
@@ -136,10 +167,14 @@ export default function Ingredients(): ReactElement {
             list={list}
             q={q}
             setQ={setQ}
+            activeFilter={activeFilter}
+            setActiveFilter={setActiveFilter}
             dirty={dirty}
             setDirty={setDirty}
             checked={checked}
             toggleCk={toggleCk}
+            toggleActive={toggleActive}
+            toggling={toggling}
             setEditing={setEditing}
             setDeleting={setDeleting}
             setRecipeFor={setRecipeFor}
@@ -486,10 +521,14 @@ function BahanTable({
   list,
   q,
   setQ,
+  activeFilter,
+  setActiveFilter,
   dirty,
   setDirty,
   checked,
   toggleCk,
+  toggleActive,
+  toggling,
   setEditing,
   setDeleting,
   setRecipeFor
@@ -498,10 +537,14 @@ function BahanTable({
   list: Ingredient[]
   q: string
   setQ: (s: string) => void
+  activeFilter: 'all' | 'on' | 'off'
+  setActiveFilter: (f: 'all' | 'on' | 'off') => void
   dirty: Record<number, number>
   setDirty: (d: Record<number, number>) => void
   checked: Set<number>
   toggleCk: (id: number, on: boolean) => void
+  toggleActive: (i: Ingredient) => Promise<void>
+  toggling: number | null
   setEditing: (i: Partial<Ingredient> | null) => void
   setDeleting: (i: Ingredient | null) => void
   setRecipeFor: (i: Ingredient | null) => void
@@ -525,6 +568,27 @@ function BahanTable({
     <>
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <input className="input max-w-52" placeholder="Cari nama / kode…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari barang" />
+        {/* filter status bahan: bahan nonaktif disembunyikan dari dropdown & saran beli di tempat lain */}
+        <div className="flex gap-1" role="radiogroup" aria-label="Filter status bahan">
+          {(
+            [
+              ['all', 'Semua'],
+              ['on', 'Aktif'],
+              ['off', 'Nonaktif']
+            ] as ['all' | 'on' | 'off', string][]
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              role="radio"
+              aria-checked={activeFilter === k}
+              className={`chip h-9 px-3 ${activeFilter === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+              onClick={() => setActiveFilter(k)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <button type="button" className="btn-ghost" onClick={() => checkAll(true)} title="Centang semua barang yang perlu dibeli">
           ✅ Pilih yang perlu beli
         </button>
@@ -621,6 +685,16 @@ function BahanTable({
                     )}
                   </td>
                   <td className="whitespace-nowrap">
+                    {/* toggle aktif langsung di baris: bahan tak terpakai cukup dimatikan tanpa buka Edit */}
+                    <button
+                      type="button"
+                      className={`btn-ghost !min-h-0 !px-2 !py-1 text-xs ${i.active ? '' : '!border-brand-gold !text-brand-redtext'}`}
+                      disabled={toggling === i.id}
+                      title={i.active ? 'Matikan: hilang dari dropdown produksi, resep & saran beli' : 'Nyalakan lagi: bahan kembali dipakai'}
+                      onClick={() => void toggleActive(i)}
+                    >
+                      {toggling === i.id ? '…' : i.active ? 'Nonaktifkan' : 'Aktifkan'}
+                    </button>{' '}
                     {i.kind === 'prepared' && (
                       <button type="button" className="btn-ghost !min-h-0 !px-2 !py-1 text-xs" onClick={() => setRecipeFor(i)}>
                         Resep

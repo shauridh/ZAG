@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { loadCatalog, loadFryers, createBatch, fillFryer, endOilCycle, saveFryer, type Catalog } from '../lib/db'
-import { ingIndex, ingredientNeeds, maxAvailableQty } from '../lib/hpp'
+import { ingIndex, ingredientNeeds } from '../lib/hpp'
 import { fmtRp, fmtQty, parseNum } from '../lib/money'
 import type { Fryer, Ingredient, OilCycle, Settings } from '../lib/types'
 import { loadSettings } from '../lib/db'
@@ -37,6 +37,9 @@ export default function Production(): ReactElement {
 
   const ingById = ingIndex(catalog.ingredients)
   const prepared = catalog.ingredients.filter((i) => i.kind === 'prepared' && i.active)
+  // Output produksi fleksibel: bahan SETENGAH JADI maupun MENTAH yang aktif —
+  // mis. pisah/ayam dipotong jadi "potongan siap goreng" (mentah, tanpa resep → stok langsung +).
+  const outPool = catalog.ingredients.filter((i) => i.active)
   // Banner siklus minyak: keputusan rasa & biaya, jadi tampil di atas — bukan catatan sekunder
   const bannerCycle = cycles.find((c) => c.status === 'aktif')
   const bannerDays = bannerCycle ? Math.floor((Date.now() - new Date(bannerCycle.started_at).getTime()) / 86400000) : 0
@@ -66,7 +69,7 @@ export default function Production(): ReactElement {
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <BatchForm catalog={catalog} prepared={prepared} fryers={fryers} onDone={reload} setErr={setErr} toast={toast} />
+        <BatchForm catalog={catalog} outPool={outPool} fryers={fryers} onDone={reload} setErr={setErr} toast={toast} />
         <FryerPanel
           fryers={fryers}
           cycles={cycles}
@@ -101,20 +104,20 @@ export default function Production(): ReactElement {
 
 function BatchForm({
   catalog,
-  prepared,
+  outPool,
   fryers,
   onDone,
   setErr,
   toast
 }: {
   catalog: Catalog
-  prepared: Ingredient[]
+  outPool: Ingredient[]
   fryers: Fryer[]
   onDone: () => Promise<void>
   setErr: (s: string) => void
   toast: (s: string) => void
 }): ReactElement {
-  const [outputs, setOutputs] = useState<{ ingredient_id: number; qty: number }[]>(prepared.length ? [{ ingredient_id: prepared[0].id, qty: 9 }] : [])
+  const [outputs, setOutputs] = useState<{ ingredient_id: number; qty: number }[]>(outPool.length ? [{ ingredient_id: outPool[0].id, qty: 9 }] : [])
   const [fryerId, setFryerId] = useState<number | ''>('')
   const [grams, setGrams] = useState('')
   const ingById = useMemo(() => ingIndex(catalog.ingredients), [catalog])
@@ -126,14 +129,25 @@ function BatchForm({
     return total
   }, [outputs, catalog.ingRecipes])
 
-  const maxOut = (id: number): number => maxAvailableQty(id, catalog.recipeByProduct, ingById)
+  // Batas aman output dari STOK BAHAN MENTAH (resep bahan, bukan resep produk):
+  // output tanpa resep = langsung (tanpa konsumsi) → 999 (tidak dibatasi).
+  const maxOut = (id: number): number => {
+    const needs = ingredientNeeds(id, 1, catalog.ingRecipes)
+    let max = Infinity
+    for (const [iid, q] of needs) {
+      const ing = ingById.get(iid)
+      if (!ing) continue
+      max = Math.min(max, Math.floor((ing.stock / q) * 1000) / 1000)
+    }
+    return max === Infinity ? 999 : Math.max(0, Math.floor(max))
+  }
 
   return (
     <div className="card strip p-4">
       <h2 className="mb-1 font-extrabold">Batch Produksi Baru</h2>
       <p className="mb-3 text-xs text-brand-muted">Bahan mentah berkurang otomatis sesuai resep produksi, stok siap jual bertambah.</p>
       {outputs.map((o, i) => {
-        const prep = prepared.find((p) => p.id === o.ingredient_id)
+        const prep = outPool.find((p) => p.id === o.ingredient_id)
         return (
           <div key={i} className="mb-2 grid grid-cols-[1fr_88px_28px] gap-2">
             <select
@@ -142,9 +156,11 @@ function BatchForm({
               onChange={(e) => setOutputs((os) => os.map((x, j) => (j === i ? { ...x, ingredient_id: parseInt(e.target.value, 10) } : x)))}
               aria-label="Output produksi"
             >
-              {prepared.map((p) => (
+              {outPool.length === 0 && <option value={o.ingredient_id}>— tidak ada bahan aktif —</option>}
+              {outPool.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
+                  {p.kind === 'raw' ? ' (mentah)' : ''}
                 </option>
               ))}
             </select>
@@ -166,9 +182,12 @@ function BatchForm({
           </div>
         )
       })}
-      <button type="button" className="btn-ghost !min-h-0 !py-1.5 text-xs" onClick={() => prepared.length && setOutputs((os) => [...os, { ingredient_id: prepared[0].id, qty: 1 }])}>
+      <button type="button" className="btn-ghost !min-h-0 !py-1.5 text-xs" onClick={() => outPool.length && setOutputs((os) => [...os, { ingredient_id: outPool[0].id, qty: 1 }])}>
         + Output
       </button>
+      <p className="mt-1 text-xs text-brand-muted">
+        Dropdown memuat semua bahan aktif. <b>(mentah)</b> = bahan beli langsung jadi output (pemotongan/persiapan) — stoknya bertambah tanpa resep.
+      </p>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <div>
@@ -205,17 +224,22 @@ function BatchForm({
               </li>
             )
           })}
-          {needs.size === 0 && <li className="font-normal text-brand-muted">pilih output dulu</li>}
+          {needs.size === 0 && (
+            <li className="font-normal text-brand-muted">
+              {outputs.length ? 'output langsung — tidak ada bahan mentah terpotong' : 'pilih output dulu'}
+            </li>
+          )}
         </ul>
       </div>
 
       <button
         type="button"
         className="btn-primary mt-3 w-full"
+        disabled={outputs.filter((o) => o.qty > 0 && outPool.some((p) => p.id === o.ingredient_id)).length === 0}
         onClick={async () => {
           try {
             await createBatch({
-              outputs: outputs.filter((o) => o.qty > 0),
+              outputs: outputs.filter((o) => o.qty > 0 && outPool.some((p) => p.id === o.ingredient_id)),
               fryer_id: fryerId === '' ? null : fryerId,
               fried_grams: parseInt(grams, 10) || 0,
               note: ''
