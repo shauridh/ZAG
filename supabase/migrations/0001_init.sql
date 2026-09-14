@@ -783,7 +783,8 @@ begin
     raise exception 'Kas drawer kurang dari float wajib Rp %, tidak bisa tutup shift', v_float;
   end if;
 
-  select coalesce(sum(amount),0) into v_cash_sales
+  -- Penjualan tunai = uang diterima MINUS kembalian (payments menyimpan uang diterima).
+  select coalesce(sum(least(p.amount, t.total)),0) into v_cash_sales
   from payments p join transactions t on t.id = p.transaction_id
   where t.shift_id = v_shift.id and p.method = 'cash';
 

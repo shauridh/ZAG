@@ -22,11 +22,13 @@ import type {
   Settings,
   Shift,
   Transaction,
-  TransactionItem
+  TransactionItem,
+  HeldOrder
 } from './types'
 import { ingredientNeeds, maxAvailableQty, productNeeds, rawNeedsCost, ingIndex, recipeIndexBy, ingRecipeIndexBy, type IngById, type RecipeByProduct } from './hpp'
 import { feeForDistance, haversineKm } from './geo'
 import { fmtRpPlain } from './money'
+import { txCashNet } from './reports'
 import { todayISO } from './dates'
 import { type Catalog, type TxResult, type SessionInfo, type RefundResult, type PortalAddress, err, txIsEditable, hashPin } from './db-shared'
 
@@ -66,6 +68,7 @@ export interface DemoData {
   otherIncome: OtherIncome[]
   customer: DemoCustomer | null
   orders: PortalOrder[]
+  heldOrders: HeldOrder[]
   session: { email: string; role: 'admin' | 'kasir'; name: string } | null
   seq: number
 }
@@ -93,11 +96,11 @@ const DEMO_PHOTOS: Record<number, string> = {
   27: '/demo/teh-botol.svg'
 }
 
-const DEMO_VERSION = 4
+const DEMO_VERSION = 7
 
 function defaultDemo(): DemoData {
   const d: DemoData = {
-    v: 3,
+    v: DEMO_VERSION,
     settings: {
       store: { name: 'Sabana Drieischicken', tagline: 'Drieischicken POS', address: 'Jl. Kebun Sayur No. 1', phone: '', footer: 'Terima kasih, datang kembali!' },
       shift: { float_cash: 350000 },
@@ -155,38 +158,39 @@ function defaultDemo(): DemoData {
       { id: 27, name: 'Teh Botol Sosro', category_id: 7, price: 5000, unit: 'porsi', is_active: true, sort: 13 }
     ],
     // KONVENSI `price`: harga per 1 SATUAN DASAR (harga kemasan / isi). Sama dgn seed.sql.
+    // small_unit: satuan kecil hasil konversi isi kemasan — dipakai resep langsung.
     ingredients: [
-      { id: 1, name: 'Ayam Potong 9', code: '100001', kind: 'raw', buy_unit: 'ekor', pack_content: 9, price: 5333, stock: 12, min_stock: 6, active: true },
-      { id: 3, name: 'Tepung Bumbu Fried Chicken', code: '200001', kind: 'raw', buy_unit: 'pack', pack_content: 1, price: 23500, stock: 2, min_stock: 2, active: true },
-      { id: 4, name: 'Minyak Goreng Sunco 2L', code: '200002', kind: 'raw', buy_unit: 'liter', pack_content: 2, price: 21700, stock: 8, min_stock: 4, active: true },
-      { id: 5, name: 'Gas 3 kg', code: '', kind: 'raw', buy_unit: 'tabung', pack_content: 1, price: 23000, stock: 2, min_stock: 1, active: true },
-      { id: 6, name: 'Kemasan Ayam (ikat 100)', code: '200011', kind: 'raw', buy_unit: 'pack', pack_content: 100, price: 235, stock: 1.5, min_stock: 1, active: true },
-      { id: 7, name: 'Kantong Plastik (pack 50)', code: '200023', kind: 'raw', buy_unit: 'pack', pack_content: 50, price: 140, stock: 2, min_stock: 1, active: true },
-      { id: 8, name: 'Sauce Cup 35ml (pack 50)', code: '200022', kind: 'raw', buy_unit: 'pack', pack_content: 50, price: 300, stock: 1, min_stock: 1, active: true },
-      { id: 9, name: 'Kertas Nasi (pack 100)', code: '200013', kind: 'raw', buy_unit: 'pack', pack_content: 100, price: 130, stock: 1, min_stock: 1, active: true },
-      { id: 10, name: 'Box Nasi Standard (pack 100)', code: '200014', kind: 'raw', buy_unit: 'pack', pack_content: 100, price: 1250, stock: 1, min_stock: 1, active: true },
-      { id: 11, name: 'Beras Mentik Wangi', code: '100006', kind: 'raw', buy_unit: 'kg', pack_content: 1, price: 16500, stock: 20, min_stock: 10, active: true },
-      { id: 12, name: 'Saus Sambal Sabana (pack 125)', code: '200007', kind: 'raw', buy_unit: 'pack', pack_content: 125, price: 180, stock: 2, min_stock: 1, active: true },
-      { id: 13, name: 'Sambal Geprek 500g', code: '200019', kind: 'raw', buy_unit: 'pouch 500g', pack_content: 1, price: 64000, stock: 2, min_stock: 2, active: true },
-      { id: 17, name: 'Saos Keju Mentai 500g', code: '200030', kind: 'raw', buy_unit: 'pouch 500g', pack_content: 1, price: 27000, stock: 2, min_stock: 1, active: true },
-      { id: 26, name: 'Chicken Katsu', code: '200059', kind: 'raw', buy_unit: 'pcs', pack_content: 1, price: 4500, stock: 10, min_stock: 10, active: true },
-      { id: 27, name: 'Kentang Simplot', code: '200043', kind: 'raw', buy_unit: 'kg', pack_content: 2.72, price: 42279, stock: 2.72, min_stock: 2, active: true },
-      { id: 32, name: 'Box Kentang (pack 200)', code: '200018', kind: 'raw', buy_unit: 'pack', pack_content: 200, price: 599, stock: 1, min_stock: 1, active: true },
-      { id: 35, name: 'Sendok Garpu (pack 50)', code: '200051', kind: 'raw', buy_unit: 'pack', pack_content: 50, price: 200, stock: 1, min_stock: 1, active: true },
-      { id: 37, name: 'Sayuran (timun/selada)', code: '', kind: 'raw', buy_unit: 'porsi', pack_content: 1, price: 1000, stock: 30, min_stock: 10, active: true },
-      { id: 40, name: 'Teh Botol Sosro 250ml', code: '200038', kind: 'raw', buy_unit: 'pcs', pack_content: 1, price: 2500, stock: 24, min_stock: 12, active: true },
-      { id: 50, name: 'Ayam Marinasi (per potong)', code: '', kind: 'prepared', buy_unit: 'potong', pack_content: 1, price: 0, stock: 18, min_stock: 9, active: true },
-      { id: 52, name: 'Sambal Geprek Cup', code: '', kind: 'prepared', buy_unit: 'cup', pack_content: 1, price: 0, stock: 6, min_stock: 5, active: true },
-      { id: 56, name: 'Saos Mentai Cup', code: '', kind: 'prepared', buy_unit: 'cup', pack_content: 1, price: 0, stock: 8, min_stock: 5, active: true }
+      { id: 1, name: 'Ayam Potong 9', code: '100001', kind: 'raw', buy_unit: 'pack', small_unit: 'potong', pack_content: 9, price: 5333, stock: 12, min_stock: 6, active: true },
+      { id: 3, name: 'Tepung Bumbu Fried Chicken', code: '200001', kind: 'raw', buy_unit: 'pack', small_unit: 'gram', pack_content: 1000, price: 24, stock: 2000, min_stock: 2000, active: true },
+      { id: 4, name: 'Minyak Goreng Sunco 2L', code: '200002', kind: 'raw', buy_unit: 'pouch', small_unit: 'liter', pack_content: 2, price: 21700, stock: 8, min_stock: 4, active: true },
+      { id: 5, name: 'Gas 3 kg', code: '', kind: 'raw', buy_unit: 'tabung', small_unit: '', pack_content: 1, price: 23000, stock: 2, min_stock: 1, active: true },
+      { id: 6, name: 'Kemasan Ayam (ikat 100)', code: '200011', kind: 'raw', buy_unit: 'pack', small_unit: 'lembar', pack_content: 100, price: 235, stock: 150, min_stock: 100, active: true },
+      { id: 7, name: 'Kantong Plastik (pack 50)', code: '200023', kind: 'raw', buy_unit: 'pack', small_unit: 'pcs', pack_content: 50, price: 140, stock: 100, min_stock: 50, active: true },
+      { id: 8, name: 'Sauce Cup 35ml (pack 50)', code: '200022', kind: 'raw', buy_unit: 'pack', small_unit: 'cup', pack_content: 50, price: 300, stock: 50, min_stock: 50, active: true },
+      { id: 9, name: 'Kertas Nasi (pack 100)', code: '200013', kind: 'raw', buy_unit: 'pack', small_unit: 'lembar', pack_content: 100, price: 130, stock: 100, min_stock: 100, active: true },
+      { id: 10, name: 'Box Nasi Standard (pack 100)', code: '200014', kind: 'raw', buy_unit: 'pack', small_unit: 'pcs', pack_content: 100, price: 1250, stock: 100, min_stock: 100, active: true },
+      { id: 11, name: 'Beras Mentik Wangi', code: '100006', kind: 'raw', buy_unit: 'kg', small_unit: '', pack_content: 1, price: 16500, stock: 20, min_stock: 10, active: true },
+      { id: 12, name: 'Saus Sambal Sabana (pack 125)', code: '200007', kind: 'raw', buy_unit: 'pack', small_unit: 'sachet', pack_content: 125, price: 180, stock: 250, min_stock: 125, active: true },
+      { id: 13, name: 'Sambal Geprek 500g', code: '200019', kind: 'raw', buy_unit: 'pouch 500g', small_unit: 'gram', pack_content: 500, price: 128, stock: 1000, min_stock: 1000, active: true },
+      { id: 17, name: 'Saos Keju Mentai 500g', code: '200030', kind: 'raw', buy_unit: 'pouch 500g', small_unit: 'gram', pack_content: 500, price: 54, stock: 1000, min_stock: 500, active: true },
+      { id: 26, name: 'Chicken Katsu', code: '200059', kind: 'raw', buy_unit: 'pcs', small_unit: 'pcs', pack_content: 1, price: 4500, stock: 10, min_stock: 10, active: true },
+      { id: 27, name: 'Kentang Simplot', code: '200043', kind: 'raw', buy_unit: 'pack', small_unit: 'gram', pack_content: 2720, price: 42, stock: 2720, min_stock: 500, active: true },
+      { id: 32, name: 'Box Kentang (pack 200)', code: '200018', kind: 'raw', buy_unit: 'pack', small_unit: 'pcs', pack_content: 200, price: 599, stock: 200, min_stock: 200, active: true },
+      { id: 35, name: 'Sendok Garpu (pack 50)', code: '200051', kind: 'raw', buy_unit: 'pack', small_unit: 'pcs', pack_content: 50, price: 200, stock: 50, min_stock: 50, active: true },
+      { id: 37, name: 'Sayuran (timun/selada)', code: '', kind: 'raw', buy_unit: 'porsi', small_unit: '', pack_content: 1, price: 1000, stock: 30, min_stock: 10, active: true },
+      { id: 40, name: 'Teh Botol Sosro 250ml', code: '200038', kind: 'raw', buy_unit: 'pcs', small_unit: 'pcs', pack_content: 1, price: 2500, stock: 24, min_stock: 12, active: true },
+      { id: 50, name: 'Ayam Marinasi (per potong)', code: '', kind: 'prepared', buy_unit: 'potong', small_unit: '', pack_content: 1, price: 0, stock: 18, min_stock: 9, active: true },
+      { id: 52, name: 'Sambal Geprek Cup', code: '', kind: 'prepared', buy_unit: 'cup', small_unit: '', pack_content: 1, price: 0, stock: 6, min_stock: 5, active: true },
+      { id: 56, name: 'Saos Mentai Cup', code: '', kind: 'prepared', buy_unit: 'cup', small_unit: '', pack_content: 1, price: 0, stock: 8, min_stock: 5, active: true }
     ],
     bundles: [],
     recipeItems: [],
     ingRecipes: [
       { ingredient_id: 50, component_id: 1, qty: 1 },
-      { ingredient_id: 52, component_id: 13, qty: 0.05 },
+      { ingredient_id: 52, component_id: 13, qty: 25 }, // 25 gram sambal (pouch 500 gr)
       { ingredient_id: 52, component_id: 4, qty: 0.0122 },
       { ingredient_id: 52, component_id: 8, qty: 1 },
-      { ingredient_id: 56, component_id: 17, qty: 0.05 },
+      { ingredient_id: 56, component_id: 17, qty: 25 }, // 25 gram mentai
       { ingredient_id: 56, component_id: 8, qty: 1 }
     ],
     targets: [
@@ -217,6 +221,7 @@ function defaultDemo(): DemoData {
     otherIncome: [],
     customer: null,
     orders: [],
+    heldOrders: [],
     session: null,
     seq: 100
   }
@@ -226,9 +231,10 @@ function defaultDemo(): DemoData {
 
 // Resep demo produk ringkas (mirip seed SQL versi lengkap)
 function seedDemoRecipes(d: DemoData) {
+  // Qty resep memakai SATUAN KECIL bahan (potong/gram/liter/sachet/lembar/pcs).
   const perPotong: [number, number][] = [
     [50, 1],
-    [3, 0.03704],
+    [3, 37.04], // tepung gram (pack isi 1000 gr)
     [6, 0.005],
     [12, 0.008],
     [4, 0.02222],
@@ -239,7 +245,7 @@ function seedDemoRecipes(d: DemoData) {
     for (const [cid, qty] of perPotong) d.recipeItems.push({ product_id: pid, kind: 'ingredient', component_id: cid, qty })
   for (const [cid, qty] of [
     [50, 9],
-    [3, 0.33333],
+    [3, 333.33], // tepung gram
     [6, 0.045],
     [12, 0.072],
     [4, 0.2],
@@ -263,7 +269,7 @@ function seedDemoRecipes(d: DemoData) {
   ] as [number, number][])
     d.recipeItems.push({ product_id: 8, kind: 'ingredient', component_id: cid, qty })
   for (const [cid, qty] of [
-    [27, 0.12],
+    [27, 120], // kentang gram per porsi
     [4, 0.025],
     [32, 0.005],
     [12, 0.016],
@@ -285,7 +291,34 @@ function loadDemo(): DemoData {
       if (d.v === 3) {
         // v3 -> v4: data demo lama dapat foto demo tanpa perlu reset
         for (const p of d.products) p.photo ??= DEMO_PHOTOS[p.id] ?? null
-        d.v = DEMO_VERSION
+        d.v = 4
+      }
+      if (d.v === 4) {
+        // v4 -> v5: resepi lama memakai satuan dasar lama; seed bahan baru dgn
+        // satuan kecil & isi kemasan resmi (price list). Paling aman: mulai baru.
+        const fresh = defaultDemo()
+        seedDemoRecipes(fresh)
+        fresh.session = d.session
+        saveDemo(fresh)
+        return fresh
+      }
+      if (d.v === 5) {
+        // v5 -> v6: stok bahan kemasan di-seed dlm pack, padahal konvensi stok =
+        // satuan kecil. Skalakan stock & min_stock dgn isi kemasan.
+        const scale = new Set([3, 6, 7, 8, 9, 10, 12, 13, 17, 32, 35])
+        for (const i of d.ingredients)
+          if (scale.has(i.id)) {
+            i.stock *= i.pack_content || 1
+            i.min_stock *= i.pack_content || 1
+          }
+        d.v = 6
+        saveDemo(d)
+        return d
+      }
+      if (d.v === 6) {
+        // v6 -> v7: simpan pesanan (bill). Data lama tidak punya daftar bill.
+        d.heldOrders ??= []
+        d.v = 7
         saveDemo(d)
         return d
       }
@@ -416,7 +449,21 @@ export function demoCreateTx(p: {
   discount?: number
   note?: string
 }): TxResult {
-  const d = loadDemo()
+  return createTxIn(loadDemo(), p)
+}
+
+/**
+ * Inti create_tx di atas dataset yang sudah dimuat — supaya alur lain
+ * (mis. bayar bill tersimpan) bisa menjalankan aturan bisnis yang sama
+ * tanpa load/save ulang yang menimpa perubahan dataset terbaru.
+ */
+function createTxIn(d: DemoData, p: {
+  orderType: OrderType
+  items: { product_id: number; qty: number }[]
+  payments: { method: 'cash' | 'qris' | 'transfer'; amount: number }[]
+  discount?: number
+  note?: string
+}): TxResult {
   const { recipeByProduct, ingRecipes } = mapsOf(d)
   const online = p.orderType === 'gofood' || p.orderType === 'grabfood' || p.orderType === 'shopeefood'
 
@@ -636,10 +683,12 @@ export function demoCloseShift(closingCash: number, note: string): { cash_sales:
   const shift = d.shifts.find((s) => s.status === 'buka') ?? err('Tidak ada shift terbuka')
   const floatCash = d.settings.shift.float_cash
   if (closingCash < floatCash) err(`Kas drawer kurang dari float wajib ${floatCash.toLocaleString('id-ID')}, tidak bisa tutup shift`)
+  // Penjualan tunai = uang diterima MINUS kembalian (lihat txCashNet di reports).
+  // Refund tunai berupa payment negatif — ikut mengurangi kas.
   const cashSales = d.txs
     .filter((t) => t.shift_id === shift.id)
     .filter((t) => (t.status ?? 'normal') === 'normal' || t.status === 'refund')
-    .reduce((s, t) => s + (t.payments ?? []).filter((p) => p.method === 'cash').reduce((a, p) => a + p.amount, 0), 0)
+    .reduce((s, t) => s + txCashNet(t), 0)
   const cashIn = shift.cash_in ?? 0
   const cashOut = shift.cash_out ?? 0
   const expected = shift.opening_cash + cashSales + cashIn - cashOut
@@ -870,6 +919,90 @@ export function demoDeleteIngredient(id: number): void {
   saveDemo(d)
 }
 
+// ================= Impor price list & reset mulai dari nol (demo) =================
+
+/** Sama dgn RPC import_price_list: upsert per kode; harga = harga kemasan / isi. */
+export function demoImportPriceList(
+  items: { code: string; name: string; buy_unit: string; pack_content: number; pack_price: number; small_unit: string }[],
+  replace: boolean
+): { created: number; updated: number } {
+  const d = loadDemo()
+  if (replace) demoDeleteAllMasterIn(d)
+  let created = 0
+  let updated = 0
+  for (const it of items) {
+    const name = it.name.trim()
+    if (!name) continue
+    const code = it.code.trim() || null
+    const content = Math.max(it.pack_content || 1, 0.0001)
+    const price = Math.round(it.pack_price / content)
+    const found = code ? d.ingredients.find((x) => x.code && x.code === code) : undefined
+    if (!found) {
+      d.ingredients.push({
+        id: ++d.seq,
+        name,
+        code,
+        kind: 'raw',
+        buy_unit: it.buy_unit.trim() || 'pack',
+        small_unit: it.small_unit.trim() || null,
+        pack_content: content,
+        price,
+        stock: 0,
+        min_stock: 0,
+        active: true
+      })
+      created++
+    } else {
+      found.name = name
+      found.buy_unit = it.buy_unit.trim() || 'pack'
+      found.pack_content = content
+      found.price = price
+      found.small_unit = it.small_unit.trim() || found.small_unit
+      updated++
+    }
+  }
+  saveDemo(d)
+  return { created, updated }
+}
+
+/** Sama dgn RPC delete_all_master: kosongkan master (dipanggil setelah riwayat bersih). */
+function demoDeleteAllMasterIn(d: DemoData): void {
+  d.targets = []
+  d.recipeItems = []
+  d.ingRecipes = []
+  d.bundles = []
+  d.ingredients = []
+  d.products = []
+  d.fryers = []
+}
+
+/**
+ * Sama dgn RPC reset_operational_data: kosongkan SEMUA data operasional + master
+ * supaya produksi mulai dari nol. Pengaturan toko & sesi login tidak disentuh.
+ */
+export function demoResetOperationalData(): void {
+  const d = loadDemo()
+  d.txs = []
+  d.shifts = []
+  d.orders = []
+  d.heldOrders = []
+  d.expenses = []
+  d.otherIncome = []
+  d.expenseCats = []
+  d.oilCycles = []
+  d.customer = null
+  demoDeleteAllMasterIn(d)
+  saveDemo(d)
+}
+
+/** Sama dgn RPC clear_owner_pin: lupa PIN -> hapus supaya bisa diset ulang. */
+export function demoClearOwnerPin(): void {
+  const d = loadDemo()
+  d.settings.owner_pin_hash = undefined
+  d.settings.owner_pin_set = false
+  saveDemo(d)
+}
+
 /** Hapus menu; ditolak bila sudah pernah terjual/dipakai resep/paket — suruh nonaktifkan. */
 export function demoDeleteProduct(id: number): void {
   const d = loadDemo()
@@ -916,6 +1049,11 @@ export function demoSaveZones(zones: { radius_km: number; fee: number }[], outle
 
 // ================= Pesanan portal (demo) =================
 
+/** Cari pesanan portal di dataset yang sudah dimuat (tanpa load/save ulang). */
+function dOrdersFind(d: DemoData, id: number): PortalOrder | undefined {
+  return d.orders.find((x) => x.id === id)
+}
+
 export function demoLoadPortalOrders(): PortalOrder[] {
   return [...loadDemo().orders].reverse()
 }
@@ -926,9 +1064,7 @@ export function demoAcceptOrder(id: number): void {
   if (!o || o.status !== 'menunggu') err('Pesanan tidak dalam status menunggu')
   o.status = 'qris_dikirim'
   saveDemo(d)
-}
-
-export function demoRejectOrder(id: number, reason: string): void {
+}export function demoRejectOrder(id: number, reason: string): void {
   const d = loadDemo()
   const o = d.orders.find((x) => x.id === id)
   if (!o || o.status !== 'menunggu') err('Pesanan tidak dalam status menunggu')
@@ -937,24 +1073,65 @@ export function demoRejectOrder(id: number, reason: string): void {
   saveDemo(d)
 }
 
-export function demoVerifyOrderPayment(id: number): void {
+/**
+ * Tolak pesanan portal, termasuk yang sudah bayar ('menunggu_verifikasi') —
+ * misalnya stok habis saat pelanggan sudah transfer. Status verifikasi masih
+ * SEBELUM potong stok, jadi di sini aman: tidak ada stok yang perlu dilepas.
+ */
+export function demoRejectPaidOrder(id: number, reason: string): void {
   const d = loadDemo()
-  const o = d.orders.find((x) => x.id === id)
-  if (!o || o.status !== 'menunggu_verifikasi') err('Pesanan tidak menunggu verifikasi')
-  // buat transaksi delivery dengan potong stok
-  const items = o!.items.map((i) => {
-    const prod = d.products.find((p) => p.name === i.name)
-    return { product_id: prod?.id ?? 0, qty: i.qty }
-  })
-  o!.status = 'diproses'
+  const o = dOrdersFind(d, id)
+  if (!o || !['menunggu', 'menunggu_verifikasi'].includes(o.status)) err('Pesanan tidak bisa ditolak pada status ini')
+  o.status = 'ditolak'
+  o.reject_reason = reason
   saveDemo(d)
-  demoCreateTx({ orderType: 'delivery', items, payments: [{ method: 'qris', amount: o!.total }], note: `Pesanan portal #${id}` })
 }
 
+export function demoVerifyOrderPayment(id: number): void {
+  const d = loadDemo()
+  const o = dOrdersFind(d, id)
+  if (!o || o.status !== 'menunggu_verifikasi') err('Pesanan tidak menunggu verifikasi')
+  // mapping item per product_id (bukan nama — menu bisa di-rename setelah pesanan)
+  const items = o.items.map((i) => {
+    const prod = d.products.find((p) => p.id === i.product_id) ?? d.products.find((p) => p.name === i.name) ?? err(`Menu "${i.name}" sudah tidak ada — pesanan tak bisa diverifikasi`)
+    return { product_id: prod.id, qty: i.qty }
+  })
+  // transaksi DULU di SATU dataset (validasi stok + potong stok + simpan atomik),
+  // baru status diganti. Kalau stok kurang: err sebelum save — pesanan tetap
+  // menunggu verifikasi & kasir bisa menolak, bukan stuck 'diproses'.
+  // (Pakai createTxIn, bukan demoCreateTx: load/save ulang di tengah akan
+  // menimpa dataset dengan salinan basi — bug yang sama yang dulu hilangkan
+  // transaksi bill.)
+  createTxIn(d, { orderType: 'delivery', items, payments: [{ method: 'qris', amount: o.total }], note: `Pesanan portal #${id}` })
+  o.status = 'diproses'
+  saveDemo(d)
+}
+
+const ALLOWED_STATUS_FLOW: Record<PortalOrder['status'], PortalOrder['status'][]> = {
+  // Paritas dgn RPC set_order_status (0009): kasir hanya majukan status
+  // proses kirim. Transisi lain lewat fungsi khusus: accept/reject/verify,
+  // dan batal pelanggan lewat cancelOrder (status sebelum potong stok).
+  menunggu: [],
+  qris_dikirim: [],
+  menunggu_verifikasi: [],
+  diproses: ['dikirim'],
+  dikirim: ['selesai'],
+  selesai: [],
+  ditolak: [],
+  batal: []
+}
+
+/**
+ * Transisi status oleh kasir (dikirim/selesai). Penjaga arah: status tak bisa
+ * dimundurkan/dilompat — yang sudah potong stok ('diproses' dst) tak mungkin
+ * jadi 'batal' dari sini (pembatalan pelanggan sudah dicegah di cancelOrder).
+ */
 export function demoSetOrderStatus(id: number, status: PortalOrder['status']): void {
   const d = loadDemo()
-  const o = d.orders.find((x) => x.id === id)
-  if (o) o.status = status
+  const o = dOrdersFind(d, id)
+  if (!o) err('Pesanan tidak ditemukan')
+  if (!ALLOWED_STATUS_FLOW[o.status].includes(status)) err(`Transisi tidak sah: ${o.status} → ${status}`)
+  o.status = status
   saveDemo(d)
 }
 
@@ -1093,7 +1270,7 @@ export const demoPortal = {
       created_at: new Date().toISOString(),
       items: items.map((it) => {
         const p = d.products.find((x) => x.id === it.product_id)!
-        return { name: p.name, qty: it.qty, price: p.price }
+        return { name: p.name, qty: it.qty, price: p.price, product_id: p.id }
       })
     })
     saveDemo(d)
@@ -1133,4 +1310,75 @@ export function demoSubscribeOrders(cb: () => void): () => void {
     last = n
   }, 3000)
   return () => window.clearInterval(h)
+}
+
+// ================= Simpan pesanan / bill (pembayaran nanti) =================
+
+export function demoSaveHeldOrder(p: {
+  orderType: OrderType
+  items: { product_id: number; name: string; qty: number; price: number }[]
+  subtotal: number
+  discount: number
+  total: number
+  note: string | null
+  label: string | null
+}): HeldOrder {
+  const d = loadDemo()
+  const shift = d.shifts.find((s) => s.status === 'buka')
+  if (!shift) err('Buka shift dulu sebelum menyimpan pesanan')
+  if (p.items.length === 0) err('Keranjang kosong')
+  const held: HeldOrder = {
+    id: ++d.seq,
+    shift_id: shift.id,
+    user_id: null,
+    order_type: p.orderType,
+    items: p.items,
+    subtotal: p.subtotal,
+    discount: p.discount,
+    total: p.total,
+    note: p.note,
+    label: p.label,
+    created_at: new Date().toISOString()
+  }
+  d.heldOrders.push(held)
+  saveDemo(d)
+  return held
+}
+
+export function demoLoadHeldOrders(): HeldOrder[] {
+  return loadDemo().heldOrders.slice().sort((a, b) => a.created_at.localeCompare(b.created_at))
+}
+
+/**
+ * Bayar bill tersimpan: buat transaksi (stok dipotong di sini, aturan sama
+ * dgn create_tx) lalu hapus bill — semuanya di SATU dataset supaya tidak ada
+ * penulisan lama yang menimpa transaksi/stok baru. Kalau transaksi gagal,
+ * bill tetap ada.
+ */
+export function demoPayHeldOrder(
+  heldId: number,
+  method: 'cash' | 'qris' | 'transfer',
+  amount: number,
+  discountOverride?: number
+): TxResult {
+  const d = loadDemo()
+  const held = d.heldOrders.find((h) => h.id === heldId) ?? err('Bill tidak ditemukan (mungkin sudah dibayar)')
+  const tx = createTxIn(d, {
+    orderType: held.order_type,
+    items: held.items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
+    payments: [{ method, amount }],
+    discount: discountOverride ?? held.discount,
+    note: held.note ?? undefined
+  })
+  d.heldOrders = d.heldOrders.filter((h) => h.id !== heldId)
+  saveDemo(d)
+  return tx
+}
+
+/** Void bill: batal tanpa jadi transaksi, stok tidak tersentuh. */
+export function demoVoidHeldOrder(heldId: number): void {
+  const d = loadDemo()
+  if (!d.heldOrders.some((h) => h.id === heldId)) err('Bill tidak ditemukan (mungkin sudah dibayar)')
+  d.heldOrders = d.heldOrders.filter((h) => h.id !== heldId)
+  saveDemo(d)
 }

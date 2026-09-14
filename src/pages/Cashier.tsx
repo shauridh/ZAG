@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
-import { loadCatalog, loadSettings, createTx, currentShift, openShift, subscribeOrders, type Catalog, type TxResult } from '../lib/db'
+import { loadCatalog, loadSettings, createTx, currentShift, openShift, subscribeOrders, saveHeldOrder, loadHeldOrders, payHeldOrder, voidHeldOrder, type Catalog, type TxResult, type HeldOrder } from '../lib/db'
 import { ingIndex, maxAvailableQty } from '../lib/hpp'
 import { fmtRp, fmtRpPlain } from '../lib/money'
 import type { OrderType, Payment, Product, Settings, Shift } from '../lib/types'
@@ -49,6 +49,14 @@ export default function Cashier(): ReactElement {
   const [loadError, setLoadError] = useState('')
   const [busy, setBusy] = useState(false)
   const [newOrders, setNewOrders] = useState(false)
+  // Simpan pesanan / bill: keranjang ditunda untuk dibayar nanti.
+  const [held, setHeld] = useState<HeldOrder[]>([])
+  const [billsOpen, setBillsOpen] = useState(false)
+  const [billPay, setBillPay] = useState<HeldOrder | null>(null) // bill yg sedang dibayar dlm modal
+  const [billMethod, setBillMethod] = useState<Payment['method']>('cash')
+  const [voidConfirmId, setVoidConfirmId] = useState<number | null>(null)
+  const [billLabel, setBillLabel] = useState('')
+  const [billCash, setBillCash] = useState(0)
 
   const reload = useCallback(async () => {
     try {
@@ -57,6 +65,8 @@ export default function Cashier(): ReactElement {
       setSettings(s)
       setShift(sh)
       setLoadError('')
+      // bill tersimpan dimuat sekalian; gagal tak boleh menghalangi kasir
+      loadHeldOrders().then(setHeld).catch(() => {})
     } catch (ex) {
       setLoadError((ex as Error).message)
     }
@@ -77,6 +87,25 @@ export default function Cashier(): ReactElement {
   }, [reload])
 
   const online = ORDER_TYPES.find((o) => o.key === orderType)?.online ?? false
+
+  /** Print otomatis setelah transaksi lunas (dipakai alur normal & bayar bill). */
+  const autoPrint = (st: Settings, tx: TxResult): void => {
+    if (!st.printer.auto_print) return
+    if ((st.printer.mode ?? 'bt') === 'rawbt') {
+      const html = buildReceiptHtml(receiptFromTx(st, tx, tx.items, tx.payments, ''), st.receipt.width_mm)
+      if (!openRawBtReceipt(html)) {
+        setErr('Print otomatis terblokir popup browser. Transaksi tetap tersimpan — izinkan popup lalu tekan Cetak.')
+      }
+    } else {
+      void printTextBluetooth(buildReceiptText(receiptFromTx(st, tx, tx.items, tx.payments, ''), st.receipt.width_mm)).then((how) => {
+        if (how === 'reconnect-gagal') {
+          setErr('Print otomatis gagal (dialog pair butuh ketukan — normal di Chrome stabil). Transaksi tetap tersimpan — tekan Cetak untuk buka dialog, atau pakai Dialog/RawBT.')
+        } else if (how === 'print-gagal') {
+          setErr('Print otomatis gagal: printer tersambung tapi struk gagal terkirim. Transaksi tetap tersimpan — tekan Cetak untuk coba lagi.')
+        }
+      })
+    }
+  }
 
   const ingById = useMemo(() => ingIndex(catalog?.ingredients ?? []), [catalog])
 
@@ -238,28 +267,109 @@ export default function Cashier(): ReactElement {
       void reload()
       // Print otomatis bila diaktifkan di Pengaturan; gagal sambung tidak
       // menghentikan kasir dan tidak memunculkan dialog pair mendadak.
-      // Mode RawBT: auto-print membuka jendela struk (1 ketuk CETAK) — bila
-      // popup diblokir, pesannya jujur dan tombol Cetak tinggal ditekan lagi.
-      if (settings?.printer.auto_print) {
-        if ((settings.printer.mode ?? 'bt') === 'rawbt') {
-          const html = buildReceiptHtml(receiptFromTx(settings, tx, tx.items, tx.payments, ''), settings.receipt.width_mm)
-          if (!openRawBtReceipt(html)) {
-            setErr('Print otomatis terblokir popup browser. Transaksi tetap tersimpan — izinkan popup lalu tekan Cetak.')
-          }
-        } else {
-          void printTextBluetooth(receiptText(tx)).then((how) => {
-            if (how === 'reconnect-gagal') {
-              setErr('Print otomatis gagal (dialog pair butuh ketukan — normal di Chrome stabil). Transaksi tetap tersimpan — tekan Cetak untuk buka dialog, atau pakai Dialog/RawBT.')
-            } else if (how === 'print-gagal') {
-              setErr('Print otomatis gagal: printer tersambung tapi struk gagal terkirim. Transaksi tetap tersimpan — tekan Cetak untuk coba lagi.')
-            }
-          })
-        }
+      if (settings) autoPrint(settings, tx)
+    } catch (ex) {
+      setErr((ex as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // ===== Simpan pesanan / bill =====
+
+  const [recallConfirmId, setRecallConfirmId] = useState<number | null>(null)
+  useEffect(() => {
+    if (recallConfirmId === null) return
+    const t = window.setTimeout(() => setRecallConfirmId(null), 4000)
+    return () => window.clearTimeout(t)
+  }, [recallConfirmId])
+
+  /** Panggil bill: muat ke keranjang + hapus dari daftar (server ikut dihapus; gagal → chip dikembalikan). */
+  const loadBillInto = (h: HeldOrder): void => {
+    setRecallConfirmId(null)
+    setOrderType(h.order_type)
+    setDiscount(h.discount)
+    setNote(h.note ?? '')
+    setBillLabel(h.label ?? '')
+    setCart(h.items.map((i) => ({ product_id: i.product_id, name: i.name, qty: i.qty, price: i.price, max: Math.max(maxOf(i.product_id), i.qty) })))
+    setHeld((hs) => hs.filter((x) => x.id !== h.id))
+    void voidHeldOrder(h.id).catch((ex) => {
+      setErr(`Bill gagal dihapus dari server: ${(ex as Error).message}`)
+      setHeld((hs) => [...hs, h].sort((a, b) => a.created_at.localeCompare(b.created_at)))
+    })
+  }
+
+  const recallBill = (h: HeldOrder): void => {
+    // keranjang masih isi: butuh konfirmasi 2-ketuk supaya tak menimpa tanpa sengaja
+    if (cart.length > 0) {
+      if (recallConfirmId === h.id) loadBillInto(h)
+      else setRecallConfirmId(h.id)
+      return
+    }
+    loadBillInto(h)
+  }
+
+  const doSaveBill = async (): Promise<void> => {
+    if (cart.length === 0) return
+    setBusy(true)
+    setErr('')
+    try {
+      const label = billLabel.trim() || null
+      const h = await saveHeldOrder({
+        orderType,
+        items: cart.map((l) => ({ product_id: l.product_id, name: l.name, qty: l.qty, price: l.price })),
+        subtotal,
+        discount,
+        total,
+        note: note || null,
+        label
+      })
+      setHeld((hs) => [...hs, h].sort((a, b) => a.created_at.localeCompare(b.created_at)))
+      setCart([])
+      setDiscount(0)
+      setNote('')
+      setBillLabel('')
+    } catch (ex) {
+      setErr((ex as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const doPayBill = async (method: Payment['method'], amount: number, discountOverride?: number): Promise<void> => {
+    if (!billPay) return
+    setBusy(true)
+    setErr('')
+    try {
+      const tx = await payHeldOrder(billPay.id, method, amount, discountOverride)
+      setHeld((hs) => hs.filter((h) => h.id !== billPay.id))
+      setBillPay(null)
+      beepRegister()
+      vibrateSuccess()
+      void reload()
+      if (settings) {
+        autoPrint(settings, tx)
+        // buka popup struk yang sama dgn alur normal supaya kasir bisa cetak ulang
+        setCheckout(true)
+        setCashVal(method === 'cash' ? amount : tx.total)
+        setPayMethod(method)
+        setDone({ tx, change: method === 'cash' ? Math.max(0, amount - tx.total) : 0 })
       }
     } catch (ex) {
       setErr((ex as Error).message)
     } finally {
       setBusy(false)
+    }
+  }
+
+  const doVoidBill = async (id: number): Promise<void> => {
+    setVoidConfirmId(null)
+    setErr('')
+    try {
+      await voidHeldOrder(id)
+      setHeld((hs) => hs.filter((h) => h.id !== id))
+    } catch (ex) {
+      setErr((ex as Error).message)
     }
   }
 
@@ -431,13 +541,35 @@ export default function Cashier(): ReactElement {
                 type="button"
                 role="radio"
                 aria-checked={orderType === o.key}
-                onClick={() => setOrderType(o.key)}
-                className={`chip h-8 px-2.5 ${orderType === o.key ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+                onClick={() => setOrderType(o.key)}              className={`chip h-8 px-2.5 ${orderType === o.key ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+        {/* Bill tersimpan: chip bar 1-ketuk utk recall tanpa buka modal.
+            Keranjang masih isi → ketuk 2x (konfirmasi) supaya tak menimpa. */}
+        {held.length > 0 && (
+          <div className="no-scrollbar -mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-0.5" role="list" aria-label={`Bill tersimpan, ${held.length} bill — ketuk untuk panggil ke keranjang`}>
+            {held.map((h) => (
+              <button
+                key={h.id}
+                type="button"
+                role="listitem"
+                onClick={() => recallBill(h)}
+                className={`chip h-auto shrink-0 flex-col items-start !gap-0 !py-1 pl-2.5 pr-2 text-left ${
+                  recallConfirmId === h.id ? 'bg-brand-redtext text-white' : 'border-[1.5px] border-brand-line bg-brand-paper'
+                }`}
+                title={recallConfirmId === h.id ? 'Ketuk lagi: ganti keranjang dengan bill ini' : 'Panggil bill ke keranjang'}
               >
-                {o.label}
+                <span className="max-w-36 truncate text-xs font-extrabold">{h.label || 'Bill'}</span>
+                <span className="text-[11px] font-bold tabular-nums opacity-80">
+                  {fmtRp(h.total)} · {h.items.reduce((s, i) => s + i.qty, 0)} item
+                </span>
+                {recallConfirmId === h.id && <span className="text-[10px] font-extrabold">Ketuk lagi: ganti keranjang</span>}
               </button>
             ))}
           </div>
+        )}
         </div>
         <div className="max-h-[32vh] min-h-0 flex-1 overflow-y-auto px-3 py-2 lg:max-h-none">
           {cart.length === 0 && <p className="py-10 text-center text-sm text-brand-muted">Keranjang kosong. Ketuk menu di kiri.</p>}
@@ -511,9 +643,120 @@ export default function Cashier(): ReactElement {
           >
             {online ? `Catat · ${fmtRp(total)}` : `Bayar · ${fmtRp(total)}`}
           </button>
+          {/* Simpan pesanan: keranjang ditunda sbg bill, stok belum dipotong,
+              dipanggil lagi lewat tombol bill utk dibayar/dibatalkan. */}
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              className="input !h-10 flex-1 text-sm"
+              placeholder="Nama bill (opsional)"
+              value={billLabel}
+              onChange={(e) => setBillLabel(e.target.value)}
+              aria-label="Nama bill — nama pelanggan atau meja"
+            />
+            <button
+              type="button"
+              className="btn-ghost !h-10 shrink-0 px-3 text-sm font-extrabold"
+              disabled={cart.length === 0 || busy || (!shift && !online)}
+              onClick={() => void doSaveBill()}
+              title="Simpan pesanan untuk pembayaran nanti (stok belum dipotong)"
+            >
+              💵 Simpan
+            </button>
+            <button
+              type="button"
+              className="btn-ghost relative !h-10 shrink-0 px-3 text-sm font-extrabold"
+              onClick={() => setBillsOpen(true)}
+              aria-label={`Daftar bill tersimpan, ${held.length} bill`}
+            >
+              🧾 Bill{held.length > 0 ? ` (${held.length})` : ''}
+            </button>
+          </div>
           {!shift && !online && <p className="mt-1 text-center text-xs font-bold text-brand-redtext">Buka shift dulu untuk checkout.</p>}
         </div>
       </aside>
+
+      {/* ===== Daftar bill tersimpan (simpan pesanan) ===== */}
+      <Modal open={billsOpen} title="Bill Tersimpan" onClose={() => setBillsOpen(false)}>
+        <p className="mb-3 text-xs font-bold text-brand-muted">
+          Pesanan yang disimpan belum memotong stok. Panggil untuk melanjutkan, bayar, atau batalkan.
+        </p>
+        {held.length === 0 && <p className="py-6 text-center text-sm text-brand-muted">Belum ada bill tersimpan.</p>}
+        <div className="flex flex-col gap-2">
+          {held.map((h) => (
+            <div key={h.id} className="rounded-lg border-[1.5px] border-brand-line p-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-extrabold">{h.label || 'Tanpa nama'} · {fmtRp(h.total)}</p>
+                  <p className="mt-0.5 line-clamp-2 text-xs text-brand-muted">
+                    {h.items.map((i) => `${i.qty}× ${i.name}`).join(', ')}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-brand-muted">
+                    {CHANNEL_LABEL[h.order_type] ?? h.order_type} · {new Date(h.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-col gap-1">
+                  <button type="button" className="btn-primary !min-h-0 !py-1.5 text-xs" onClick={() => { setBillPay(h); setBillMethod('cash'); setBillCash(0) }}>
+                    Bayar
+                  </button>
+                  {voidConfirmId === h.id ? (
+                    <div className="flex gap-1">
+                      <button type="button" className="btn-ghost !min-h-0 !px-2 !py-1 text-[11px] font-extrabold text-brand-redtext" onClick={() => void doVoidBill(h.id)}>
+                        Yakin hapus
+                      </button>
+                      <button type="button" className="btn-ghost !min-h-0 !px-2 !py-1 text-[11px]" onClick={() => setVoidConfirmId(null)}>
+                        Batal
+                      </button>
+                    </div>
+                  ) : (
+                    <button type="button" className="btn-ghost !min-h-0 !py-1.5 text-xs" onClick={() => setVoidConfirmId(h.id)}>
+                      Void
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Modal>
+
+      {/* ===== Bayar bill tersimpan: numpad ala checkout ===== */}
+      <Modal open={billPay !== null} title={billPay ? `Bayar Bill — ${billPay.label || 'Tanpa nama'}` : ''} onClose={() => { setBillPay(null); setErr('') }}>
+        {billPay && (
+          <>
+            <div className="mb-3 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-2.5">
+              <p className="text-xs text-brand-muted">Total bill</p>
+              <p className="text-2xl font-extrabold tabular-nums">{fmtRp(billPay.total)}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-brand-muted">{billPay.items.map((i) => `${i.qty}× ${i.name}`).join(', ')}</p>
+            </div>
+            <div className="mb-3 flex gap-1.5" role="radiogroup" aria-label="Metode pembayaran bill">
+              {(['cash', 'qris', 'transfer'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={billMethod === m}
+                  onClick={() => setBillMethod(m)}
+                  className={`chip h-10 flex-1 px-3 ${billMethod === m ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+                >
+                  {METHOD_LABEL[m]}
+                </button>
+              ))}
+            </div>
+            {err && (
+              <p className="mb-2 rounded-lg bg-brand-redtext/10 px-3 py-2 text-sm font-bold text-brand-redtext" role="alert">
+                {err}
+              </p>
+            )}
+            <Numpad
+              value={billCash}
+              onChange={setBillCash}
+              total={billPay.total}
+              submitLabel="Bayar Bill"
+              onSubmit={() => void doPayBill(billMethod, billCash)}
+            />
+          </>
+        )}
+      </Modal>
 
       {/* ===== Popup checkout 2 sisi: kiri numpad/lunas, kanan struk ===== */}
       {checkout && (

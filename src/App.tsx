@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react'
-import { NavLink, Route, Routes, useNavigate } from 'react-router-dom'
+import { lazy, Suspense, useEffect, useRef, useState, type ReactElement } from 'react'
+import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
 import { isDemo, loadSettings } from './lib/db'
 import { OfflineIndicator } from './components/OfflineIndicator'
@@ -16,7 +16,6 @@ const Orders = lazy(() => import('./pages/Orders'))
 const Production = lazy(() => import('./pages/Production'))
 const Ingredients = lazy(() => import('./pages/Ingredients'))
 const Products = lazy(() => import('./pages/Products'))
-const StockPage = lazy(() => import('./pages/Stock'))
 const Finance = lazy(() => import('./pages/Finance'))
 const ShiftPage = lazy(() => import('./pages/Shift'))
 const HistoryPage = lazy(() => import('./pages/History'))
@@ -51,8 +50,7 @@ const NAV_ADMIN: NavGroup[] = [
     label: 'Produk & Stok',
     items: [
       { to: '/menu', label: 'Menu & Paket', icon: '🍗' },
-      { to: '/bahan', label: 'Bahan & HPP', icon: '🥘' },
-      { to: '/stok', label: 'Stok & Pembelian', icon: '📦' }
+      { to: '/bahan', label: 'Bahan Baku & HPP', icon: '🥘' }
     ]
   },
   {
@@ -77,7 +75,7 @@ const NAV_KASIR: NavGroup[] = [
   },
   {
     label: 'Produk & Stok',
-    items: [{ to: '/stok', label: 'Stok & Pembelian', icon: '📦' }]
+    items: [{ to: '/bahan', label: 'Bahan Baku & HPP', icon: '🥘' }]
   }
 ]
 
@@ -87,8 +85,41 @@ function Shell(): ReactElement {
   const { session, signOut } = useAuth()
   const nav = useNavigate()
   const [open, setOpen] = useState(false)
+  const drawerRef = useRef<HTMLElement>(null)
   // Brand dari settings toko (nama + tagline); fallback aman saat gagal muat
   const [brand, setBrand] = useState({ name: 'Sabana Kasir', tagline: 'Drieischicken POS' })
+  // Aksesibilitas drawer mobile (ux: drawer focus trap — High):
+  // Escape menutup, fokus masuk ke link pertama, Tab dipagari di dalam drawer,
+  // fokus kembali ke tombol ☰ saat drawer ditutup.
+  useEffect(() => {
+    if (!open) return
+    const aside = drawerRef.current
+    const panel = aside?.querySelector('nav') ?? aside
+    const first = panel?.querySelector<HTMLElement>('a, button')
+    first?.focus()
+    const h = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        setOpen(false)
+        return
+      }
+      if (e.key !== 'Tab' || !aside) return
+      const items = [...aside.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')]
+      if (items.length === 0) return
+      const idx = items.indexOf(document.activeElement as HTMLElement)
+      e.preventDefault()
+      const next = e.shiftKey ? (idx <= 0 ? items.length - 1 : idx - 1) : idx === items.length - 1 ? 0 : idx + 1
+      items[next].focus()
+    }
+    window.addEventListener('keydown', h)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', h)
+      document.body.style.overflow = prevOverflow
+      document.querySelector<HTMLButtonElement>('button[aria-label="Buka menu"]')?.focus()
+    }
+  }, [open])
   useEffect(() => {
     if (!session) return
     void loadSettings()
@@ -196,12 +227,20 @@ function Shell(): ReactElement {
       {/* Drawer mobile/tablet kecil */}
       {open && (
         <div className="fixed inset-0 z-40 flex md:hidden" role="dialog" aria-modal="true" aria-label="Menu navigasi">
-          <div className="absolute inset-0 bg-black/45" onClick={() => setOpen(false)} />
-          <aside className="relative w-64 border-r-[1.5px] border-brand-line bg-brand-card">
-            <div className="strip px-4 pb-3 pt-5">
+          <div className="absolute inset-0 bg-black/45" onClick={() => setOpen(false)} aria-hidden />
+          <aside ref={drawerRef} className="relative w-64 border-r-[1.5px] border-brand-line bg-brand-card">
+            <div className="strip flex items-center justify-between px-4 pb-3 pt-5">
               <p className="text-lg font-extrabold leading-tight">{brand.name}</p>
-              {brand.tagline && <p className="text-xs font-bold text-brand-muted">{brand.tagline}</p>}
+              <button
+                type="button"
+                className="btn-ghost !min-h-[44px] !w-[44px] !min-w-[44px] !px-0 text-lg"
+                onClick={() => setOpen(false)}
+                aria-label="Tutup menu"
+              >
+                ✕
+              </button>
             </div>
+            {brand.tagline && <p className="px-4 text-xs font-bold text-brand-muted">{brand.tagline}</p>}
             {renderNav(false)}
           </aside>
         </div>
@@ -235,7 +274,8 @@ function Shell(): ReactElement {
                 <Route path="/produksi" element={<Production />} />
                 <Route path="/bahan" element={<Ingredients />} />
                 <Route path="/menu" element={<Products />} />
-                <Route path="/stok" element={<StockPage />} />
+                {/* Halaman Stok lama sudah merger ke /bahan?tab=stok */}
+                <Route path="/stok" element={<Navigate to="/bahan?tab=stok" replace />} />
                 <Route path="/keuangan" element={<Finance />} />
                 <Route path="/shift" element={<ShiftPage />} />
                 <Route path="/pengaturan" element={<SettingsPage />} />

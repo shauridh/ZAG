@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { fmtRp } from '../lib/money'
 
 /**
@@ -26,6 +27,23 @@ export function Numpad({
     const n = parseInt(next, 10)
     if (String(n) === next.replace(/^0+(?=\d)/, '')) onChange(n)
   }
+  // Keyboard fisik: digit, Backspace (hapus 1 angka), C (bersih), Enter (simpan).
+  // Abaikan bila sedang mengetik di input/select asli supaya tidak dobel.
+  useEffect(() => {
+    const h = (e: KeyboardEvent): void => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
+      if (e.key >= '0' && e.key <= '9') push(e.key)
+      else if (e.key === 'Backspace') onChange(Math.floor(value / 10))
+      else if (e.key.toLowerCase() === 'c') onChange(0)
+      else if (e.key === 'Enter' && onSubmit && !(total !== undefined && value < total)) onSubmit()
+      else return
+      e.preventDefault()
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  })
   const exact = total !== undefined && value === total
   const hasChange = total !== undefined && value > total
 

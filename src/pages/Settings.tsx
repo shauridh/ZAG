@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactElement } from 'react'
-import { loadSettings, saveSetting, loadZones, saveZones, resetDemoData, isDemo } from '../lib/db'
+import { loadSettings, saveSetting, loadZones, saveZones, resetDemoData, isDemo, resetOperationalData, clearOwnerPin } from '../lib/db'
 import { fmtRpPlain, parseNum } from '../lib/money'
 import { normalizeSchedule, DAY_LABELS, DAY_ORDER, type DeliveryWeek } from '../lib/delivery-schedule'
 import type { Settings } from '../lib/types'
@@ -192,20 +192,7 @@ export default function SettingsPage(): ReactElement {
                 <p className="mt-1 text-xs text-brand-muted">Format internasional tanpa + (contoh 6281234567890). Saat shift ditutup, WhatsApp terbuka dengan laporan terisi tinggal kirim.</p>
               </div>
             </div>
-            {isDemo && (
-              <button
-                type="button"
-                className="btn-danger mt-4"
-                onClick={() => {
-                  if (window.confirm('Hapus semua data demo dan mulai dari awal?')) {
-                    resetDemoData()
-                    window.location.reload()
-                  }
-                }}
-              >
-                Reset Data Demo
-              </button>
-            )}
+            <ResetZone />
           </div>
           </div>
       )}
@@ -917,6 +904,87 @@ function ReceiptForm({ settings, onSave }: { settings: Settings; onSave: (v: Set
         </div>
         <p className="mt-2 text-xs text-brand-muted">Cetak via printer Bluetooth (Chrome/Edge) atau print dialog dari modal struk kasir.</p>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Zona reset: mulai dari nol.
+ * - Reset Data Demo: kembalikan demo ke seed awal (hanya mode demo).
+ * - Reset TOTAL (produksi & demo): kosongkan SEMUA data operasional + master
+ *   (transaksi, shift, stok, bahan, menu, dst) — konfirmasi ketik HAPUS.
+ * - Hapus PIN owner (lupa PIN -> set ulang di Keuangan). Hanya admin.
+ */
+function ResetZone(): ReactElement {
+  const { toast } = useToast()
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [demoResetArmed, setDemoResetArmed] = useState(false)
+  const armed = confirm.trim().toUpperCase() === 'HAPUS'
+  const doReset = async (): Promise<void> => {
+    if (!armed || busy) return
+    setBusy(true)
+    try {
+      await resetOperationalData()
+      toast('Semua data operasional & master dihapus — aplikasi mulai dari nol.')
+      setTimeout(() => window.location.reload(), 600)
+    } catch (ex) {
+      toast(`Reset gagal: ${(ex as Error).message}`)
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="card mt-4 border-[1.5px] !border-brand-redtext p-4">
+      <h2 className="font-extrabold text-brand-redtext">⚠ Mulai dari Nol</h2>
+      <p className="mt-1 text-sm text-brand-muted">
+        Menghapus <b>semua</b> data operasional &amp; master: transaksi, riwayat, shift, pesanan portal, pelanggan, pembelian, produksi, stok, bahan baku, menu, resep, paket, dan fryer.
+        Pengaturan toko, printer, dan akun login <b>tidak</b> tersentuh. Cocok saat pertama go-live sebelum data asli mengalir.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          className="input max-w-40"
+          placeholder="ketik HAPUS"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          aria-label="Ketik HAPUS untuk mengaktifkan tombol reset"
+        />
+        <button type="button" className="btn-danger" disabled={!armed || busy} onClick={() => void doReset()}>
+          {busy ? 'Menghapus…' : '🗑 Hapus Semua Data (mulai dari nol)'}
+        </button>
+        <button
+          type="button"
+          className="btn-ghost"
+          onClick={async () => {
+            try {
+              await clearOwnerPin()
+              toast('PIN owner dihapus. Set PIN baru di menu Keuangan.')
+            } catch (ex) {
+              toast(`Gagal: ${(ex as Error).message}`)
+            }
+          }}
+        >
+          🔑 Hapus PIN Owner (lupa PIN)
+        </button>
+      </div>
+      {isDemo && (
+        <button
+          type="button"
+          className="btn-ghost mt-3"
+          onClick={() => {
+            // Konfirmasi dua-klik (bukan window.confirm: dialog native bisa
+            // membekukan webview & mengganggu otomasi).
+            if (demoResetArmed) {
+              resetDemoData()
+              window.location.reload()
+              return
+            }
+            setDemoResetArmed(true)
+            setTimeout(() => setDemoResetArmed(false), 4000)
+          }}
+        >
+          {demoResetArmed ? '⚠ Yakin? Klik sekali lagi' : '↩ Reset Data Demo (kembali ke seed)'}
+        </button>
+      )}
     </div>
   )
 }

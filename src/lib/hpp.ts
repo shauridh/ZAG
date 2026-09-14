@@ -136,6 +136,20 @@ export function marginPct(price: number, hpp: number): number {
   return ((price - hpp) / price) * 100
 }
 
+/**
+ * Satuan kecil bahan: hasil konversi isi kemasan (mis. pack isi 9 potong -> 'potong').
+ * Dipakai resep langsung. Kosong/null = sama dengan satuan beli.
+ */
+export function smallUnitOf(i: Pick<Ingredient, 'buy_unit' | 'small_unit' | 'pack_content'>): string {
+  const s = (i.small_unit ?? '').trim()
+  return s || i.buy_unit
+}
+
+/** Harga per 1 kemasan utuh = harga per satuan dasar × isi kemasan (untuk tampilan ala price list). */
+export function packPriceOf(i: Pick<Ingredient, 'price' | 'pack_content'>): number {
+  return Math.round(i.price * (i.pack_content || 1))
+}
+
 export const fmtHppQty = (l: HppLine): string =>
   `${fmtQty(l.qty)} ${l.buyUnit}${l.packContent > 1 ? ` (1 ${l.buyUnit} = ${fmtQty(l.packContent)})` : ''}`
 

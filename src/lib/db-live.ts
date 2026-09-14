@@ -8,6 +8,7 @@ import type {
   DeliveryZone,
   Expense,
   ExpenseCategory,
+  HeldOrder,
   Fryer,
   Ingredient,
   IngredientRecipe,
@@ -477,6 +478,29 @@ export async function liveDeleteIngredient(sb: Sb, id: number): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+// ================= Impor price list & reset mulai dari nol (live) =================
+
+export async function liveImportPriceList(
+  sb: Sb,
+  items: { code: string; name: string; buy_unit: string; pack_content: number; pack_price: number; small_unit: string }[],
+  replace: boolean
+): Promise<{ created: number; updated: number }> {
+  const { data, error } = await sb.rpc('import_price_list', { p_items: items, p_replace: replace })
+  if (error) throw new Error(error.message)
+  const row = Array.isArray(data) ? data[0] : data
+  return { created: Number(row?.created ?? 0), updated: Number(row?.updated ?? 0) }
+}
+
+export async function liveResetOperationalData(sb: Sb): Promise<void> {
+  const { error } = await sb.rpc('reset_operational_data')
+  if (error) throw new Error(error.message)
+}
+
+export async function liveClearOwnerPin(sb: Sb): Promise<void> {
+  const { error } = await sb.rpc('clear_owner_pin')
+  if (error) throw new Error(error.message)
+}
+
 // ================= Foto menu (live: Supabase Storage) =================
 
 export async function liveUploadProductPhoto(sb: Sb, blob: Blob, ext = 'jpg'): Promise<{ url: string; path: string }> {
@@ -526,7 +550,7 @@ export async function liveUpsertCategory(sb: Sb, c: { id?: number; name: string;
   ensureAdminWrite(data?.length ?? 0, c.id !== undefined)
 }
 
-export async function liveUpsertIngredient(sb: Sb, i: { id?: number; name: string; code: string | null; kind: 'raw' | 'prepared'; buy_unit: string; pack_content: number; price: number; min_stock: number; active: boolean }): Promise<void> {
+export async function liveUpsertIngredient(sb: Sb, i: { id?: number; name: string; code: string | null; kind: 'raw' | 'prepared'; buy_unit: string; small_unit?: string | null; pack_content: number; price: number; min_stock: number; active: boolean }): Promise<void> {
   const { data, error } = await (i.id
     ? sb.from('ingredients').update({ ...i, id: undefined }).eq('id', i.id)
     : sb.from('ingredients').insert(i)
@@ -708,4 +732,89 @@ export async function liveEmailShiftReport(sb: Sb, shiftId: number, rep: { cash_
   } catch (e) {
     console.warn('Email shift gagal:', e)
   }
+}
+
+// ================= Simpan pesanan / bill (pembayaran nanti) =================
+
+export async function liveSaveHeldOrder(
+  sb: Sb,
+  p: {
+    orderType: OrderType
+    items: { product_id: number; name: string; qty: number; price: number }[]
+    subtotal: number
+    discount: number
+    total: number
+    note: string | null
+    label: string | null
+  }
+): Promise<HeldOrder> {
+  const { data: sh } = await sb.from('shifts').select('id').eq('status', 'buka').limit(1).maybeSingle()
+  const shiftId = sh?.id ?? null
+  if (shiftId === null) throw new Error('Buka shift dulu sebelum menyimpan pesanan')
+  const { data: sess } = await sb.auth.getUser()
+  const { data, error } = await sb
+    .from('held_orders')
+    .insert({
+      shift_id: shiftId,
+      user_id: sess?.user?.id ?? null,
+      order_type: p.orderType,
+      items: p.items,
+      subtotal: p.subtotal,
+      discount: p.discount,
+      total: p.total,
+      note: p.note,
+      label: p.label
+    })
+    .select('*')
+    .single()
+  if (error) throw new Error(error.message)
+  return data as HeldOrder
+}
+
+export async function liveLoadHeldOrders(sb: Sb): Promise<HeldOrder[]> {
+  const { data, error } = await sb.from('held_orders').select('*').order('created_at')
+  if (error) throw new Error(error.message)
+  return (data ?? []) as HeldOrder[]
+}
+
+/**
+ * Bayar bill tersimpan lewat RPC pay_held_order: buat transaksi (stok dipotong,
+ * aturan bisnis di create_tx) lalu hapus bill secara atomik di server.
+ */
+export async function livePayHeldOrder(
+  sb: Sb,
+  heldId: number,
+  method: 'cash' | 'qris' | 'transfer',
+  amount: number,
+  discountOverride?: number
+): Promise<TxResult> {
+  const { data, error } = await sb.rpc('pay_held_order', {
+    p_held_id: heldId,
+    p_method: method,
+    p_amount: amount,
+    p_discount: discountOverride ?? null
+  })
+  if (error) throw new Error(error.message)
+  const txId = (data as { id: number }).id
+  const { data: tx } = await sb.from('transactions').select('*').eq('id', txId).single()
+  const { data: items } = await sb.from('transaction_items').select('name, qty, price').eq('transaction_id', txId)
+  const { data: pays } = await sb.from('payments').select('method, amount').eq('transaction_id', txId)
+  return {
+    id: txId,
+    receipt_no: tx!.receipt_no,
+    subtotal: tx!.subtotal,
+    discount: tx!.discount,
+    total: tx!.total,
+    channel_fee: tx!.channel_fee,
+    order_type: tx!.order_type,
+    created_at: tx!.created_at,
+    items: items ?? [],
+    payments: pays ?? []
+  }
+}
+
+/** Void bill: batal tanpa jadi transaksi, stok tidak tersentuh. */
+export async function liveVoidHeldOrder(sb: Sb, heldId: number): Promise<void> {
+  const { error } = await sb.rpc('void_held_order', { p_held_id: heldId })
+  if (error) throw new Error(error.message)
 }

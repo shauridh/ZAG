@@ -16,6 +16,10 @@ export interface Ingredient {
   kind: 'raw' | 'prepared'
   buy_unit: string
   pack_content: number
+  /** Satuan kecil hasil konversi isi kemasan (mis. pack isi 9 potong -> 'potong'). Kosong = pakai satuan beli. */
+  small_unit?: string | null
+  /** Hanya di form (tidak tersimpan): teks sementara saat ketik satuan kecil kustom. */
+  small_unit_custom?: string
   price: number
   stock: number
   min_stock: number
@@ -100,6 +104,25 @@ export interface Transaction {
 
 export interface TransactionItem { name: string; qty: number; price: number; hpp: number }
 
+/**
+ * Bill tersimpan (simpan pesanan / bill-in): keranjang kasir yang belum
+ * dibayar. Stok baru dikurangi saat bill dibayar (payHeldOrder), bukan saat
+ * disimpan — bahan belum keluar sebelum uang masuk.
+ */
+export interface HeldOrder {
+  id: number
+  shift_id: number | null
+  user_id: string | null
+  order_type: OrderType
+  items: { product_id: number; name: string; qty: number; price: number }[]
+  subtotal: number
+  discount: number
+  total: number
+  note: string | null
+  label: string | null
+  created_at: string
+}
+
 export interface PortalOrder {
   id: number
   status: 'menunggu' | 'ditolak' | 'qris_dikirim' | 'menunggu_verifikasi' | 'diproses' | 'dikirim' | 'selesai' | 'batal'
@@ -109,7 +132,7 @@ export interface PortalOrder {
   note: string | null
   reject_reason: string | null
   created_at: string
-  items: { name: string; qty: number; price: number }[]
+  items: { name: string; qty: number; price: number; product_id?: number }[]
 }
 
 export interface DeliveryZone { id: number; radius_km: number; fee: number }

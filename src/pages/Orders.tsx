@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
-import { loadPortalOrders, loadSettings, saveSetting, acceptOrder, rejectOrder, verifyOrderPayment, setOrderStatus, subscribeOrders, type PortalOrderT } from '../lib/db'
+import { loadPortalOrders, loadSettings, saveSetting, acceptOrder, rejectPaidOrder, verifyOrderPayment, setOrderStatus, subscribeOrders, type PortalOrderT } from '../lib/db'
 import { fmtRp } from '../lib/money'
 import { fmtDateTime } from '../lib/dates'
 import type { Settings } from '../lib/types'
@@ -190,21 +190,27 @@ export default function Orders(): ReactElement {
                 </>
               )}
               {o.status === 'menunggu_verifikasi' && (
-                <button
-                  type="button"
-                  className="btn-primary !min-h-0 !py-2 text-xs"
-                  onClick={async () => {
-                    try {
-                      await verifyOrderPayment(o.id)
-                      stopOrderAlert()
-                      await reload()
-                    } catch (ex) {
-                      setErr((ex as Error).message)
-                    }
-                  }}
-                >
-                  Pembayaran Masuk, Proses
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="btn-primary !min-h-0 !py-2 text-xs"
+                    onClick={async () => {
+                      try {
+                        await verifyOrderPayment(o.id)
+                        stopOrderAlert()
+                        await reload()
+                      } catch (ex) {
+                        setErr((ex as Error).message)
+                      }
+                    }}
+                  >
+                    Pembayaran Masuk, Proses
+                  </button>
+                  {/* stok belum dipotong di status ini: boleh ditolak (mis. stok habis) */}
+                  <button type="button" className="btn-danger !min-h-0 !py-2 text-xs" onClick={() => { setRejecting(o); setReason('') }}>
+                    Tolak
+                  </button>
+                </>
               )}
               {o.status === 'diproses' && (
                 <button
@@ -260,7 +266,7 @@ export default function Orders(): ReactElement {
           disabled={!reason.trim()}
           onClick={async () => {
             try {
-              await rejectOrder(rejecting!.id, reason.trim())
+              await rejectPaidOrder(rejecting!.id, reason.trim())
               setRejecting(null)
               await reload()
             } catch (ex) {

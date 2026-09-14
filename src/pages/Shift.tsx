@@ -5,7 +5,7 @@ import type { Shift, Transaction, Settings } from '../lib/types'
 import { Numpad } from '../components/Numpad'
 import { Modal } from '../components/Modal'
 import { fmtDateTime, todayISO, dayStart } from '../lib/dates'
-import { byChannel, byItem, byPayment, totalsOf, endOfDayReport, endOfDayText } from '../lib/reports'
+import { byChannel, byItem, byPayment, totalsOf, endOfDayReport, endOfDayText, txCashNet } from '../lib/reports'
 import { downloadCsv } from '../lib/csv'
 import { useToast } from '../components/Toast'
 
@@ -49,7 +49,7 @@ export default function ShiftPage(): ReactElement {
   if (!settings) return <div className="p-6 text-sm font-bold text-brand-muted">Memuat...</div>
 
   const cashSales = (t: Shift): number =>
-    (txs ?? []).filter((x) => x.shift_id === t.id).reduce((sum, x) => sum + (x.payments ?? []).filter((p) => p.method === 'cash').reduce((a, p) => a + p.amount, 0), 0)
+    (txs ?? []).filter((x) => x.shift_id === t.id).reduce((sum, x) => sum + txCashNet(x), 0)
   // uang non-penjualan: setoran modal ke drawer / belanja mendadak dari drawer
   const cashInOf = (t: Shift): number => t.cash_in ?? 0
   const cashOutOf = (t: Shift): number => t.cash_out ?? 0

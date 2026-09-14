@@ -6,6 +6,7 @@ import { Modal } from '../components/Modal'
 import { fmtDate, fmtDateTime, todayISO, dayStart, dayEnd } from '../lib/dates'
 import { CHANNEL_LABEL } from '../lib/escpos'
 import { buildReceiptHtml, receiptFromTx } from '../lib/escpos'
+import { txCashNet } from '../lib/reports'
 import { loadSettings } from '../lib/db'
 import type { Settings } from '../lib/types'
 import { useToast } from '../components/Toast'
@@ -58,7 +59,7 @@ export default function History(): ReactElement {
   const dayTxs = txs ?? []
   const cashNet = useMemo(
     () =>
-      dayTxs.reduce((s, t) => s + (t.payments ?? []).filter((p) => p.method === 'cash').reduce((a, p) => a + p.amount, 0), 0),
+      dayTxs.reduce((s, t) => s + txCashNet(t), 0),
     [dayTxs]
   )
   const salesCount = dayTxs.filter((t) => t.total >= 0 && (t.status ?? 'normal') === 'normal').length

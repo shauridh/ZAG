@@ -8,7 +8,7 @@
 // File ini hanya memilih adapter — tidak ada logika bisnis di sini.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { OrderType, Settings, Shift, Transaction } from './types'
+import type { HeldOrder, OrderType, Settings, Shift, Transaction } from './types'
 import { endOfDayReport } from './reports'
 import { type Catalog, type TxResult, type SessionInfo, type RefundResult, type PortalAddress, currentOnline, setOnline, emit, onSyncStateChange, txIsEditable, TX_STATUS_LABEL, MENU_BUCKET, requireOwnerPin, hashPin } from './db-shared'
 import * as demo from './db-demo'
@@ -22,7 +22,7 @@ export const sb: SupabaseClient | null = isDemo
   : createClient(SUPABASE_URL!, SUPABASE_KEY!, { realtime: { params: { eventsPerSecond: 5 } } })
 
 // Kontrak & tipe yang sebelumnya hidup di file ini — API tidak berubah.
-export type { Catalog, TxResult, SessionInfo, RefundResult, PortalAddress }
+export type { Catalog, TxResult, SessionInfo, RefundResult, PortalAddress, HeldOrder }
 export type { PortalOrderT } from './db-shared'
 export { currentOnline, onSyncStateChange, txIsEditable, TX_STATUS_LABEL, MENU_BUCKET }
 export { queueCount, QUEUE_EVENT } from './offline'
@@ -83,6 +83,43 @@ export async function createTx(p: {
 }): Promise<TxResult> {
   if (isDemo) return demo.demoCreateTx(p)
   return live.liveCreateTx(sb!, currentOnline(), p)
+}
+
+// ================= Simpan pesanan / bill (pembayaran nanti) =================
+
+export async function saveHeldOrder(p: {
+  orderType: OrderType
+  items: { product_id: number; name: string; qty: number; price: number }[]
+  subtotal: number
+  discount: number
+  total: number
+  note: string | null
+  label: string | null
+}): Promise<HeldOrder> {
+  if (isDemo) return demo.demoSaveHeldOrder(p)
+  return live.liveSaveHeldOrder(sb!, p)
+}
+
+export async function loadHeldOrders(): Promise<HeldOrder[]> {
+  if (isDemo) return demo.demoLoadHeldOrders()
+  return live.liveLoadHeldOrders(sb!)
+}
+
+/** Bayar bill: stok dipotong di sini (bukan saat disimpan); bill dihapus atomik. */
+export async function payHeldOrder(
+  heldId: number,
+  method: 'cash' | 'qris' | 'transfer',
+  amount: number,
+  discountOverride?: number
+): Promise<TxResult> {
+  if (isDemo) return demo.demoPayHeldOrder(heldId, method, amount, discountOverride)
+  return live.livePayHeldOrder(sb!, heldId, method, amount, discountOverride)
+}
+
+/** Void bill: batal tanpa jadi transaksi, stok tidak tersentuh. */
+export async function voidHeldOrder(heldId: number): Promise<void> {
+  if (isDemo) return demo.demoVoidHeldOrder(heldId)
+  return live.liveVoidHeldOrder(sb!, heldId)
 }
 
 // ================= Riwayat transaksi: ubah, hapus, refund =================
@@ -345,7 +382,7 @@ export async function upsertCategory(c: { id?: number; name: string; sort: numbe
   return live.liveUpsertCategory(sb!, c)
 }
 
-export async function upsertIngredient(i: { id?: number; name: string; code: string | null; kind: 'raw' | 'prepared'; buy_unit: string; pack_content: number; price: number; min_stock: number; active: boolean }): Promise<void> {
+export async function upsertIngredient(i: { id?: number; name: string; code: string | null; kind: 'raw' | 'prepared'; buy_unit: string; small_unit?: string | null; pack_content: number; price: number; min_stock: number; active: boolean }): Promise<void> {
   if (isDemo) return demo.demoUpsertIngredient(i)
   return live.liveUpsertIngredient(sb!, i)
 }
@@ -359,6 +396,45 @@ export async function deleteProduct(id: number): Promise<void> {
 export async function deleteIngredient(id: number): Promise<void> {
   if (isDemo) return demo.demoDeleteIngredient(id)
   return live.liveDeleteIngredient(sb!, id)
+}
+
+// ================= Impor price list & reset mulai dari nol =================
+
+export interface PriceListItem {
+  code: string
+  name: string
+  buy_unit: string
+  pack_content: number
+  /** Harga per 1 kemasan utuh (ala price list supplier). */
+  pack_price: number
+  /** Satuan kecil hasil konversi isi kemasan (mis. 'potong', 'gram', 'pcs'); boleh ''. */
+  small_unit: string
+}
+
+/**
+ * Impor/sinkron daftar harga supplier (Price List Sabana Sharing Mitra).
+ * Upsert per kode barang; created/updated dikembalikan utk pesan hasil.
+ * replace=true: master dibersihkan dulu (hanya dari halaman Bahan, wajib konfirmasi).
+ */
+export async function importPriceList(items: PriceListItem[], replace = false): Promise<{ created: number; updated: number }> {
+  if (isDemo) return demo.demoImportPriceList(items, replace)
+  return live.liveImportPriceList(sb!, items, replace)
+}
+
+/**
+ * Reset TOTAL: kosongkan semua data operasional + master (transaksi, shift,
+ * stok, bahan, menu, dst) supaya produksi mulai dari nol. Pengaturan toko
+ * & sesi login tidak tersentuh. Wajib konfirmasi ganda di UI.
+ */
+export async function resetOperationalData(): Promise<void> {
+  if (isDemo) return demo.demoResetOperationalData()
+  return live.liveResetOperationalData(sb!)
+}
+
+/** Hapus PIN owner (lupa PIN) — hanya admin, lalu set ulang dari Keuangan. */
+export async function clearOwnerPin(): Promise<void> {
+  if (isDemo) return demo.demoClearOwnerPin()
+  return live.liveClearOwnerPin(sb!)
 }
 
 export async function saveRecipe(productId: number, lines: { kind: 'ingredient' | 'product'; component_id: number; qty: number }[]): Promise<void> {
@@ -400,6 +476,12 @@ export async function acceptOrder(id: number): Promise<void> {
 
 export async function rejectOrder(id: number, reason: string): Promise<void> {
   if (isDemo) return demo.demoRejectOrder(id, reason)
+  return live.liveRejectOrder(sb!, id, reason)
+}
+
+/** Tolak pesanan, termasuk yang sudah bayar tapi belum diverifikasi (belum potong stok). */
+export async function rejectPaidOrder(id: number, reason: string): Promise<void> {
+  if (isDemo) return demo.demoRejectPaidOrder(id, reason)
   return live.liveRejectOrder(sb!, id, reason)
 }
 

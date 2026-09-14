@@ -68,7 +68,9 @@ begin
   v_cash_in := coalesce(v_shift.cash_in, 0);
   v_cash_out := coalesce(v_shift.cash_out, 0);
 
-  select coalesce(sum(p.amount),0) into v_cash_sales
+  -- Penjualan tunai = uang diterima MINUS kembalian: payments menyimpan uang
+  -- diterima (nota 27rb dibayar 50rb → kas masuk 27rb, kembali 23rb).
+  select coalesce(sum(least(p.amount, t.total)),0) into v_cash_sales
   from payments p join transactions t on t.id = p.transaction_id
   where t.shift_id = v_shift.id and p.method = 'cash' and t.status in ('normal','refund');
 
