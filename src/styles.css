@@ -89,6 +89,22 @@ body {
   animation: newpulse 1.4s ease-in-out infinite;
 }
 
+/* Indikator server tersambung: titik hijau berkedip lembut */
+@keyframes dotblink {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(34, 170, 85, 0.55);
+  }
+  50% {
+    opacity: 0.45;
+    box-shadow: 0 0 0 4px rgba(34, 170, 85, 0);
+  }
+}
+.dot-blink {
+  animation: dotblink 1.6s ease-in-out infinite;
+}
+
 /* Peta Leaflet di modal */
 .leaflet-container {
   z-index: 0;

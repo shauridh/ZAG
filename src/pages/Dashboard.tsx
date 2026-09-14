@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { Link } from 'react-router-dom'
-import { loadCatalog, loadTransactions, loadFinance, loadSettings, loadFryers, loadPortalOrders, type Catalog } from '../lib/db'
+import { loadCatalog, loadTransactions, loadFinance, loadSettings, loadFryers, loadPortalOrders, upsertProduct, saveRecipe, type Catalog } from '../lib/db'
 import { totalsOf, byChannel, byItem, byHour, byPayment, methodLabel } from '../lib/reports'
 import { stockTrendsFrom } from '../lib/stock-trend'
+import { auditRecipeHealth, bundleIdeas, bundleRecipeLines, type BundleIdea } from '../lib/menu-ideas'
+import { ingIndex, maxAvailableQty } from '../lib/hpp'
+import { useToast } from '../components/Toast'
 import { downloadCsv } from '../lib/csv'
 import { fmtRp, fmtRpPlain, fmtQty } from '../lib/money'
 import { todayISO, addDaysISO, dayStart, dayEnd, fmtDate, localDateISO } from '../lib/dates'
-import type { Expense, OtherIncome, Settings, Transaction, OilCycle } from '../lib/types'
+import type { Expense, OtherIncome, Settings, Transaction, OilCycle, Category } from '../lib/types'
 import {
   ResponsiveContainer,
   AreaChart,
@@ -19,7 +22,9 @@ import {
   Pie,
   Cell,
   BarChart,
-  Bar
+  Bar,
+  LineChart,
+  Line
 } from 'recharts'
 
 const CHAN_LABEL: Record<string, string> = {
@@ -68,6 +73,13 @@ function rangeOf(p: Period, customFrom: string, customTo: string): { from: strin
 /** Jumlah hari kalender dalam rentang [from, to] inklusif. */
 function spanDays(from: string, to: string): number {
   return Math.round((new Date(to + 'T00:00:00').getTime() - new Date(from + 'T00:00:00').getTime()) / 86400000) + 1
+}
+
+/** ISO tanggal ke-i (0-based) dari rentang yang berawal `from` — sejajar dailySeries. */
+function dailyDateISO(from: string, i: number): string {
+  const d = new Date(from + 'T00:00:00')
+  d.setDate(d.getDate() + i)
+  return localDateISO(d)
 }
 
 /**
@@ -124,6 +136,62 @@ function compareRangeOf(from: string, to: string, period: Period): { from: strin
 
 const WD = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
 
+/* ===== Toggle tampil/sembunyi tiap kartu dashboard (persist di localStorage) ===== */
+type WidgetKey =
+  | 'summary'
+  | 'actions'
+  | 'recipeIssues'
+  | 'dailyTrend'
+  | 'channelMix'
+  | 'channelTable'
+  | 'topItems'
+  | 'busyHours'
+  | 'paymentMix'
+  | 'targets'
+  | 'bestSellers'
+  | 'revCompare'
+  | 'stockTrend'
+  | 'preparedStock'
+  | 'ideas'
+  | 'lowStock'
+  | 'txPerDay'
+  | 'catMix'
+  | 'avgTicket'
+
+const WIDGET_DEFS: { key: WidgetKey; label: string; def: boolean }[] = [
+  { key: 'summary', label: 'Ringkasan omzet & laba', def: true },
+  { key: 'actions', label: 'Perlu tindakan', def: true },
+  { key: 'recipeIssues', label: 'Peringatan resep rusak', def: true },
+  { key: 'dailyTrend', label: 'Tren omzet & laba harian', def: true },
+  { key: 'txPerDay', label: 'Jumlah transaksi per hari (baru)', def: true },
+  { key: 'channelMix', label: 'Channel penjualan (donat)', def: true },
+  { key: 'channelTable', label: 'Tabel penerimaan channel', def: true },
+  { key: 'topItems', label: 'Menu terlaris (bar)', def: true },
+  { key: 'busyHours', label: 'Jam sibuk', def: true },
+  { key: 'catMix', label: 'Omzet per kategori (donat, baru)', def: true },
+  { key: 'avgTicket', label: 'Rata-rata nota harian (baru)', def: true },
+  { key: 'paymentMix', label: 'Metode pembayaran', def: true },
+  { key: 'targets', label: 'Target menu hari ini', def: true },
+  { key: 'bestSellers', label: 'Best seller vs target + sisa porsi', def: true },
+  { key: 'revCompare', label: 'Omzet vs periode lalu', def: true },
+  { key: 'stockTrend', label: 'Tren stok bahan kritis', def: true },
+  { key: 'preparedStock', label: 'Stok siap jual', def: true },
+  { key: 'ideas', label: 'Ide menu paket', def: true },
+  { key: 'lowStock', label: 'Bahan menipis / habis', def: true }
+]
+
+const WIDGET_STORE = 'sabana-dash-widgets-v1'
+
+/** Set key aktif; key yang belum pernah disimpan mengikuti default-nya. */
+function loadWidgets(): Set<WidgetKey> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(WIDGET_STORE) ?? '{}') as Record<string, boolean>
+    return new Set(WIDGET_DEFS.filter((d) => raw[d.key] ?? d.def).map((d) => d.key))
+  } catch {
+    return new Set(WIDGET_DEFS.filter((d) => d.def).map((d) => d.key))
+  }
+}
+
 export default function Dashboard(): ReactElement {
   const [catalog, setCatalog] = useState<Catalog | null>(null)
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -135,6 +203,10 @@ export default function Dashboard(): ReactElement {
   const [cycles, setCycles] = useState<OilCycle[]>([])
   const [pendingOrders, setPendingOrders] = useState(0)
   const [err, setErr] = useState('')
+  const [creatingIdea, setCreatingIdea] = useState<string | null>(null)
+  const [widgets, setWidgets] = useState<Set<WidgetKey>>(loadWidgets)
+  const [widgetsOpen, setWidgetsOpen] = useState(false)
+  const { toast } = useToast()
 
   const { from, to, label } = useMemo(() => rangeOf(period, customFrom, customTo), [period, customFrom, customTo])
   const cmp = useMemo(() => compareRangeOf(from, to, period), [from, to, period])
@@ -202,6 +274,39 @@ export default function Dashboard(): ReactElement {
   const topItems = useMemo(() => byItem(txs).slice(0, 6), [txs])
   const hours = useMemo(() => byHour(txs).filter((h) => h.revenue > 0), [txs])
 
+  /** Jumlah transaksi & rata-rata nota per hari (dari deret harian yang sudah ada). */
+  const txPerDay = useMemo(
+    () =>
+      dailySeries.map((d, i) => ({
+        hari: d.hari,
+        trx: (txs ?? []).filter((t) => localDateISO(t.created_at) === dailyDateISO(from, i)).length,
+        avg: 0
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dailySeries, txs, from]
+  )
+  // isi avg di iterasi kedua agar bisa pakai omzet deret yang sama
+  const avgTicket = useMemo(
+    () => dailySeries.map((d, i) => ({ hari: d.hari, avg: d.omzet / Math.max(1, txPerDay[i]?.trx ?? 0) })),
+    [dailySeries, txPerDay]
+  )
+
+  /** Omzet per kategori menu: paket tanpa kategori digabung sbg "Paket". */
+  const catMix = useMemo(() => {
+    if (!catalog) return []
+    const catName = new Map<number, string>(catalog.categories.map((c: Category) => [c.id, c.name]))
+    const m = new Map<string, number>()
+    for (const t of txs)
+      for (const it of t.items ?? []) {
+        const p = catalog.products.find((x) => x.name === it.name)
+        const label = p ? (p.category_id != null ? (catName.get(p.category_id) ?? 'Lainnya') : 'Paket') : 'Lainnya'
+        m.set(label, (m.get(label) ?? 0) + it.qty * it.price)
+      }
+    return [...m.entries()]
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+  }, [catalog, txs])
+
   const targets = useMemo(() => {
     if (!catalog || period !== 'today') return []
     return catalog.products
@@ -213,22 +318,58 @@ export default function Dashboard(): ReactElement {
       })
   }, [catalog, txs, period])
 
-  /** Best seller vs target (pindahan Laporan): qty terjual, omzet, pencapaian target bila ada. */
+  /** Best seller vs target (pindahan Laporan): qty terjual, omzet, pencapaian target bila ada + sisa porsi live. */
   const bestSellers = useMemo(() => {
     if (!catalog) return []
+    const ingById = ingIndex(catalog.ingredients)
     return byItem(txs)
       .map((i) => {
         const pid = catalog.products.find((p) => p.name === i.name)?.id
         const target = pid ? (catalog.targets.get(pid) ?? 0) : 0
         // target adalah per-hari; utk rentang panjang dikali jumlah hari
         const targetTotal = target * (period === 'today' ? 1 : Math.min(spanDays(from, to), 31))
-        return { name: i.name, qty: i.qty, revenue: i.revenue, target: targetTotal }
+        // sisa porsi live dari resep × stok bahan (sumber sama dgn kasir)
+        const sisa = pid ? maxAvailableQty(pid, catalog.recipeByProduct, ingById) : null
+        return { name: i.name, qty: i.qty, revenue: i.revenue, target: targetTotal, pid, sisa }
       })
       .slice(0, 8)
       .sort((a, b) => b.qty - a.qty)
   }, [catalog, txs, period, from, to])
 
+  /** Wujudkan ide paket jadi menu baru + resep (komponen = menu penyusun, bahan utama saja). */
+  const createBundle = async (idea: BundleIdea): Promise<void> => {
+    setCreatingIdea(idea.name)
+    setErr('')
+    try {
+      await upsertProduct({
+        name: idea.name,
+        category_id: null,
+        price: idea.suggestedPrice,
+        unit: 'paket',
+        is_active: true,
+        sort: 90
+      })
+      const fresh = await loadCatalog()
+      // menu baru = id terbesar (identity) — nama bisa sama dg paket lama yang nonaktif
+      const created = fresh.products.reduce((a, b) => (b.id > a.id ? b : a), fresh.products[0])
+      if (!created || created.name !== idea.name) throw new Error('Menu paket tidak ditemukan setelah disimpan')
+      await saveRecipe(created.id, bundleRecipeLines(created.id, idea.items))
+      setCatalog(fresh)
+      toast(`Menu "${idea.name}" dibuat lengkap dengan resep ${idea.items.length} komponen.`)
+    } catch (ex) {
+      setErr((ex as Error).message)
+    } finally {
+      setCreatingIdea(null)
+    }
+  }
+
   const lowStock = useMemo(() => (catalog?.ingredients ?? []).filter((i) => i.active && i.stock <= i.min_stock), [catalog])
+  // kesehatan resep: bahan nonaktif yang masih dipakai → resep diam-diam rusak
+  const recipeIssues = useMemo(() => (catalog ? auditRecipeHealth(catalog) : []), [catalog])
+  // ide menu PAKET: kombinasi menu existing dengan harga bundling diskon
+  const ideas = useMemo(() => (catalog ? bundleIdeas(catalog) : []), [catalog])
+  // stok siap jual = bahan setengah jadi hasil batch produksi
+  const preparedStock = useMemo(() => (catalog?.ingredients ?? []).filter((i) => i.kind === 'prepared' && i.active), [catalog])
 
   /** Tren stok 7 hari bahan kritis (estimasi rekonstruksi dari resep transaksi). */
   const stockTrend = useMemo(() => {
@@ -296,8 +437,59 @@ export default function Dashboard(): ReactElement {
           <button type="button" className="btn-ghost !min-h-0 !h-9 !px-3" onClick={downloadReport}>
             Unduh CSV
           </button>
+          <button
+            type="button"
+            className={`chip h-9 px-3 ${widgetsOpen ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+            aria-expanded={widgetsOpen}
+            aria-haspopup="dialog"
+            title="Pilih kartu yang tampil di dashboard"
+            onClick={() => setWidgetsOpen((v) => !v)}
+          >
+            ⚙ Widget
+          </button>
         </div>
       </div>
+
+      {/* Panel toggle kartu dashboard: tersimpan per perangkat */}
+      {widgetsOpen && (
+        <div className="card mb-3 p-3" role="dialog" aria-label="Atur tampilan dashboard">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-extrabold">Kartu yang ditampilkan</h2>
+            <div className="flex gap-1">
+              <button type="button" className="btn-ghost !min-h-0 !py-1 text-[11px]" onClick={() => setWidgets(new Set(WIDGET_DEFS.map((d) => d.key)))}>
+                Tampilkan semua
+              </button>
+              <button type="button" className="btn-ghost !min-h-0 !py-1 text-[11px]" onClick={() => setWidgets(new Set())}>
+                Sembunyikan semua
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3 lg:grid-cols-4">
+            {WIDGET_DEFS.map((d) => (
+              <label key={d.key} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs font-bold hover:bg-brand-paper">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-[#c4151b]"
+                  checked={widgets.has(d.key)}
+                  onChange={(e) =>
+                    setWidgets((prev) => {
+                      const next = new Set(prev)
+                      if (e.target.checked) next.add(d.key)
+                      else next.delete(d.key)
+                      const rec: Record<string, boolean> = {}
+                      WIDGET_DEFS.forEach((w) => (rec[w.key] = next.has(w.key)))
+                      localStorage.setItem(WIDGET_STORE, JSON.stringify(rec))
+                      return next
+                    })
+                  }
+                />
+                {d.label}
+              </label>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-brand-muted">Pilihan tersimpan otomatis di perangkat ini.</p>
+        </div>
+      )}
       {period === 'custom' && (
         <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
           <input type="date" className="input !h-9 !w-40" value={customFrom} onChange={(e) => { setCustomFrom(e.target.value); if (customTo < e.target.value) setCustomTo(e.target.value) }} aria-label="Dari tanggal" />
@@ -325,6 +517,7 @@ export default function Dashboard(): ReactElement {
       )}
 
       {/* Ringkasan periode terpilih */}
+      {widgets.has('summary') && (
       <div className="card strip mb-3 grid grid-cols-1 gap-3 p-4 min-[480px]:grid-cols-2 sm:grid-cols-4">
         <div>
           <p className="text-xs font-bold text-brand-muted">Omzet · {label}</p>
@@ -354,9 +547,10 @@ export default function Dashboard(): ReactElement {
           <p className="text-xs font-bold text-brand-muted">omzet bulan ini {fmtRp(sumMonth.revenue)}</p>
         </div>
       </div>
+      )}
 
       {/* ===== Perlu tindakan: satu kolom kartu aksi urut urgensi ===== */}
-      {(pendingOrders > 0 || lowStock.length > 0 || oilAlert.length > 0) && (
+      {widgets.has('actions') && (pendingOrders > 0 || lowStock.length > 0 || oilAlert.length > 0) && (
         <div className="card mb-3 p-3">
           <h2 className="mb-2 font-extrabold">Perlu tindakan</h2>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -395,7 +589,32 @@ export default function Dashboard(): ReactElement {
       )}
 
       <div className="grid gap-3 lg:grid-cols-3">
+        {/* Peringatan resep rusak: bahan nonaktif masih dipakai resep — taruh paling atas grid supaya terlihat */}
+        {widgets.has('recipeIssues') && recipeIssues.length > 0 && (
+          <div className="card strip p-3 lg:col-span-3" style={{ borderColor: 'var(--c-redtext)' }}>
+            <h2 className="mb-1 font-extrabold">⚠ Resep memakai bahan nonaktif</h2>
+            <p className="mb-2 text-xs font-bold text-brand-muted">
+              HPP &amp; ketersediaan menu ini bisa melompat / batch produksi bisa gagal. Aktifkan lagi bahan di halaman Bahan, atau ganti komponen resepnya.
+            </p>
+            <ul className="flex flex-col gap-1.5 text-sm">
+              {recipeIssues.map((x) => (
+                <li key={x.ingredientId} className="rounded-lg bg-brand-paper px-3 py-2">
+                  <b>{x.name}</b>
+                  {x.products.length > 0 && (
+                    <span className="text-brand-muted"> — dipakai menu: {x.products.map((p) => p.name).join(', ')}</span>
+                  )}
+                  {x.preparedUsedBy.length > 0 && (
+                    <span className="text-brand-muted"> — dipakai resep produksi: {x.preparedUsedBy.map((p) => p.name).join(', ')}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <Link to="/bahan" className="btn-ghost mt-2 !min-h-0 !py-1.5 inline-flex text-xs">Periksa di Bahan Baku →</Link>
+          </div>
+        )}
+
         {/* Tren harian sesuai periode */}
+        {widgets.has('dailyTrend') && (
         <div className="card p-3 lg:col-span-2">
           <h2 className="mb-2 font-extrabold">Omzet & laba kotor · {label}</h2>
           <div className="h-56">
@@ -411,8 +630,32 @@ export default function Dashboard(): ReactElement {
             </ResponsiveContainer>
           </div>
         </div>
+        )}
+
+        {/* NEW: jumlah transaksi per hari */}
+        {widgets.has('txPerDay') && (
+          <div className="card p-3">
+            <h2 className="mb-2 font-extrabold">Transaksi per hari · {label}</h2>
+            {txPerDay.every((d) => d.trx === 0) ? (
+              <p className="py-10 text-center text-sm text-brand-muted">Belum ada transaksi pada periode ini.</p>
+            ) : (
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={txPerDay} margin={{ left: 8, right: 8 }}>
+                    <CartesianGrid stroke="#e8d9cd" vertical={false} />
+                    <XAxis dataKey="hari" tick={{ fontSize: 11 }} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} tickLine={false} width={32} />
+                    <Tooltip formatter={(v: number) => `${v} transaksi`} />
+                    <Bar dataKey="trx" name="Transaksi" fill="#8a5a44" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Mix channel sesuai periode */}
+        {widgets.has('channelMix') && (
         <div className="card p-3">
           <h2 className="mb-2 font-extrabold">Channel penjualan · {label}</h2>
           {chans.length === 0 ? (
@@ -441,8 +684,10 @@ export default function Dashboard(): ReactElement {
             ))}
           </ul>
         </div>
+        )}
 
         {/* ===== Pindahan Laporan: tabel penerimaan per channel (bersih) ===== */}
+        {widgets.has('channelTable') && (
         <div className="card p-3 lg:col-span-2">
           <h2 className="mb-2 font-extrabold">Penerimaan per channel · {label}</h2>
           {chans.length === 0 ? (
@@ -475,8 +720,10 @@ export default function Dashboard(): ReactElement {
           )}
           <p className="mt-2 text-xs text-brand-muted">Bersih = omzet − komisi channel. Beban tetap bulanan {fmtRp(settings.fixed_costs.reduce((s, f) => s + f.amount, 0))} tidak dihitung di sini; lihat Keuangan.</p>
         </div>
+        )}
 
         {/* Terlaris */}
+        {widgets.has('topItems') && (
         <div className="card p-3">
           <h2 className="mb-2 font-extrabold">Menu terlaris · {label}</h2>
           {topItems.length === 0 ? (
@@ -494,8 +741,43 @@ export default function Dashboard(): ReactElement {
             </div>
           )}
         </div>
+        )}
+
+        {/* NEW: omzet per kategori (donat) */}
+        {widgets.has('catMix') && (
+          <div className="card p-3">
+            <h2 className="mb-2 font-extrabold">Omzet per kategori · {label}</h2>
+            {catMix.length === 0 ? (
+              <p className="py-10 text-center text-sm text-brand-muted">Belum ada penjualan pada periode ini.</p>
+            ) : (
+              <>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={catMix} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="85%" paddingAngle={2}>
+                        {catMix.map((c, i) => (
+                          <Cell key={c.name} fill={pieColors[i % pieColors.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v: number) => fmtRp(v)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <ul className="mt-1 text-xs font-bold">
+                  {catMix.map((c, i) => (
+                    <li key={c.name}>
+                      <span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm align-middle" style={{ background: pieColors[i % pieColors.length] }} />
+                      {c.name}: {fmtRp(c.value)}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Jam sibuk */}
+        {widgets.has('busyHours') && (
         <div className="card p-3">
           <h2 className="mb-2 font-extrabold">Jam sibuk · {label}</h2>
           {hours.length === 0 ? (
@@ -513,8 +795,32 @@ export default function Dashboard(): ReactElement {
             </div>
           )}
         </div>
+        )}
+
+        {/* NEW: rata-rata nota per hari (line) */}
+        {widgets.has('avgTicket') && (
+          <div className="card p-3">
+            <h2 className="mb-2 font-extrabold">Rata-rata nota harian · {label}</h2>
+            {avgTicket.every((d) => d.avg === 0) ? (
+              <p className="py-10 text-center text-sm text-brand-muted">Belum ada transaksi pada periode ini.</p>
+            ) : (
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={avgTicket} margin={{ left: 8, right: 8 }}>
+                    <CartesianGrid stroke="#e8d9cd" vertical={false} />
+                    <XAxis dataKey="hari" tick={{ fontSize: 11 }} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}rb` : String(v))} tickLine={false} width={44} />
+                    <Tooltip formatter={(v: number) => fmtRp(v)} />
+                    <Line type="monotone" dataKey="avg" name="Rata-rata nota" stroke="#f5a302" strokeWidth={2.5} dot={{ r: 3, fill: '#f5a302' }} activeDot={{ r: 5 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Metode pembayaran: uang di drawer vs QRIS/transfer */}
+        {widgets.has('paymentMix') && (
         <div className="card p-3">
           <h2 className="mb-2 font-extrabold">Metode pembayaran · {label}</h2>
           {pays.length === 0 ? (
@@ -547,8 +853,10 @@ export default function Dashboard(): ReactElement {
             </>
           )}
         </div>
+        )}
 
         {/* Target vs aktual */}
+        {widgets.has('targets') && (
         <div className="card p-3">
           <h2 className="mb-2 font-extrabold">Target hari ini</h2>
           <ul className="flex flex-col gap-2">
@@ -571,8 +879,10 @@ export default function Dashboard(): ReactElement {
             {targets.length === 0 && <li className="text-sm text-brand-muted">Atur target di halaman Menu & Paket, tab Target Harian.</li>}
           </ul>
         </div>
+        )}
 
         {/* ===== Pindahan Laporan: best seller vs target (tabel) ===== */}
+        {widgets.has('bestSellers') && (
         <div className="card p-3 lg:col-span-2">
           <h2 className="mb-2 font-extrabold">Best seller vs target · {label}</h2>
           {bestSellers.length === 0 ? (
@@ -592,9 +902,23 @@ export default function Dashboard(): ReactElement {
                 <tbody>
                   {bestSellers.map((b) => {
                     const pct = b.target > 0 ? Math.min(100, Math.round((b.qty / b.target) * 100)) : null
+                    const sisa = b.sisa
                     return (
                       <tr key={b.name}>
-                        <td className="font-bold">{b.name}</td>
+                        <td className="font-bold">
+                          {b.name}
+                          {/* sisa porsi live dari resep × stok — kasir tahu mana yang hampir habis */}
+                          {sisa !== null && (
+                            <span
+                              className={`chip ml-1.5 align-middle text-[10px] ${
+                                sisa <= 0 ? 'bg-brand-redtext text-white' : sisa <= 5 ? 'bg-brand-gold' : 'bg-brand-gold/30'
+                              }`}
+                              title="Sisa porsi dari resep × stok bahan saat ini"
+                            >
+                              {sisa <= 0 ? 'habis' : `sisa ${sisa}`}
+                            </span>
+                          )}
+                        </td>
                         <td className="text-right tabular-nums">{b.qty}</td>
                         <td className="text-right tabular-nums text-brand-muted">{b.target > 0 ? b.target : '—'}</td>
                         <td style={{ minWidth: 120 }}>
@@ -618,8 +942,10 @@ export default function Dashboard(): ReactElement {
             </div>
           )}
         </div>
+        )}
 
         {/* Omzet vs periode pembanding (sejajar hari kerja) */}
+        {widgets.has('revCompare') && (
         <div className="card p-3">
           <h2 className="mb-2 font-extrabold">Omzet vs periode lalu</h2>
           {!cmp ? (
@@ -651,9 +977,10 @@ export default function Dashboard(): ReactElement {
             </>
           )}
         </div>
+        )}
 
         {/* ===== Tren stok bahan kritis 7 hari (estimasi dari resep) ===== */}
-        {stockTrend.length > 0 && (
+        {widgets.has('stockTrend') && stockTrend.length > 0 && (
           <div className="card p-3 lg:col-span-3">
             <h2 className="mb-2 font-extrabold">
               Stok bahan kritis — 7 hari <span className="text-xs font-bold text-brand-muted">(estimasi dari resep transaksi; garis putus = minimum)</span>
@@ -692,7 +1019,66 @@ export default function Dashboard(): ReactElement {
           </div>
         )}
 
+        {/* Stok siap jual (hasil produksi) + ide menu baru dari stok */}
+        {widgets.has('preparedStock') && (
+        <div className="card p-3">
+          <h2 className="mb-2 font-extrabold">Stok siap jual</h2>
+          {preparedStock.length === 0 ? (
+            <p className="text-sm text-brand-muted">Belum ada bahan setengah jadi. Hasil batch produksi tampil di sini.</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {preparedStock.map((i) => (
+                <li key={i.id} className="flex items-center justify-between gap-2 rounded-lg bg-brand-paper px-3 py-2">
+                  <span className="min-w-0 truncate text-sm font-bold">{i.name}</span>
+                  <span className="shrink-0 text-base font-extrabold tabular-nums">
+                    {fmtQty(i.stock)} <span className="text-[10px] font-bold text-brand-muted">{i.buy_unit}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Link to="/produksi" className="mt-2 inline-flex text-xs font-extrabold text-brand-btn">Ke Produksi →</Link>
+        </div>
+        )}
+
+        {widgets.has('ideas') && (
+        <div className="card p-3 lg:col-span-2">
+          <h2 className="mb-1 font-extrabold">Ide menu paket</h2>
+          <p className="mb-2 text-xs font-bold text-brand-muted">
+            Kombinasi menu yang sudah ada → harga bundling diskon {ideas[0]?.discountPct ?? 10}% + HPP gabungan. Satu klik jadi menu & resep (komponen paket, bahan utama saja).
+          </p>
+          {ideas.length === 0 ? (
+            <p className="text-sm text-brand-muted">Belum ada kombinasi layak — pastikan ada minimal 2 menu aktif yang tersedia (stok resep masih ada).</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {ideas.map((idea) => (
+                <li key={idea.name} className="rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-2.5">
+                  <div className="flex flex-wrap items-baseline justify-between gap-1">
+                    <span className="text-sm font-extrabold">{idea.name}</span>
+                    <span className="text-base font-extrabold tabular-nums">{fmtRp(idea.suggestedPrice)}</span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] font-bold text-brand-muted">
+                    Normal {fmtRp(idea.normalTotal)} · HPP {fmtRp(idea.hpp)} · margin {idea.marginPct.toFixed(0)}% · cukup untuk {idea.maxPortions} paket
+                  </p>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="btn-primary !min-h-0 !py-1.5 text-xs"
+                      disabled={creatingIdea !== null}
+                      onClick={() => void createBundle(idea)}
+                    >
+                      {creatingIdea === idea.name ? 'Membuat…' : '＋ Jadikan Menu'}
+                    </button>
+                    <span className="text-[10px] font-bold text-brand-muted">menu baru + resep {idea.items.length} komponen terpasang otomatis</span>
+                  </div>              </li>
+            ))}
+            </ul>
+          )}
+        </div>
+        )}
+
         {/* Peringatan stok: kartu per bahan, habis didahulukan */}
+        {widgets.has('lowStock') && (
         <div className="card p-3 lg:col-span-3">
           <h2 className="mb-2 font-extrabold">Bahan menipis / habis</h2>
           {lowStock.length === 0 ? (
@@ -729,6 +1115,7 @@ export default function Dashboard(): ReactElement {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   )

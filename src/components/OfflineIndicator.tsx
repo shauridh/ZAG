@@ -1,6 +1,6 @@
 // Indikator koneksi & status antrean offline.
-// Hijau "Online": tersambung. Emas "Offline — N antre": jualan tetap jalan,
-// transaksi masuk antrean dan terkirim otomatis saat online kembali.
+// Hijau "Online" BERKEDIP: tersambung ke server. Emas "Offline — N antre": jualan
+// tetap jalan, transaksi masuk antrean dan terkirim otomatis saat online kembali.
 import { useEffect, useState, type ReactElement } from 'react'
 import { currentOnline, flushQueue, onSyncStateChange, QUEUE_EVENT, queueCount } from '../lib/db'
 
@@ -22,7 +22,7 @@ export function OfflineIndicator({ className = '' }: { className?: string }): Re
   if (online && pending === 0) {
     return (
       <span className={`chip bg-brand-paper text-[11px] font-bold text-brand-muted ${className}`} role="status" title="Tersambung ke server">
-        <span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full bg-brand-ink" />
+        <span aria-hidden className="dot-blink mr-1 inline-block h-2 w-2 rounded-full bg-[#22aa55]" />
         Online
       </span>
     )
