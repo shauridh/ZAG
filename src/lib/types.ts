@@ -159,6 +159,8 @@ export interface Settings {
   fixed_costs: { name: string; amount: number }[]
   /** Kategori pengeluaran dikelola owner di menu Keuangan (bukan tabel terpisah). */
   expense_categories?: { id: number; name: string }[]
+  /** Templat batch produksi: 1 klik dapur = potong resep bahan → stok siap jual bertambah. */
+  batch_templates?: { id: number; name: string; outputs: { ingredient_id: number; qty: number }[]; fryer_id: number | null; fried_grams: number }[]
   /** True setelah owner menetapkan PIN (PIN-nya sendiri tidak pernah dikirim ke client). */
   owner_pin_set?: boolean
   /** Hanya ada di mode demo: hash SHA-256 PIN untuk verifikasi lokal. */

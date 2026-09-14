@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
-import { loadCatalog, loadFryers, createBatch, fillFryer, endOilCycle, saveFryer, type Catalog } from '../lib/db'
+import { loadCatalog, loadFryers, createBatch, fillFryer, endOilCycle, saveFryer, saveSetting, type Catalog } from '../lib/db'
 import { ingIndex, ingredientNeeds } from '../lib/hpp'
 import { fmtRp, fmtQty, parseNum } from '../lib/money'
 import type { Fryer, Ingredient, OilCycle, Settings } from '../lib/types'
@@ -67,6 +67,9 @@ export default function Production(): ReactElement {
           {bannerWarn && <span className="chip bg-brand-gold">Ambang terlampaui — segera ganti</span>}
         </div>
       )}
+
+      <QuickProduce templates={settings.batch_templates ?? []} catalog={catalog} outPool={outPool} fryers={fryers} settings={settings} onDone={reload} setErr={setErr} setSettings={setSettings} toast={toast} />
+
 
       <div className="grid gap-4 lg:grid-cols-2">
         <BatchForm catalog={catalog} outPool={outPool} fryers={fryers} onDone={reload} setErr={setErr} toast={toast} />
@@ -171,8 +174,8 @@ function BatchForm({
               onChange={(e) => setOutputs((os) => os.map((x, j) => (j === i ? { ...x, qty: parseNum(e.target.value) } : x)))}
               aria-label="Jumlah output"
             />
-            <button type="button" className="font-extrabold text-brand-redtext" onClick={() => setOutputs((os) => os.filter((_, j) => j !== i))} aria-label="Hapus">
-              ✕
+            <button type="button" className="icon-btn-danger" onClick={() => setOutputs((os) => os.filter((_, j) => j !== i))} aria-label="Hapus">
+              🗑
             </button>
             {prep && o.qty > maxOut(prep.id) && (
               <p className="col-span-3 text-xs font-bold text-brand-redtext">
@@ -253,6 +256,212 @@ function BatchForm({
       >
         Simpan Batch
       </button>
+    </div>
+  )
+}
+
+interface BatchTemplate {
+  id: number
+  name: string
+  outputs: { ingredient_id: number; qty: number }[]
+  fryer_id: number | null
+  fried_grams: number
+}
+
+/**
+ * Produksi Cepat: templat batch 1 klik utk dapur.
+ * Satu templat = resep batch (x ayam potong + x tepung = x potongan siap goreng).
+ * Tombol Produksi menjalankan createBatch yang sama dgn form manual — stok gudang
+ * berkurang, stok siap jual bertambah, kasir langsung melihat sisa porsi baru.
+ * Templat tersimpan di settings.batch_templates (shared demo/live via saveSetting).
+ */
+function QuickProduce({
+  templates,
+  catalog,
+  outPool,
+  fryers,
+  settings,
+  onDone,
+  setErr,
+  setSettings,
+  toast
+}: {
+  templates: BatchTemplate[]
+  catalog: Catalog
+  outPool: Ingredient[]
+  fryers: Fryer[]
+  settings: Settings
+  onDone: () => Promise<void>
+  setErr: (s: string) => void
+  setSettings: (s: Settings) => void
+  toast: (s: string) => void
+}): ReactElement {
+  const ingById = useMemo(() => ingIndex(catalog.ingredients), [catalog])
+  const [editing, setEditing] = useState<BatchTemplate | null>(null)
+  const [busyId, setBusyId] = useState<number | null>(null)
+
+  const run = async (t: BatchTemplate): Promise<void> => {
+    setBusyId(t.id)
+    setErr('')
+    try {
+      await createBatch({
+        outputs: t.outputs,
+        fryer_id: t.fryer_id,
+        fried_grams: t.fried_grams || 0,
+        note: `templat: ${t.name}`
+      })
+      toast(`Produksi "${t.name}" selesai — stok siap jual bertambah.`)
+      await onDone()
+    } catch (ex) {
+      setErr((ex as Error).message)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const saveTemplate = async (t: BatchTemplate): Promise<void> => {
+    try {
+      const next = [...(templates ?? [])]
+      const idx = next.findIndex((x) => x.id === t.id)
+      if (idx >= 0) next[idx] = t
+      else next.push({ ...t, id: Math.max(0, ...next.map((x) => x.id)) + 1 })
+      await saveSetting('batch_templates', next)
+      setSettings({ ...settings, batch_templates: next })
+      toast('Templat produksi tersimpan.')
+      setEditing(null)
+      await onDone()
+    } catch (ex) {
+      setErr((ex as Error).message)
+    }
+  }
+
+  const deleteTemplate = async (id: number): Promise<void> => {
+    try {
+      const next = (templates ?? []).filter((t) => t.id !== id)
+      await saveSetting('batch_templates', next)
+      setSettings({ ...settings, batch_templates: next })
+      await onDone()
+    } catch (ex) {
+      setErr((ex as Error).message)
+    }
+  }
+
+  return (
+    <div className="card strip mb-4 p-4">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <h2 className="font-extrabold">Produksi Cepat — satu klik dari templat</h2>
+        <button type="button" className="btn-ghost ml-auto !min-h-0 !py-1.5 text-xs" onClick={() => setEditing({ id: 0, name: '', outputs: outPool.length ? [{ ingredient_id: outPool[0].id, qty: 1 }] : [], fryer_id: null, fried_grams: 0 })}>
+          + Templat Baru
+        </button>
+      </div>
+      <p className="mb-3 text-xs text-brand-muted">
+        Templat = resep batch tetap (mis. 1 batch Ayam Goreng = 4 ayam potong + 500g tepung → 36 potongan siap goreng). Dapur cukup tekan tombol — stok gudang berkurang, etalase jual bertambah, kasir ikut tahu sisa porsinya.
+      </p>
+      {(templates ?? []).length === 0 ? (
+        <p className="text-sm text-brand-muted">Belum ada templat. Buat dari tombol di kanan atas, atau isi form manual di bawah.</p>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {(templates ?? []).map((t) => {
+            const missing = t.outputs.filter((o) => !outPool.some((p) => p.id === o.ingredient_id))
+            const needs = new Map<number, number>()
+            for (const o of t.outputs)
+              for (const [iid, need] of ingredientNeeds(o.ingredient_id, o.qty, catalog.ingRecipes)) needs.set(iid, (needs.get(iid) ?? 0) + need)
+            const short = [...needs.entries()].filter(([iid, need]) => (ingById.get(iid)?.stock ?? 0) < need)
+            const disabled = missing.length > 0 || busyId !== null
+            return (
+              <div key={t.id} className={`rounded-lg border-[1.5px] p-3 ${missing.length ? 'border-brand-line opacity-60' : short.length ? 'border-brand-gold' : 'border-brand-line'}`}>
+                <div className="flex items-start justify-between gap-1">
+                  <p className="min-w-0 font-extrabold">{t.name}</p>
+                  <span className="flex shrink-0 gap-1">
+                    <button type="button" className="icon-btn !h-7 !w-7 text-xs" title="Edit templat" aria-label={`Edit templat ${t.name}`} onClick={() => setEditing({ ...t })}>
+                      ✏️
+                    </button>
+                    <button type="button" className="icon-btn-danger !h-7 !w-7 text-xs" title="Hapus templat" aria-label={`Hapus templat ${t.name}`} onClick={() => void deleteTemplate(t.id)}>
+                      🗑
+                    </button>
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11px] font-bold text-brand-muted">
+                  {t.outputs
+                    .map((o) => `${fmtQty(o.qty)} ${ingById.get(o.ingredient_id)?.name ?? `#${o.ingredient_id}`}`)
+                    .join(' + ')}
+                </p>
+                {short.length > 0 && (
+                  <p className="mt-1 text-[11px] font-bold text-brand-redtext">
+                    Stok kurang: {short.map(([iid, need]) => `${ingById.get(iid)?.name ?? `#${iid}`} (butuh ${fmtQty(need)})`).join(', ')}
+                  </p>
+                )}
+                {missing.length > 0 && <p className="mt-1 text-[11px] font-bold text-brand-redtext">Bahan sudah dihapus/nonaktif — edit templat.</p>}
+                <button type="button" className="btn-primary mt-2 w-full !min-h-0 !py-2 text-sm" disabled={disabled} onClick={() => void run(t)}>
+                  {busyId === t.id ? 'Memproses…' : '▶ Produksi Sekarang'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <Modal open={editing !== null} title={editing?.id ? 'Edit Templat Produksi' : 'Templat Produksi Baru'} onClose={() => setEditing(null)}>
+        {editing && (
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void saveTemplate(editing)
+            }}
+          >
+            <div>
+              <label className="lbl" htmlFor="tname">Nama templat</label>
+              <input id="tname" className="input" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} placeholder="cth: Batch Ayam Goreng" required />
+            </div>
+            {editing.outputs.map((o, i) => (
+              <div key={i} className="grid grid-cols-[1fr_96px_36px] gap-2">
+                <select
+                  className="input !h-10"
+                  value={o.ingredient_id}
+                  onChange={(e) => setEditing({ ...editing, outputs: editing.outputs.map((x, j) => (j === i ? { ...x, ingredient_id: parseInt(e.target.value, 10) } : x)) })}
+                  aria-label="Output templat"
+                >
+                  {outPool.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}{p.kind === 'raw' ? ' (mentah)' : ''}</option>
+                  ))}
+                </select>
+                <input
+                  className="input !h-10 text-right"
+                  inputMode="decimal"
+                  value={String(o.qty)}
+                  onChange={(e) => setEditing({ ...editing, outputs: editing.outputs.map((x, j) => (j === i ? { ...x, qty: parseNum(e.target.value) } : x)) })}
+                  aria-label="Jumlah output"
+                />
+                <button type="button" className="icon-btn-danger" onClick={() => setEditing({ ...editing, outputs: editing.outputs.filter((_, j) => j !== i) })} aria-label="Hapus baris">
+                  🗑
+                </button>
+              </div>
+            ))}
+            <button type="button" className="btn-ghost !min-h-0 !py-1.5 text-xs" onClick={() => outPool.length && setEditing({ ...editing, outputs: [...editing.outputs, { ingredient_id: outPool[0].id, qty: 1 }] })}>
+              + Output
+            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="lbl" htmlFor="tfry">Fryer (opsional)</label>
+                <select id="tfry" className="input" value={editing.fryer_id ?? ''} onChange={(e) => setEditing({ ...editing, fryer_id: e.target.value ? parseInt(e.target.value, 10) : null })}>
+                  <option value="">Tanpa fryer</option>
+                  {fryers.map((f) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="lbl" htmlFor="tgr">Berat goreng (gram)</label>
+                <input id="tgr" className="input" inputMode="numeric" value={editing.fried_grams ? String(editing.fried_grams) : ''} onChange={(e) => setEditing({ ...editing, fried_grams: parseInt(e.target.value.replace(/\D/g, ''), 10) || 0 })} placeholder="0" />
+              </div>
+            </div>
+            <button type="submit" className="btn-primary" disabled={!editing.name.trim() || editing.outputs.every((o) => o.qty <= 0)}>
+              Simpan Templat
+            </button>
+          </form>
+        )}
+      </Modal>
     </div>
   )
 }
