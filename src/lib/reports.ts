@@ -4,6 +4,18 @@ const METHOD_LABEL: Record<string, string> = { cash: 'Tunai', qris: 'QRIS', tran
 
 export const methodLabel = (m: string): string => METHOD_LABEL[m] ?? m
 
+/**
+ * Kas tunai murni dari satu transaksi: uang diterima MINUS kembalian.
+ * payments menyimpan UANG DITERIMA (nota 27rb dibayar 50rb → kas masuk 27rb).
+ * Refund berupa payment tunai negatif — mengurangi kas tanpa clamp.
+ */
+export function txCashNet(t: Transaction): number {
+  const paid = (t.payments ?? []).filter((p) => p.method === 'cash').reduce((a, p) => a + p.amount, 0)
+  const allPaid = (t.payments ?? []).reduce((a, p) => a + p.amount, 0)
+  const change = allPaid > t.total ? allPaid - t.total : 0
+  return paid - change
+}
+
 export interface ReportTotals {
   revenue: number
   hpp: number
@@ -37,7 +49,12 @@ export function byPayment(
   txs: Transaction[]
 ): { method: string; amount: number }[] {
   const m = new Map<string, number>()
-  for (const t of txs) for (const p of t.payments ?? []) m.set(p.method, (m.get(p.method) ?? 0) + p.amount)
+  for (const t of txs) {
+    for (const p of t.payments ?? []) m.set(p.method, (m.get(p.method) ?? 0) + p.amount)
+    // payments menyimpan UANG DITERIMA; kembalian tunai bukan kas masuk
+    const change = (t.payments ?? []).reduce((s, p) => s + p.amount, 0) - t.total
+    if (change > 0 && m.has('cash')) m.set('cash', (m.get('cash') ?? 0) - change)
+  }
   return [...m.entries()].map(([method, amount]) => ({ method, amount }))
 }
 
@@ -113,19 +130,13 @@ export function endOfDayReport(txs: Transaction[], channels: Settings['channels'
   )
   const fee = feeComputed > 0 ? feeComputed : t.fee
 
-  // per metode bayar: jumlah uang + jumlah transaksi yang memakai metode itu
-  const mAmt = new Map<string, number>()
+  // per metode bayar: jumlah uang + jumlah transaksi yang memakai metode itu.
+  // byPayment sudah mengoreksi kembalian tunai (payments = uang diterima).
   const mCnt = new Map<string, number>()
-  for (const tx of txs) {
-    const methods = new Set<string>()
-    for (const p of tx.payments ?? []) {
-      mAmt.set(p.method, (mAmt.get(p.method) ?? 0) + p.amount)
-      methods.add(p.method)
-    }
-    for (const m of methods) mCnt.set(m, (mCnt.get(m) ?? 0) + 1)
-  }
-  const methods = [...mAmt.entries()]
-    .map(([method, amount]) => ({ method, label: methodLabel(method), amount, count: mCnt.get(method) ?? 0 }))
+  for (const tx of txs)
+    for (const m of new Set((tx.payments ?? []).map((p) => p.method))) mCnt.set(m, (mCnt.get(m) ?? 0) + 1)
+  const methods = byPayment(txs)
+    .map(({ method, amount }) => ({ method, label: methodLabel(method), amount, count: mCnt.get(method) ?? 0 }))
     .sort((a, b) => b.amount - a.amount)
 
   const discount = txs.reduce((s, x) => s + (x.discount ?? 0), 0)
