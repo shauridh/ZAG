@@ -52,6 +52,9 @@ export default defineConfig({
   ],
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts']
+    include: ['src/**/*.test.ts'],
+    // Unit test selalu mode demo: .env.local di komputer tidak boleh membuat
+    // facade db.ts memilih adapter live (RPC Supabase nyata) saat test.
+    env: { VITE_SUPABASE_URL: '', VITE_SUPABASE_ANON_KEY: '' }
   }
 })

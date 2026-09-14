@@ -1,0 +1,2 @@
+# Folder sengaja kosong: envDir instance demo (vite.demo.config.ts)
+# supaya .env.local di root tidak ikut termuat saat mode demo.
