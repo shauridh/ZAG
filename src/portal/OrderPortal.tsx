@@ -232,6 +232,21 @@ function PortalMain({
   const activeOrder = orders.find((o) => !['selesai', 'batal', 'ditolak'].includes(o.status))
   const catOf = (id: number): string => catalog.categories.find((c) => c.id === id)?.name ?? 'Lainnya'
 
+  // Sinkron keranjang dg ketersediaan terkini: menu yang baru dinonaktifkan/habis
+  // dibuang, qty yang melebihi sisa dipangkas. Tanpa ini, pelanggan bisa membawa
+  // menu mati di tas lalu kehabisan saat kasir menerima pesanan.
+  useEffect(() => {
+    if (avail.size === 0) return
+    setCart((c) => {
+      const next = c
+        .map((x) => ({ ...x, qty: Math.min(x.qty, avail.get(x.product_id) ?? 0) }))
+        .filter((x) => x.qty > 0 && catalog.products.some((p) => p.id === x.product_id && p.is_active))
+      // referensi lama dipertahankan bila tak berubah supaya tidak re-render tiap refresh
+      const same = next.length === c.length && next.every((x, i) => x.product_id === c[i].product_id && x.qty === c[i].qty)
+      return same ? c : next
+    })
+  }, [avail, catalog.products])
+
   // Mode pemesanan diingat antar kunjungan: pelanggan langganan tak perlu pilih ulang
   const [mode, setModeState] = useState<'ambil' | 'antar'>(() => (localStorage.getItem(LS_MODE) === 'antar' ? 'antar' : 'ambil'))
   const setMode = (m: 'ambil' | 'antar'): void => {
@@ -401,6 +416,7 @@ function PortalMain({
           <CheckoutScreen
             cart={cart}
             catalog={catalog}
+            avail={avail}
             addresses={addresses}
             zones={zones}
             outlet={outlet}
@@ -476,6 +492,7 @@ function PortalMain({
 function CheckoutScreen({
   cart,
   catalog,
+  avail,
   addresses,
   zones,
   outlet,
@@ -491,6 +508,8 @@ function CheckoutScreen({
 }: {
   cart: { product_id: number; qty: number }[]
   catalog: Catalog
+  /** Ketersediaan live per menu (0 = habis; menu nonaktif tidak ada di map). */
+  avail: Map<number, number>
   addresses: PortalAddress[]
   zones: DeliveryZone[]
   outlet: OutletSetting
@@ -525,6 +544,8 @@ function CheckoutScreen({
 
   const prodOf = (id: number) => catalog.products.find((p) => p.id === id)
   const subtotal = cart.reduce((s, l) => s + (prodOf(l.product_id)?.price ?? 0) * l.qty, 0)
+  // Item yang kehabisan/nonaktif setelah masuk tas → tombol kirim dikunci sampai dibuang
+  const deadItems = cart.filter((l) => (avail.get(l.product_id) ?? 0) < l.qty)
   // Saat layanan antar libur (manual atau jadwal), alamat kirim tidak bisa dipilih: hanya Ambil Sendiri.
   const pickable = addresses.filter((a) => deliveryOn || a.label === 'Ambil Sendiri')
   const addrObj = pickable.find((a) => a.id === selected)
@@ -568,14 +589,21 @@ function CheckoutScreen({
         {cart.map((l) => {
           const p = prodOf(l.product_id)
           if (!p) return null
+          const left = avail.get(l.product_id) ?? 0
+          const habis = left <= 0
+          const kurang = !habis && l.qty > left
           return (
             <div key={l.product_id} className="mb-2 flex items-center gap-2">
-              <span className="flex-1 text-sm font-bold">{p.name}</span>
+              <span className="flex-1 text-sm font-bold">
+                {p.name}
+                {habis && <span className="chip ml-1 bg-brand-redtext text-white text-[10px]">Habis — buang dari tas</span>}
+                {kurang && <span className="chip ml-1 bg-brand-gold text-[10px]">sisa {left}</span>}
+              </span>
               <button type="button" className="btn-ghost !min-h-0 !h-8 !w-8 !px-0" onClick={() => setQty(l.product_id, l.qty - 1)} aria-label={`Kurangi ${p.name}`}>
                 −
               </button>
               <span className="w-6 text-center text-sm font-extrabold tabular-nums">{l.qty}</span>
-              <button type="button" className="btn-ghost !min-h-0 !h-8 !w-8 !px-0" onClick={() => setQty(l.product_id, l.qty + 1)} aria-label={`Tambah ${p.name}`}>
+              <button type="button" className="btn-ghost !min-h-0 !h-8 !w-8 !px-0" disabled={l.qty >= left} onClick={() => setQty(l.product_id, l.qty + 1)} aria-label={`Tambah ${p.name}`}>
                 +
               </button>
               <span className="w-20 text-right text-sm font-bold tabular-nums">{fmtRp(p.price * l.qty)}</span>
@@ -769,10 +797,10 @@ function CheckoutScreen({
         <button
           type="button"
           className="btn-primary mt-3 w-full !py-3"
-          disabled={selected === null || busy || (estFee === null && addrObj?.label !== 'Ambil Sendiri')}
+          disabled={selected === null || busy || deadItems.length > 0 || (estFee === null && addrObj?.label !== 'Ambil Sendiri')}
           onClick={() => selected !== null && void onSubmit(selected, note)}
         >
-          {busy ? 'Mengirim...' : 'Kirim Pesanan ke Kasir'}
+          {deadItems.length > 0 ? 'Ada menu habis — sesuaikan tas dulu' : busy ? 'Mengirim...' : 'Kirim Pesanan ke Kasir'}
         </button>
         <p className="mt-2 text-center text-xs text-brand-muted">
           Pesananmu divalidasi kasir dulu. Setelah diterima, kamu diminta bayar via QRIS di halaman ini.
