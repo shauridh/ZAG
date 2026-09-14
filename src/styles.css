@@ -55,6 +55,13 @@ body {
   .btn-gold {
     @apply btn bg-brand-gold text-brand-ink hover:brightness-95;
   }
+  /* Tombol aksi ikon di tabel: ringkas, satu baris per baris tabel */
+  .icon-btn {
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border-[1.5px] border-brand-line bg-brand-card text-base leading-none transition-colors hover:bg-brand-paper disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .icon-btn-danger {
+    @apply icon-btn border-brand-redtext text-brand-redtext hover:bg-brand-paper;
+  }
   .input {
     @apply min-h-[44px] w-full rounded-lg border-[1.5px] border-brand-line bg-white px-3 text-[15px] text-brand-ink placeholder:text-brand-muted focus:border-brand-btn;
   }

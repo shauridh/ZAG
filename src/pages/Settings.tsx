@@ -384,8 +384,8 @@ export default function SettingsPage(): ReactElement {
                     onChange={(e) => setZones(zones.map((x, j) => (j === i ? { ...x, fee: parseInt(e.target.value.replace(/\D/g, ''), 10) || 0 } : x)))}
                   />
                 </div>
-                <button type="button" className="mt-4 font-extrabold text-brand-redtext" onClick={() => setZones(zones.filter((_, j) => j !== i))} aria-label="Hapus zona">
-                  ✕
+                <button type="button" className="icon-btn-danger mt-4" onClick={() => setZones(zones.filter((_, j) => j !== i))} aria-label="Hapus zona">
+                  🗑
                 </button>
               </div>
             ))}
@@ -439,11 +439,11 @@ export default function SettingsPage(): ReactElement {
               />
               <button
                 type="button"
-                className="mt-1 font-extrabold text-brand-redtext"
+                className="icon-btn-danger mt-1"
                 onClick={() => setSettings({ ...settings, fixed_costs: settings.fixed_costs.filter((_, j) => j !== i) })}
                 aria-label="Hapus beban"
               >
-                ✕
+                🗑
               </button>
             </div>
           ))}

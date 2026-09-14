@@ -204,33 +204,39 @@ function ProductsTab({
                   )}
                 </span>
                 {!p.is_active && <span className="chip w-fit bg-brand-line">Nonaktif</span>}
-                <span className="mt-auto flex gap-1.5 pt-1.5">
+                <span className="mt-auto flex justify-center gap-1.5 pt-1.5">
+                  {/* aksi ikon selaras dgn halaman Bahan: resep, edit, toggle, hapus */}
                   <button
                     type="button"
-                    className={`btn-ghost flex-1 !min-h-0 !py-1.5 text-xs ${hpp <= 0 ? '!border-brand-redtext !text-brand-redtext' : ''}`}
+                    className={`icon-btn ${hpp <= 0 ? '!border-brand-redtext !text-brand-redtext' : ''}`}
+                    title={hpp > 0 ? 'Resep & HPP' : 'Atur resep (HPP belum diatur)'}
+                    aria-label={`Resep ${p.name}`}
                     onClick={() => setRecipeFor(p)}
                   >
-                    {hpp > 0 ? 'Resep' : 'Atur resep'}
+                    🧾
                   </button>
-                  <button type="button" className="btn-ghost flex-1 !min-h-0 !py-1.5 text-xs" onClick={() => setEditProd(p)}>
-                    Edit
+                  <button type="button" className="icon-btn" title="Edit menu" aria-label={`Edit ${p.name}`} onClick={() => setEditProd(p)}>
+                    ✏️
                   </button>
                   {/* toggle aktif langsung di kartu: menu kosong/habis musiman cukup dimatikan */}
                   <button
                     type="button"
-                    className={`btn-ghost flex-1 !min-h-0 !py-1.5 text-xs ${p.is_active ? '' : '!border-brand-gold !text-brand-btn'}`}
+                    className={`icon-btn ${p.is_active ? '' : '!border-brand-gold !text-brand-btn'}`}
                     disabled={toggling === p.id}
                     title={p.is_active ? 'Matikan: hilang dari kasir & portal customer' : 'Nyalakan lagi: menu kembali tampil di kasir & portal'}
+                    aria-label={p.is_active ? `Matikan ${p.name}` : `Nyalakan ${p.name}`}
                     onClick={() => void toggleActive(p)}
                   >
-                    {toggling === p.id ? '…' : p.is_active ? 'Matikan' : 'Nyalakan'}
+                    {p.is_active ? '⏻' : '⚡'}
                   </button>
                   <button
                     type="button"
-                    className="btn-ghost flex-1 !min-h-0 !py-1.5 text-xs font-bold text-brand-redtext"
+                    className="icon-btn-danger"
+                    title="Hapus menu"
+                    aria-label={`Hapus ${p.name}`}
                     onClick={() => setDeleting(p)}
                   >
-                    Hapus
+                    🗑
                   </button>
                 </span>
               </div>
@@ -408,8 +414,8 @@ function RecipeEditor({
                 aria-label="Qty"
               />
               <span className="text-right text-xs font-bold tabular-nums">{line ? fmtRp(line.cost) : '—'}</span>
-              <button type="button" className="text-lg font-extrabold text-brand-redtext" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} aria-label="Hapus baris">
-                ✕
+              <button type="button" className="icon-btn-danger" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} aria-label="Hapus baris">
+                🗑
               </button>
             </div>
           )
@@ -495,13 +501,15 @@ function BundlesTab({
               <p className="mt-1 text-sm font-bold">
                 {fmtRp(b.price)} <span className="font-normal text-brand-muted">(normal {fmtRp(comp)})</span>
               </p>
-              <div className="mt-2 flex gap-2">
-                <button type="button" className="btn-ghost !min-h-0 !py-1 text-xs" onClick={() => setEditing({ id: b.id, name: b.name, price: b.price, items: [...(b.items ?? [])] })}>
-                  Edit
+              <div className="mt-2 flex gap-1.5">
+                <button type="button" className="icon-btn" title="Edit paket" aria-label={`Edit ${b.name}`} onClick={() => setEditing({ id: b.id, name: b.name, price: b.price, items: [...(b.items ?? [])] })}>
+                  ✏️
                 </button>
                 <button
                   type="button"
-                  className="btn-danger !min-h-0 !py-1 text-xs"
+                  className="icon-btn-danger"
+                  title="Hapus paket"
+                  aria-label={`Hapus ${b.name}`}
                   onClick={async () => {
                     try {
                       await deleteBundle(b.id)
@@ -511,7 +519,7 @@ function BundlesTab({
                     }
                   }}
                 >
-                  Hapus
+                  🗑
                 </button>
               </div>
             </div>
@@ -566,8 +574,8 @@ function BundlesTab({
                     onChange={(e) => setEditing({ ...editing, items: editing.items.map((x, j) => (j === i ? { ...x, qty: parseInt(e.target.value.replace(/\D/g, ''), 10) || 1 } : x)) })}
                     aria-label="Qty"
                   />
-                  <button type="button" className="font-extrabold text-brand-redtext" onClick={() => setEditing({ ...editing, items: editing.items.filter((_, j) => j !== i) })} aria-label="Hapus">
-                    ✕
+                  <button type="button" className="icon-btn-danger" onClick={() => setEditing({ ...editing, items: editing.items.filter((_, j) => j !== i) })} aria-label="Hapus">
+                    🗑
                   </button>
                 </div>
               ))}

@@ -274,8 +274,8 @@ function CategoriesModal({ open, settings, onClose, setErr }: { open: boolean; s
             onChange={(e) => setCats(cats.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
             aria-label="Nama kategori"
           />
-          <button type="button" className="font-extrabold text-brand-redtext" onClick={() => setCats(cats.filter((_, j) => j !== i))} aria-label="Hapus kategori">
-            ✕
+          <button type="button" className="icon-btn-danger" onClick={() => setCats(cats.filter((_, j) => j !== i))} aria-label="Hapus kategori">
+            🗑
           </button>
         </div>
       ))}

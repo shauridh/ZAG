@@ -121,6 +121,11 @@ export default function Ingredients(): ReactElement {
     }
   }
 
+  // modal satuan "Lainnya (ketik sendiri)": aktif bila nilai bukan preset ATAU masih '?' penanda custom eksplisit.
+  // PENTING: input custom hanya menulis *_custom; small_unit/buy_unit di-commit dari custom saat simpan —
+  // kalau tidak, mengetik karakter pertama membuat kondisi render berubah dan input hilang di tengah ketik.
+  const buyUnitCustom = editing === null || editing.buy_unit === '' || editing.buy_unit === '?' || (editing.buy_unit != null && editing.buy_unit !== '' && !BUY_UNITS.includes(editing.buy_unit))
+  const smallUnitCustom = editing !== null && (editing.small_unit === '?' || (editing.small_unit != null && editing.small_unit !== '' && !SMALL_UNITS.includes(editing.small_unit)))
   return (
     <div className="p-3 lg:p-4">
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -208,13 +213,18 @@ export default function Ingredients(): ReactElement {
             onSubmit={async (e) => {
               e.preventDefault()
               try {
+                // satuan "Lainnya" diketik di input custom → commit ke kolom aslinya saat simpan
+                const finalBuyUnit = BUY_UNITS.includes(editing.buy_unit ?? '') ? editing.buy_unit : (editing.buy_unit_custom || '').trim() || 'pack'
+                const finalSmallUnit = editing.small_unit === '?' || (editing.small_unit != null && !SMALL_UNITS.includes(editing.small_unit))
+                  ? (editing.small_unit_custom || '').trim()
+                  : (editing.small_unit ?? '')
                 await upsertIngredient({
                   id: editing.id,
                   name: editing.name ?? '',
                   code: editing.code ?? '',
                   kind: editing.kind ?? 'raw',
-                  buy_unit: editing.buy_unit || 'pack',
-                  small_unit: (editing.small_unit ?? '') || null,
+                  buy_unit: finalBuyUnit || 'pack',
+                  small_unit: finalSmallUnit || null,
                   pack_content: editing.pack_content ?? 1,
                   price: editing.price ?? 0,
                   min_stock: editing.min_stock ?? 0,
@@ -247,7 +257,7 @@ export default function Ingredients(): ReactElement {
                 <label className="lbl" htmlFor="iunit">
                   Satuan beli
                 </label>
-                <select id="iunit" className="input" value={BUY_UNITS.includes(editing.buy_unit ?? '') ? editing.buy_unit : '__custom__'} onChange={(e) => setEditing({ ...editing, buy_unit: e.target.value === '__custom__' ? '' : e.target.value })}>
+                <select id="iunit" className="input" value={buyUnitCustom ? '__custom__' : BUY_UNITS.includes(editing.buy_unit ?? '') ? editing.buy_unit : '__custom__'} onChange={(e) => setEditing({ ...editing, buy_unit: e.target.value === '__custom__' ? '' : e.target.value })}>
                   {BUY_UNITS.map((u) => (
                     <option key={u} value={u}>
                       {u}
@@ -255,14 +265,12 @@ export default function Ingredients(): ReactElement {
                   ))}
                   <option value="__custom__">Lainnya (ketik sendiri)…</option>
                 </select>
-                {editing.buy_unit === '' && (
+                {buyUnitCustom && (
                   <input
                     className="input mt-2"
-                    value={editing.buy_unit_custom ?? ''}
-                    onChange={(e) => setEditing({ ...editing, buy_unit_custom: e.target.value, buy_unit: e.target.value })}
+                    value={editing.buy_unit_custom ?? (editing.buy_unit && editing.buy_unit !== '?' ? editing.buy_unit : '')}
+                    onChange={(e) => setEditing({ ...editing, buy_unit_custom: e.target.value })}
                     placeholder="contoh: slop / tray"
-                    autoFocus
-                    required
                   />
                 )}
               </div>
@@ -270,7 +278,7 @@ export default function Ingredients(): ReactElement {
                 <label className="lbl" htmlFor="ismall">
                   Satuan kecil (untuk resep)
                 </label>
-                <select id="ismall" className="input" value={SMALL_UNITS.includes(editing.small_unit ?? '') ? (editing.small_unit ?? '') : '__custom__'} onChange={(e) => setEditing({ ...editing, small_unit: e.target.value === '__custom__' ? '?' : e.target.value })}>
+                <select id="ismall" className="input" value={smallUnitCustom ? '__custom__' : SMALL_UNITS.includes(editing.small_unit ?? '') ? (editing.small_unit ?? '') : '__custom__'} onChange={(e) => setEditing({ ...editing, small_unit: e.target.value === '__custom__' ? '?' : e.target.value })}>
                   {SMALL_UNITS.map((u) => (
                     <option key={u || '__none__'} value={u}>
                       {u === '' ? '— sama dgn satuan beli —' : u}
@@ -278,14 +286,12 @@ export default function Ingredients(): ReactElement {
                   ))}
                   <option value="__custom__">Lainnya (ketik sendiri)…</option>
                 </select>
-                {editing.small_unit === '?' && (
+                {smallUnitCustom && (
                   <input
                     className="input mt-2"
-                    value={editing.small_unit_custom ?? ''}
-                    onChange={(e) => setEditing({ ...editing, small_unit_custom: e.target.value, small_unit: e.target.value })}
+                    value={editing.small_unit_custom ?? (editing.small_unit === '?' ? '' : editing.small_unit ?? '')}
+                    onChange={(e) => setEditing({ ...editing, small_unit_custom: e.target.value })}
                     placeholder="contoh: potong"
-                    autoFocus
-                    required
                   />
                 )}
               </div>
@@ -604,11 +610,10 @@ function BahanTable({
       </div>
 
       <div className="card overflow-x-auto">
-        <table className="tbl min-w-[860px]">
+        <table className="tbl min-w-[820px]">
           <thead>
             <tr>
               <th></th>
-              <th>Kode</th>
               <th>Nama Barang</th>
               <th>Satuan</th>
               <th>Isi</th>
@@ -618,7 +623,7 @@ function BahanTable({
               <th className="text-right">Min</th>
               <th>Status</th>
               <th className="whitespace-nowrap text-right">Saran Beli</th>
-              <th></th>
+              <th className="text-center">Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -632,9 +637,9 @@ function BahanTable({
                   <td>
                     {i.kind === 'raw' && <input type="checkbox" checked={checked.has(i.id)} onChange={(e) => toggleCk(i.id, e.target.checked)} aria-label={`Pilih ${i.name} untuk pembelian`} />}
                   </td>
-                  <td className="whitespace-nowrap font-mono text-xs">{i.code || '—'}</td>
                   <td className="font-bold">
                     {i.name}
+                    {i.code && <span className="ml-1 font-mono text-[10px] font-normal text-brand-muted">{i.code}</span>}
                     {i.kind === 'prepared' && <span className="chip ml-1 border-[1.5px] border-brand-line bg-brand-paper">prepared</span>}
                     {!i.active && <span className="chip ml-1 bg-brand-line">nonaktif</span>}
                   </td>
@@ -684,35 +689,38 @@ function BahanTable({
                       <span className="font-normal text-brand-muted">—</span>
                     )}
                   </td>
-                  <td className="whitespace-nowrap">
-                    {/* toggle aktif langsung di baris: bahan tak terpakai cukup dimatikan tanpa buka Edit */}
-                    <button
-                      type="button"
-                      className={`btn-ghost !min-h-0 !px-2 !py-1 text-xs ${i.active ? '' : '!border-brand-gold !text-brand-redtext'}`}
-                      disabled={toggling === i.id}
-                      title={i.active ? 'Matikan: hilang dari dropdown produksi, resep & saran beli' : 'Nyalakan lagi: bahan kembali dipakai'}
-                      onClick={() => void toggleActive(i)}
-                    >
-                      {toggling === i.id ? '…' : i.active ? 'Nonaktifkan' : 'Aktifkan'}
-                    </button>{' '}
-                    {i.kind === 'prepared' && (
-                      <button type="button" className="btn-ghost !min-h-0 !px-2 !py-1 text-xs" onClick={() => setRecipeFor(i)}>
-                        Resep
+                  <td>
+                    <div className="flex justify-center gap-1">
+                      {/* aksi ikon: ringkas satu baris — toggle, resep (prepared), edit, hapus */}
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        disabled={toggling === i.id}
+                        title={i.active ? 'Matikan: hilang dari dropdown produksi, resep & saran beli' : 'Nyalakan lagi: bahan kembali dipakai'}
+                        aria-label={i.active ? `Nonaktifkan ${i.name}` : `Aktifkan ${i.name}`}
+                        onClick={() => void toggleActive(i)}
+                      >
+                        {i.active ? '⏻' : '⚡'}
                       </button>
-                    )}{' '}
-                    <button type="button" className="btn-ghost !min-h-0 !px-2 !py-1 text-xs" onClick={() => setEditing(i)}>
-                      Edit
-                    </button>{' '}
-                    <button type="button" className="btn-ghost !min-h-0 !px-2 !py-1 text-xs font-bold text-brand-redtext" onClick={() => setDeleting(i)}>
-                      Hapus
-                    </button>
+                      {i.kind === 'prepared' && (
+                        <button type="button" className="icon-btn" title="Resep produksi" aria-label={`Resep ${i.name}`} onClick={() => setRecipeFor(i)}>
+                          🧾
+                        </button>
+                      )}
+                      <button type="button" className="icon-btn" title="Edit barang" aria-label={`Edit ${i.name}`} onClick={() => setEditing(i)}>
+                        ✏️
+                      </button>
+                      <button type="button" className="icon-btn-danger" title="Hapus barang" aria-label={`Hapus ${i.name}`} onClick={() => setDeleting(i)}>
+                        🗑
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )
             })}
             {list.length === 0 && (
               <tr>
-                <td colSpan={12} className="py-8 text-center text-sm text-brand-muted">
+                <td colSpan={11} className="py-8 text-center text-sm text-brand-muted">
                   Tidak ada barang yang cocok.
                 </td>
               </tr>
@@ -826,8 +834,8 @@ function StokTab({
                   onChange={(e) => setLines((ls) => ls.map((x, j) => (j === i ? { ...x, unit_cost: e.target.value.replace(/\D/g, '') } : x)))}
                   aria-label="Harga per kemasan"
                 />
-                <button type="button" className="font-extrabold text-brand-redtext" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} aria-label="Hapus baris">
-                  ✕
+                <button type="button" className="icon-btn-danger" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} aria-label="Hapus baris">
+                  🗑
                 </button>
               </div>
             )
@@ -1274,8 +1282,8 @@ function RecipeEditorInline({
                 <span className="text-xs font-bold text-brand-muted">{l.kind === 'ingredient' && comp && 'buy_unit' in comp ? smallUnitOf(comp) : ''}</span>
               </div>
               <span className="text-right text-xs font-bold tabular-nums">{line ? fmtRp(line.cost) : '—'}</span>
-              <button type="button" className="text-lg font-extrabold text-brand-redtext" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} aria-label="Hapus baris">
-                ✕
+              <button type="button" className="icon-btn-danger" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} aria-label="Hapus baris">
+                🗑
               </button>
             </div>
           )
@@ -1520,8 +1528,8 @@ function IngRecipeEditor({
               />
               <span className="text-xs font-bold text-brand-muted">{comp ? smallUnitOf(comp) : ''}</span>
             </div>
-            <button type="button" className="text-lg font-extrabold text-brand-redtext" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} aria-label="Hapus">
-              ✕
+            <button type="button" className="icon-btn-danger" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} aria-label="Hapus">
+              🗑
             </button>
           </div>
         )
