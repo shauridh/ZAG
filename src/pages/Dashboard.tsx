@@ -162,22 +162,22 @@ const WIDGET_DEFS: { key: WidgetKey; label: string; def: boolean }[] = [
   { key: 'summary', label: 'Ringkasan omzet & laba', def: true },
   { key: 'actions', label: 'Perlu tindakan', def: true },
   { key: 'recipeIssues', label: 'Peringatan resep rusak', def: true },
-  { key: 'dailyTrend', label: 'Tren omzet & laba harian', def: true },
-  { key: 'txPerDay', label: 'Jumlah transaksi per hari (baru)', def: true },
-  { key: 'channelMix', label: 'Channel penjualan (donat)', def: true },
-  { key: 'channelTable', label: 'Tabel penerimaan channel', def: true },
-  { key: 'topItems', label: 'Menu terlaris (bar)', def: true },
-  { key: 'busyHours', label: 'Jam sibuk', def: true },
-  { key: 'catMix', label: 'Omzet per kategori (donat, baru)', def: true },
-  { key: 'avgTicket', label: 'Rata-rata nota harian (baru)', def: true },
+  { key: 'dailyTrend', label: 'Grafik omzet & laba harian', def: true },
+  { key: 'bestSellers', label: 'Best seller + target + sisa porsi', def: true },
+  { key: 'channelTable', label: 'Channel: omzet, komisi, bersih', def: true },
   { key: 'paymentMix', label: 'Metode pembayaran', def: true },
-  { key: 'targets', label: 'Target menu hari ini', def: true },
-  { key: 'bestSellers', label: 'Best seller vs target + sisa porsi', def: true },
-  { key: 'revCompare', label: 'Omzet vs periode lalu', def: true },
-  { key: 'stockTrend', label: 'Tren stok bahan kritis', def: true },
-  { key: 'preparedStock', label: 'Stok siap jual', def: true },
-  { key: 'ideas', label: 'Ide menu paket', def: true },
-  { key: 'lowStock', label: 'Bahan menipis / habis', def: true }
+  { key: 'lowStock', label: 'Bahan menipis / habis', def: true },
+  { key: 'txPerDay', label: 'Jumlah transaksi per hari', def: false },
+  { key: 'channelMix', label: 'Channel penjualan (donat)', def: false },
+  { key: 'topItems', label: 'Menu terlaris (bar omzet)', def: false },
+  { key: 'busyHours', label: 'Jam sibuk', def: false },
+  { key: 'catMix', label: 'Omzet per kategori (donat)', def: false },
+  { key: 'avgTicket', label: 'Rata-rata nota harian (line)', def: false },
+  { key: 'targets', label: 'Target menu (progress ringkas)', def: false },
+  { key: 'revCompare', label: 'Omzet vs periode lalu', def: false },
+  { key: 'stockTrend', label: 'Tren stok bahan kritis 7 hari', def: false },
+  { key: 'preparedStock', label: 'Stok siap jual', def: false },
+  { key: 'ideas', label: 'Ide menu paket', def: false }
 ]
 
 const WIDGET_STORE = 'sabana-dash-widgets-v1'
@@ -722,7 +722,7 @@ export default function Dashboard(): ReactElement {
         </div>
         )}
 
-        {/* Terlaris */}
+        {/* Terlaris (bar omzet) — opsional; detail qty/target/sisa ada di Best seller */}
         {widgets.has('topItems') && (
         <div className="card p-3">
           <h2 className="mb-2 font-extrabold">Menu terlaris · {label}</h2>
@@ -855,10 +855,10 @@ export default function Dashboard(): ReactElement {
         </div>
         )}
 
-        {/* Target vs aktual */}
+        {/* Target vs aktual (progress ringkas; tabel lengkap ada di Best seller) */}
         {widgets.has('targets') && (
         <div className="card p-3">
-          <h2 className="mb-2 font-extrabold">Target hari ini</h2>
+          <h2 className="mb-2 font-extrabold">Target menu · {label}</h2>
           <ul className="flex flex-col gap-2">
             {targets.map((t) => {
               const pct = Math.min(100, Math.round((t.sold / t.target) * 100))
