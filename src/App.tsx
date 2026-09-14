@@ -19,6 +19,7 @@ const Products = lazy(() => import('./pages/Products'))
 const Finance = lazy(() => import('./pages/Finance'))
 const ShiftPage = lazy(() => import('./pages/Shift'))
 const HistoryPage = lazy(() => import('./pages/History'))
+const ReportDetailPage = lazy(() => import('./pages/ReportDetail'))
 const SettingsPage = lazy(() => import('./pages/Settings'))
 
 interface NavItem {
@@ -42,6 +43,7 @@ const NAV_ADMIN: NavGroup[] = [
       { to: '/kasir', label: 'Kasir', icon: '🧾' },
       { to: '/pesanan', label: 'Pesanan', icon: '🛍️' },
       { to: '/riwayat', label: 'Riwayat Transaksi', icon: '🕘' },
+      { to: '/laporan-detail', label: 'Laporan Detail', icon: '🔍' },
       { to: '/produksi', label: 'Produksi & Fryer', icon: '🍟' },
       { to: '/shift', label: 'Shift', icon: '🔄' }
     ]
@@ -271,6 +273,7 @@ function Shell(): ReactElement {
                 <Route path="/kasir" element={<Cashier />} />
                 <Route path="/pesanan" element={<Orders />} />
                 <Route path="/riwayat" element={<HistoryPage />} />
+                <Route path="/laporan-detail" element={<ReportDetailPage />} />
                 <Route path="/produksi" element={<Production />} />
                 <Route path="/bahan" element={<Ingredients />} />
                 <Route path="/menu" element={<Products />} />
