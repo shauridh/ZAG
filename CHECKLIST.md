@@ -172,7 +172,7 @@ Catatan operasional:
 | **Migrasi 0009 dijalankan di Supabase produksi** | ✅ penjaga transisi status pesanan portal + kasir bisa menolak pesanan yang sudah bayar tapi belum diverifikasi |
 | **Migrasi 0010 dijalankan di Supabase produksi** | ✅ koreksi kas drawer: kembalian tunai tidak lagi dihitung penjualan (sebelumnya terbukti di live: Laporan X cash Rp199.000 vs omzet Rp112.000). Sisi frontend sudah diperbaiki via `byPayment`. **Cek saat tutup shift #5 berikutnya**: hitung fisik = "Seharusnya di drawer" → selisih harus Rp0 (server & client kini sepakat) |
 | Simpan Pesanan (Bill) di **produksi**: simpan → bayar → struk + stok terpotong | ✅ teruji penuh live 14 Sep: simpan ✓ → bayar tunai Rp20rb utk Rp5rb → struk SB260914-0034 + kembalian Rp15rb ✓ → Riwayat kas net Rp5rb ✓ → Shift penjualan tunai +Rp5rb ✓ (cek stok terpotong saat opname berikutnya) |
-| Go-live: Pengaturan → **Hapus Semua Data (mulai dari nol)**, lalu **Impor Price List** | ⬜ (produksi mulai bersih; stok diisi via Pembelian) |
+| Go-live: Pengaturan → **Hapus Semua Data (mulai dari nol)**, lalu **Impor Price List** | ⬜ backup penuh sudah diambil lokal 14 Sep; reset butuh **`fix_reset_safeupdate.sql` dulu** di SQL Editor (pg-safeupdate menolak DELETE tanpa WHERE). Setelah itu: `SB_EMAIL=... SB_PASS=... BACKUP_DIR=backup/<ts> node scripts/go-live-reset.js` (reset → impor 62 item → pulihkan menu/resep/paket/target) |
 | Refund/hapus di **produksi** pasca-0006 | ⬜ uji 1x di live |
 | Printer thermal fisik (Bluetooth) | ⬜ uji di HP kasir — Web Bluetooth dulu, kalau gagal jalur **RawBT §2b** |
 | RawBT di HP kasir terpasang & teruji | ⬜ (cadangan andal) |

@@ -1,0 +1,498 @@
+[
+ {
+  "code": "100001",
+  "name": "Ayam Potong 9",
+  "buy_unit": "pack",
+  "pack_content": 9.0,
+  "pack_price": 48000,
+  "small_unit": "potong"
+ },
+ {
+  "code": "100002",
+  "name": "Ayam Potong 12",
+  "buy_unit": "pack",
+  "pack_content": 12.0,
+  "pack_price": 48000,
+  "small_unit": "potong"
+ },
+ {
+  "code": "100003",
+  "name": "Ayam Boneless",
+  "buy_unit": "pack",
+  "pack_content": 30.0,
+  "pack_price": 65000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "100004",
+  "name": "Kulit Ayam",
+  "buy_unit": "pack",
+  "pack_content": 500.0,
+  "pack_price": 20000,
+  "small_unit": "gram"
+ },
+ {
+  "code": "100006",
+  "name": "Beras Mentik Wangi 10 Kg",
+  "buy_unit": "karung",
+  "pack_content": 10.0,
+  "pack_price": 165000,
+  "small_unit": "kg"
+ },
+ {
+  "code": "100007",
+  "name": "Beras Mentik Wangi 25 Kg",
+  "buy_unit": "karung",
+  "pack_content": 25.0,
+  "pack_price": 412500,
+  "small_unit": "kg"
+ },
+ {
+  "code": "200001",
+  "name": "Tepung Fried Chicken",
+  "buy_unit": "pack",
+  "pack_content": 1.0,
+  "pack_price": 23500,
+  "small_unit": "pack"
+ },
+ {
+  "code": "200002",
+  "name": "Sunco Minyak Goreng 2 Liter",
+  "buy_unit": "pouch",
+  "pack_content": 2.0,
+  "pack_price": 43400,
+  "small_unit": "liter"
+ },
+ {
+  "code": "200003",
+  "name": "Chicken Patty",
+  "buy_unit": "pcs",
+  "pack_content": 1.0,
+  "pack_price": 4500,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200004",
+  "name": "Roti Burger",
+  "buy_unit": "pcs",
+  "pack_content": 1.0,
+  "pack_price": 2600,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200005",
+  "name": "Bakso",
+  "buy_unit": "pack",
+  "pack_content": 50.0,
+  "pack_price": 24000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200006",
+  "name": "Chicken Roll",
+  "buy_unit": "pack",
+  "pack_content": 10.0,
+  "pack_price": 24400,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200007",
+  "name": "Saus Sambal Sabana",
+  "buy_unit": "pack",
+  "pack_content": 125.0,
+  "pack_price": 22500,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200008",
+  "name": "Saus Tomat Delmonte",
+  "buy_unit": "pack",
+  "pack_content": 20.0,
+  "pack_price": 5300,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200009",
+  "name": "Saus Sambal Refill 1 Kg Delmonte",
+  "buy_unit": "pouch",
+  "pack_content": 1.0,
+  "pack_price": 20700,
+  "small_unit": "kg"
+ },
+ {
+  "code": "200010",
+  "name": "Saus Tomat Refill 1 Kg Delmonte",
+  "buy_unit": "pouch",
+  "pack_content": 1.0,
+  "pack_price": 15100,
+  "small_unit": "kg"
+ },
+ {
+  "code": "200011",
+  "name": "Kemasan Ayam",
+  "buy_unit": "pack",
+  "pack_content": 100.0,
+  "pack_price": 23500,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200012",
+  "name": "Kemasan Kulit Crispy",
+  "buy_unit": "pack",
+  "pack_content": 100.0,
+  "pack_price": 15000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200013",
+  "name": "Kertas Nasi",
+  "buy_unit": "pack",
+  "pack_content": 100.0,
+  "pack_price": 13000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200014",
+  "name": "Box Standard",
+  "buy_unit": "pack",
+  "pack_content": 100.0,
+  "pack_price": 125000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200015",
+  "name": "Lunch Box",
+  "buy_unit": "pack",
+  "pack_content": 100.0,
+  "pack_price": 115000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200016",
+  "name": "Box Serbaguna",
+  "buy_unit": "pack",
+  "pack_content": 100.0,
+  "pack_price": 85000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200017",
+  "name": "Box Siap Saji",
+  "buy_unit": "pack",
+  "pack_content": 100.0,
+  "pack_price": 60500,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200018",
+  "name": "Box Kentang",
+  "buy_unit": "pack",
+  "pack_content": 200.0,
+  "pack_price": 119800,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200019",
+  "name": "Sambal Geprek",
+  "buy_unit": "pouch",
+  "pack_content": 500.0,
+  "pack_price": 64000,
+  "small_unit": "gram"
+ },
+ {
+  "code": "200020",
+  "name": "Sambal Ijo",
+  "buy_unit": "pouch",
+  "pack_content": 500.0,
+  "pack_price": 53000,
+  "small_unit": "gram"
+ },
+ {
+  "code": "200021",
+  "name": "Sambal Hitam",
+  "buy_unit": "pouch",
+  "pack_content": 500.0,
+  "pack_price": 51500,
+  "small_unit": "gram"
+ },
+ {
+  "code": "200022",
+  "name": "Cup Sauce 35 Ml",
+  "buy_unit": "pack",
+  "pack_content": 50.0,
+  "pack_price": 15000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200023",
+  "name": "Plastik Kecil",
+  "buy_unit": "pack",
+  "pack_content": 1.0,
+  "pack_price": 7000,
+  "small_unit": ""
+ },
+ {
+  "code": "200024",
+  "name": "Plastik Sedang",
+  "buy_unit": "pack",
+  "pack_content": 1.0,
+  "pack_price": 7000,
+  "small_unit": ""
+ },
+ {
+  "code": "200025",
+  "name": "Plastik Hitam",
+  "buy_unit": "pack",
+  "pack_content": 30.0,
+  "pack_price": 15600,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200026",
+  "name": "Plastik Merah",
+  "buy_unit": "pack",
+  "pack_content": 30.0,
+  "pack_price": 28000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200027",
+  "name": "Sarung Tangan",
+  "buy_unit": "pack",
+  "pack_content": 75.0,
+  "pack_price": 11000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200028",
+  "name": "Saud Buldak",
+  "buy_unit": "pouch",
+  "pack_content": 500.0,
+  "pack_price": 36800,
+  "small_unit": "gram"
+ },
+ {
+  "code": "200029",
+  "name": "Saus Tomat Prima",
+  "buy_unit": "pack",
+  "pack_content": 20.0,
+  "pack_price": 9300,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200030",
+  "name": "Saus Keju Mentai",
+  "buy_unit": "pouch",
+  "pack_content": 500.0,
+  "pack_price": 27000,
+  "small_unit": "gram"
+ },
+ {
+  "code": "200031",
+  "name": "Saus Black Papper",
+  "buy_unit": "pack",
+  "pack_content": 10.0,
+  "pack_price": 16500,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200032",
+  "name": "Saus Bbq",
+  "buy_unit": "pack",
+  "pack_content": 10.0,
+  "pack_price": 8000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200033",
+  "name": "Saus Extra Pedas (Sadas)",
+  "buy_unit": "pouch",
+  "pack_content": 500.0,
+  "pack_price": 24500,
+  "small_unit": "gram"
+ },
+ {
+  "code": "200034",
+  "name": "Mayonaise Prima 900 Gr",
+  "buy_unit": "pouch",
+  "pack_content": 900.0,
+  "pack_price": 36700,
+  "small_unit": "gram"
+ },
+ {
+  "code": "200035",
+  "name": "Fruit Tea Apple 250 Ml",
+  "buy_unit": "pcs",
+  "pack_content": 1.0,
+  "pack_price": 2500,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200036",
+  "name": "Fruit Tea Blackcurrant 250 Ml",
+  "buy_unit": "pcs",
+  "pack_content": 1.0,
+  "pack_price": 2500,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200037",
+  "name": "Fruit Tea Lemon 250 Ml",
+  "buy_unit": "pcs",
+  "pack_content": 1.0,
+  "pack_price": 2500,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200038",
+  "name": "The Botol Sosro 250 Ml",
+  "buy_unit": "pcs",
+  "pack_content": 1.0,
+  "pack_price": 2500,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200039",
+  "name": "Concentrate Fruit Tea Rasa Blackcurrant",
+  "buy_unit": "botol",
+  "pack_content": 1.0,
+  "pack_price": 16700,
+  "small_unit": "botol"
+ },
+ {
+  "code": "200040",
+  "name": "Concentrate Fruit Tea Rasa Lemon Tea",
+  "buy_unit": "botol",
+  "pack_content": 1.0,
+  "pack_price": 16700,
+  "small_unit": "botol"
+ },
+ {
+  "code": "200041",
+  "name": "Air Botol 330 Ml",
+  "buy_unit": "dus",
+  "pack_content": 24.0,
+  "pack_price": 59400,
+  "small_unit": "botol"
+ },
+ {
+  "code": "200042",
+  "name": "Air Kesehatan Cup 220 Ml",
+  "buy_unit": "dus",
+  "pack_content": 48.0,
+  "pack_price": 28000,
+  "small_unit": "gelas"
+ },
+ {
+  "code": "200043",
+  "name": "Kentang Simplot 2.72 Kg",
+  "buy_unit": "pack",
+  "pack_content": 2.72,
+  "pack_price": 115000,
+  "small_unit": "kg"
+ },
+ {
+  "code": "200044",
+  "name": "Kentang Mc Cain 2.5 Kg",
+  "buy_unit": "pack",
+  "pack_content": 2.5,
+  "pack_price": 110500,
+  "small_unit": "kg"
+ },
+ {
+  "code": "200045",
+  "name": "Kardus Ukuran 30",
+  "buy_unit": "pcs",
+  "pack_content": 1.0,
+  "pack_price": 9500,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200046",
+  "name": "Kardus Ukuran 50",
+  "buy_unit": "pcs",
+  "pack_content": 1.0,
+  "pack_price": 11000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200047",
+  "name": "Roti Chicken Bun",
+  "buy_unit": "pack",
+  "pack_content": 4.0,
+  "pack_price": 8000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200048",
+  "name": "Paper Bowl 500 Ml",
+  "buy_unit": "pack",
+  "pack_content": 25.0,
+  "pack_price": 38750,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200049",
+  "name": "Paper Bowl 650 Ml",
+  "buy_unit": "pack",
+  "pack_content": 25.0,
+  "pack_price": 41250,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200050",
+  "name": "Oregano 25 Gr",
+  "buy_unit": "pcs",
+  "pack_content": 1.0,
+  "pack_price": 8000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200051",
+  "name": "Sendok Garpu Plastik",
+  "buy_unit": "pack",
+  "pack_content": 50.0,
+  "pack_price": 10000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200052",
+  "name": "Rice Box",
+  "buy_unit": "pack",
+  "pack_content": 100.0,
+  "pack_price": 153200,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200058",
+  "name": "Kentang Simplot 2 Kg",
+  "buy_unit": "pack",
+  "pack_content": 2.0,
+  "pack_price": 83000,
+  "small_unit": "kg"
+ },
+ {
+  "code": "200059",
+  "name": "Chicken Katsu",
+  "buy_unit": "pcs",
+  "pack_content": 1.0,
+  "pack_price": 4500,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200060",
+  "name": "Kardus Ukuran 40",
+  "buy_unit": "pcs",
+  "pack_content": 1.0,
+  "pack_price": 10000,
+  "small_unit": "pcs"
+ },
+ {
+  "code": "200085",
+  "name": "Cup Sauce Mika",
+  "buy_unit": "pack",
+  "pack_content": 50.0,
+  "pack_price": 10000,
+  "small_unit": "pcs"
+ }
+]
