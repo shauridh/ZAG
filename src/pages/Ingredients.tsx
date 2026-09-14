@@ -35,6 +35,10 @@ export default function Ingredients(): ReactElement {
   const [q, setQ] = useState('')
   const [dirty, setDirty] = useState<Record<number, number>>({})
   const [deleting, setDeleting] = useState<Ingredient | null>(null)
+  // Harga pembelian (per kemasan) yang sedang diketik di modal — basis perhitungan price-per-isi.
+  // Disimpan terpisah supaya saat isi kemasan diubah, harga kemasan TETAP dan harga per-isi ikut dibagi ulang
+  // (sebaliknya tampilan akan "melar": 54.000 tiba-tiba jadi 72.000 saat isi 9→12).
+  const [packPriceDraft, setPackPriceDraft] = useState<number | null>(null)
   // filter tampil: semua / aktif saja / nonaktif saja
   const [activeFilter, setActiveFilter] = useState<'all' | 'on' | 'off'>('all')
   // bahan yang sedang di-toggle (mencegah dobel-klik saat RPC jalan)
@@ -206,7 +210,7 @@ export default function Ingredients(): ReactElement {
       {tab === 'menu' && <MenuHppTab catalog={catalog} ingById={ingById} reload={reload} setErr={setErr} toast={toast} goBahan={() => setTab('bahan')} />}
 
       {/* Modal bahan (ala price list) */}
-      <Modal open={editing !== null} title={editing?.id ? 'Edit Barang' : 'Barang Baru'} onClose={() => setEditing(null)}>
+      <Modal open={editing !== null} title={editing?.id ? 'Edit Barang' : 'Barang Baru'} onClose={() => { setEditing(null); setPackPriceDraft(null) }}>
         {editing && (
           <form
             className="flex flex-col gap-3"
@@ -314,25 +318,35 @@ export default function Ingredients(): ReactElement {
                   id="icontent"
                   className="input text-right"
                   value={editing.pack_content ?? 1}
-                  onChange={(n) => setEditing({ ...editing, pack_content: n || 1 })}
+                  onChange={(n) => {
+                    const next = n || 1
+                    // harga kemasan TETAP, harga per-isi dihitung ulang = harga kemasan ÷ isi baru
+                    const pack = packPriceDraft ?? packPriceOf({ price: editing.price ?? 0, pack_content: editing.pack_content || 1 })
+                    setEditing({ ...editing, pack_content: next, price: Math.round(pack / next) || 0 })
+                  }}
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="lbl" htmlFor="iprice">
-                  Harga beli per kemasan (Rp)
+                  Harga pembelian (Rp / {editing.buy_unit || 'kemasan'})
                 </label>
+                {/* user mengetik HARGA KEMASAN utuh (mis. 48.000) — dibagi isi kemasan otomatis */}
                 <NumInput
                   id="iprice"
                   className="input text-right"
                   format={fmtRpPlain}
-                  parse={(s) => Math.round(parseInt(s.replace(/\D/g, ''), 10) / (editing.pack_content || 1)) || 0}
-                  value={editing.price ?? 0}
+                  parse={(s) => {
+                    const pack = parseInt(s.replace(/\D/g, ''), 10) || 0
+                    setPackPriceDraft(pack)
+                    return Math.round(pack / (editing.pack_content || 1)) || 0
+                  }}
+                  value={packPriceDraft ?? packPriceOf({ price: editing.price ?? 0, pack_content: editing.pack_content || 1 })}
                   onChange={(n) => setEditing({ ...editing, price: n })}
                 />
                 <p className="mt-1 text-xs text-brand-muted">
-                  ≈ <b>{fmtRpPlain(editing.price ?? 0)}</b>/{smallUnitOf({ buy_unit: editing.buy_unit || 'pack', small_unit: editing.small_unit, pack_content: editing.pack_content || 1 })} — ini yang dipakai hitung HPP.
+                  ≈ <b>{fmtRpPlain(editing.price ?? 0)}</b>/{smallUnitOf({ buy_unit: editing.buy_unit || 'pack', small_unit: editing.small_unit, pack_content: editing.pack_content || 1 })} — hasil bagi harga pembelian ÷ isi kemasan; ini yang dipakai hitung HPP.
                 </p>
               </div>
               <div>

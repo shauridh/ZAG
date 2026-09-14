@@ -25,6 +25,12 @@ export function Modal({
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
+  // onClose dipisah ke ref supaya efek fokus/trap HANYA bergantung pada `open`.
+  // Kalau onClose inline (umum di pemanggil: onClose={() => setX(null)}), identitasnya
+  // berubah tiap render — efek jalan ulang tiap ketikan dan fokus dipaksa kembali
+  // ke input pertama (bug: "typing selalu kembali ke kode barang").
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     if (!open) return
@@ -34,8 +40,9 @@ export function Modal({
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
-    // fokus masuk ke panel: input pertama kalau ada (langsung bisa ketik),
-    // kalau tidak ada baru ke tombol pertama / panel itu sendiri
+    // fokus masuk ke panel HANYA sekali saat dialog terbuka (bukan tiap render):
+    // input pertama kalau ada (langsung bisa ketik), kalau tidak ada baru ke
+    // tombol pertama / panel itu sendiri
     const panel = panelRef.current
     if (panel) {
       const focusable = [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.offsetParent !== null)
@@ -46,7 +53,7 @@ export function Modal({
     const h = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         e.stopPropagation()
-        onClose()
+        onCloseRef.current()
         return
       }
       // pagar Tab di dalam dialog
@@ -70,7 +77,7 @@ export function Modal({
       // kembalikan fokus ke pemicu pembukaan
       returnFocusRef.current?.focus?.()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
   return (
