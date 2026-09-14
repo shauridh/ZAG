@@ -42,7 +42,9 @@ def numpad_set(page, digits, dialog=None):
     d.locator('button[aria-label="Bersihkan"]').click()
     page.wait_for_timeout(150)
     for ch in digits:
-        d.locator(".grid button", has_text=ch).first.click()
+        # HANYA papan angka (.grid-cols-3) - jangan kena chip pecahan uang
+        # (mis. chip '50.000' mengandung digit 5 dan 0)
+        d.locator(".grid-cols-3 > button", has_text=ch).first.click()
         page.wait_for_timeout(60)
 
 

@@ -1,10 +1,20 @@
 import { useEffect } from 'react'
-import { fmtRp } from '../lib/money'
+import { fmtRp, fmtRpPlain } from '../lib/money'
+import { cashChips } from '../lib/cash'
 
 /**
  * Numpad kasir: tombol besar utk input nominal cepat.
  * Kembali string angka murni (tanpa titik) supaya parsing tidak ambigu.
  * Saat tunai melebihi total, kembalian ditampilkan besar & menonjol.
+ *
+ * Dua mode tampilan:
+ *  - Modal BAYAR (ada `total`): baris chip "UANG DITERIMA" berisi pecahan uang
+ *    kertas asli adaptif (cashChips) + chip "Pas". Satu ketukan = pembeli
+ *    menyerahkan lembaran itu — nilai MENIMPA (set), bukan menambah, jadi salah
+ *    sentuh cukup ditekan chip lain tanpa mulai dari nol. Papan angka kembali
+ *    murni digit 3x4.
+ *  - Input nominal bebas (tanpa `total`, mis. buka/tutup shift, kas drawer):
+ *    tombol cepat `quick` lama bertambah (+rb) seperti sebelumnya.
  */
 export function Numpad({
   value,
@@ -46,9 +56,35 @@ export function Numpad({
   })
   const exact = total !== undefined && value === total
   const hasChange = total !== undefined && value > total
+  const isPayMode = total !== undefined
+  const chips = isPayMode ? cashChips(total) : []
 
   return (
     <div>
+      {isPayMode && (
+        <div className="mb-1.5 flex flex-wrap items-center gap-1.5" role="group" aria-label="Pecahan uang diterima">
+          <span className="text-[11px] font-extrabold uppercase tracking-wide text-brand-muted">Uang diterima:</span>
+          {chips.map((d) => (
+            <button
+              key={d}
+              type="button"
+              className="btn-ghost !min-h-[40px] !px-3 !py-1 !text-[13px] font-extrabold tabular-nums"
+              aria-label={`Terima uang ${fmtRp(d)}`}
+              onClick={() => onChange(d)}
+            >
+              {fmtRpPlain(d)}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="btn-gold !min-h-[40px] !px-3 !py-1 !text-[13px] font-extrabold"
+            aria-label="Uang pas persis total"
+            onClick={() => onChange(total)}
+          >
+            Pas
+          </button>
+        </div>
+      )}
       <div
         className={`mb-2 rounded-lg border-[1.5px] px-3 py-1.5 text-right ${
           hasChange ? 'border-brand-btn bg-brand-gold/30' : 'border-brand-line bg-brand-paper'
@@ -79,16 +115,12 @@ export function Numpad({
         <button type="button" className="btn-ghost !py-2 text-lg" onClick={() => onChange(Math.floor(value / 10))} aria-label="Hapus satu angka">
           ⌫
         </button>
-        {quick.map((q) => (
-          <button key={q} type="button" className="btn-gold !py-2 text-xs" onClick={() => onChange(value + q)}>
-            +{q / 1000}rb
-          </button>
-        ))}
-        {total !== undefined && (
-          <button type="button" className="btn-gold !py-2 text-xs" onClick={() => onChange(total)}>
-            Uang Pas
-          </button>
-        )}
+        {!isPayMode &&
+          quick.map((q) => (
+            <button key={q} type="button" className="btn-gold !py-2 text-xs" onClick={() => onChange(value + q)}>
+              +{q / 1000}rb
+            </button>
+          ))}
       </div>
       {onSubmit && (
         <button
