@@ -3,6 +3,7 @@
 // ini hanya mengirim parameter dan membaca hasil.
 
 import type {
+  BatchHistoryItem,
   Bundle,
   Category,
   DeliveryZone,
@@ -236,6 +237,8 @@ type TxInput = {
   payments: { method: 'cash' | 'qris' | 'transfer'; amount: number }[]
   discount?: number
   note?: string
+  /** true = terima stok minus — kasir memaksa jual menu habis (migrasi 0014). */
+  allowNegativeStock?: boolean
 }
 
 /** Simpan transaksi live; bila jaringan putus, masuk antrean offline. */
@@ -262,7 +265,8 @@ async function createTxLive(sb: Sb, p: TxInput): Promise<TxResult> {
     p_items: p.items,
     p_payments: p.orderType === 'gofood' || p.orderType === 'grabfood' || p.orderType === 'shopeefood' ? [] : p.payments,
     p_discount: p.discount ?? 0,
-    p_note: p.note ?? null
+    p_note: p.note ?? null,
+    p_allow_negative_stock: p.allowNegativeStock ?? false
   })
   if (error) throw new Error(error.message)
   const id = data as number
@@ -375,7 +379,9 @@ export async function liveCreatePurchase(sb: Sb, lines: { ingredient_id: number;
   if (error) throw new Error(error.message)
 }
 
-export async function liveCreateBatch(sb: Sb, p: { outputs: { ingredient_id: number; qty: number }[]; fryer_id: number | null; fried_grams: number; note: string }): Promise<void> {
+export async function liveCreateBatch(sb: Sb, p: { outputs: { ingredient_id: number; qty: number; origin_unit?: 'buy' }[]; fryer_id: number | null; fried_grams: number; note: string }): Promise<void> {
+  // origin_unit dikirim dalam p_outputs (kolom opsional) — RPC lama mengabaikannya,
+  // RPC 0012 menyimpannya utk label audit "1 pack (12 potong)".
   const { error } = await sb.rpc('create_production_batch', {
     p_outputs: p.outputs,
     p_fryer_id: p.fryer_id,
@@ -383,6 +389,17 @@ export async function liveCreateBatch(sb: Sb, p: { outputs: { ingredient_id: num
     p_note: p.note || null
   })
   if (error) throw new Error(error.message)
+}
+
+export async function liveLoadBatches(sb: Sb, limit = 20): Promise<BatchHistoryItem[]> {
+  const { data, error } = await sb.rpc('recent_batches', { p_limit: limit })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((b: any) => ({
+    id: b.id,
+    created_at: b.created_at,
+    note: b.note,
+    items: (b.items ?? []).map((it: any) => ({ ingredient_id: it.ingredient_id, name: it.name, qty: Number(it.qty), origin_unit: it.origin_unit ?? null }))
+  }))
 }
 
 export async function liveFillFryer(sb: Sb, fryerId: number, oilIngredientId: number, liters: number): Promise<void> {
@@ -421,6 +438,79 @@ export async function liveLogWaste(sb: Sb, lines: ({ ingredient_id: number; qty:
 export async function liveOpname(sb: Sb, ingredientId: number, actualQty: number): Promise<void> {
   const { error } = await sb.rpc('opname_stock', { p_ingredient_id: ingredientId, p_actual_qty: actualQty, p_note: null })
   if (error) throw new Error(error.message)
+}
+
+// ================= Penyesuaian stok CRUD (live) =================
+
+/** Buat penyesuaian stok (opname): stok disetel ke qty fisik, record tercatat. */
+export async function liveCreateStockAdjustment(sb: Sb, ingredientId: number, qty: number, note: string): Promise<number> {
+  const { data, error } = await sb.rpc('create_stock_adjustment', { p_ingredient_id: ingredientId, p_qty: qty, p_note: note || null })
+  if (error) throw new Error(error.message)
+  return Number(data)
+}
+
+/** Riwayat penyesuaian terbaru (nama bahan di-resolve server). */
+export async function liveLoadStockAdjustments(sb: Sb, limit = 30): Promise<import('./types').StockAdjustment[]> {
+  const { data, error } = await sb
+    .from('stock_adjustments')
+    .select('id, ingredient_id, qty, prev_qty, note, created_at, ingredients(name)')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((r: { id: number; ingredient_id: number; qty: number; prev_qty: number; note: string | null; created_at: string; ingredients?: { name: string } | { name: string }[] | null }) => ({
+    id: r.id,
+    ingredient_id: r.ingredient_id,
+    ingredient_name: Array.isArray(r.ingredients) ? r.ingredients[0]?.name : r.ingredients?.name,
+    qty: Number(r.qty),
+    prev_qty: Number(r.prev_qty),
+    note: r.note,
+    created_at: r.created_at
+  }))
+}
+
+/** Edit penyesuaian (admin): stok terkini digeser selisih. */
+export async function liveUpdateStockAdjustment(sb: Sb, id: number, qty: number, note: string): Promise<void> {
+  const { error } = await sb.rpc('update_stock_adjustment', { p_id: id, p_qty: qty, p_note: note || null })
+  if (error) throw new Error(error.message)
+}
+
+/** Hapus penyesuaian (admin): stok kembali ke nilai sebelum penyesuaian. */
+export async function liveDeleteStockAdjustment(sb: Sb, id: number): Promise<void> {
+  const { error } = await sb.rpc('delete_stock_adjustment', { p_id: id })
+  if (error) throw new Error(error.message)
+}
+
+// ================= Ledger pergerakan stok (live) =================
+
+/**
+ * Ledger audit: semua pergerakan stok dari `stock_movements` — pembelian,
+ * produksi, penjualan, waste, opname/penyesuaian, refund/batal/revisi.
+ * Filter bahan (opsional) + rentang tanggal (konvensi loadTransactions).
+ */
+export async function liveLoadStockMoves(
+  sb: Sb,
+  opts: { ingredientId?: number; fromISO: string; toISO: string; limit?: number }
+): Promise<import('./types').StockMove[]> {
+  let q = sb
+    .from('stock_movements')
+    .select('id, ingredient_id, qty, kind, ref, note, created_at, ingredients(name)')
+    .gte('created_at', opts.fromISO)
+    .lte('created_at', opts.toISO)
+    .order('created_at', { ascending: false })
+    .limit(opts.limit ?? 500)
+  if (opts.ingredientId) q = q.eq('ingredient_id', opts.ingredientId)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((r: { id: number; ingredient_id: number; qty: number | string; kind: string; ref: string | null; note: string | null; created_at: string; ingredients?: { name: string } | { name: string }[] | null }) => ({
+    id: r.id,
+    ingredient_id: r.ingredient_id,
+    ingredient_name: Array.isArray(r.ingredients) ? r.ingredients[0]?.name : r.ingredients?.name,
+    qty: Number(r.qty),
+    kind: r.kind as import('./types').StockMove['kind'],
+    ref: r.ref,
+    note: r.note,
+    created_at: r.created_at
+  }))
 }
 
 // ================= Laporan (live) =================
@@ -550,7 +640,7 @@ export async function liveUpsertCategory(sb: Sb, c: { id?: number; name: string;
   ensureAdminWrite(data?.length ?? 0, c.id !== undefined)
 }
 
-export async function liveUpsertIngredient(sb: Sb, i: { id?: number; name: string; code: string | null; kind: 'raw' | 'prepared'; buy_unit: string; small_unit?: string | null; pack_content: number; price: number; min_stock: number; active: boolean }): Promise<void> {
+export async function liveUpsertIngredient(sb: Sb, i: { id?: number; name: string; code: string | null; kind: 'raw' | 'prepared'; buy_unit: string; small_unit?: string | null; pack_content: number; price: number; min_stock: number; active: boolean; pack_breakdown?: import('./types').PackBreakdownItem[] | null }): Promise<void> {
   const { data, error } = await (i.id
     ? sb.from('ingredients').update({ ...i, id: undefined }).eq('id', i.id)
     : sb.from('ingredients').insert(i)

@@ -24,6 +24,18 @@ export interface Ingredient {
   stock: number
   min_stock: number
   active: boolean
+  /**
+   * Komposisi potongan per 1 kemasan (opsional, utk audit jual):
+   * pack isi 9 potong = 2 Sayap + 2 Paha Atas + 2 Paha Bawah + 3 Dada.
+   * Hanya tampilan — tidak dipakai hitung stok/HPP. Kosong = tidak dirinci.
+   */
+  pack_breakdown?: PackBreakdownItem[] | null
+}
+
+/** Satu baris komposisi isi kemasan (mis. { name: 'Sayap', qty: 2 }). */
+export interface PackBreakdownItem {
+  name: string
+  qty: number
 }
 
 export interface Category { id: number; name: string; sort: number }
@@ -109,6 +121,59 @@ export interface TransactionItem { name: string; qty: number; price: number; hpp
  * dibayar. Stok baru dikurangi saat bill dibayar (payHeldOrder), bukan saat
  * disimpan — bahan belum keluar sebelum uang masuk.
  */
+/**
+ * Riwayat batch produksi (audit dapur): daftar output yang dihasilkan satu
+ * klik produksi. origin_unit 'buy' = dapur menginput dalam satuan beli/kemasan
+ * (angka qty tetap satuan kecil) — dipakai riwayat untuk menampilkan "1 pack (12 potong)".
+ */
+export interface DemoBatch {
+  id: number
+  created_at: string
+  note: string | null
+  items: { ingredient_id: number; qty: number; origin_unit?: 'buy' | null }[]
+}
+
+/**
+ * Penyesuaian stok bahan (opname/koreksi) yang bisa diedit/dihapus.
+ * qty = stok BARU (hasil hitung fisik), prev_qty = stok sebelum penyesuaian.
+ * Berbeda dgn stock_movements (delta) — record ini selalu menampung nilai absolut,
+ * jadi edit ulang angkanya tidak butuh tahu stok saat itu.
+ */
+export interface StockAdjustment {
+  id: number
+  ingredient_id: number
+  /** Nama bahan siap-tampil (live di-resolve server; demo disimpan saat input). */
+  ingredient_name?: string
+  qty: number
+  prev_qty: number
+  note: string | null
+  created_at: string
+}
+
+/**
+ * Satu pergerakan stok siap-tampil (ledger audit): pembelian, produksi,
+ * penjualan, waste, opname/penyesuaian, refund/batal/revisi, isifryer, lainnya.
+ * qty delta (+/-) dalam satuan kecil bahan; ref = jejak sumber (TX12, PO3, PR5).
+ */
+export interface StockMove {
+  id: number
+  ingredient_id: number
+  ingredient_name?: string
+  qty: number
+  kind: 'pembelian' | 'produksi' | 'penjualan' | 'opname' | 'waste' | 'isifryer' | 'refund' | 'batal' | 'revisi' | 'lainnya'
+  ref: string | null
+  note: string | null
+  created_at: string
+}
+
+/** Baris riwayat batch siap-tampil (nama bahan sudah di-resolve). */
+export interface BatchHistoryItem {
+  id: number
+  created_at: string
+  note: string | null
+  items: { ingredient_id?: number; name: string; qty: number; origin_unit?: 'buy' | null }[]
+}
+
 export interface HeldOrder {
   id: number
   shift_id: number | null

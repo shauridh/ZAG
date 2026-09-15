@@ -23,7 +23,12 @@ import type {
   Shift,
   Transaction,
   TransactionItem,
-  HeldOrder
+  HeldOrder,
+  DemoBatch,
+  BatchHistoryItem,
+  PackBreakdownItem,
+  StockAdjustment,
+  StockMove
 } from './types'
 import { ingredientNeeds, maxAvailableQty, productNeeds, rawNeedsCost, ingIndex, recipeIndexBy, ingRecipeIndexBy, type IngById, type RecipeByProduct } from './hpp'
 import { feeForDistance, haversineKm } from './geo'
@@ -69,6 +74,16 @@ export interface DemoData {
   customer: DemoCustomer | null
   orders: PortalOrder[]
   heldOrders: HeldOrder[]
+  /** Riwayat batch produksi (audit dapur): output + satuan asal + waktu. */
+  batches: DemoBatch[]
+  /** Penyesuaian stok bahan (opname) yang bisa diedit/dihapus. */
+  stockAdjustments: StockAdjustment[]
+  /** Ledger audit: semua pergerakan stok (pembelian/produksi/penjualan/waste/opname). */
+  stockMoves: StockMove[]
+  /** Penomoran ledger (terpisah dari seq master). */
+  moveSeq?: number
+  /** Penomoran pembelian utk ref ledger PO*. */
+  purchaseSeq?: number
   session: { email: string; role: 'admin' | 'kasir'; name: string } | null
   seq: number
 }
@@ -96,7 +111,7 @@ const DEMO_PHOTOS: Record<number, string> = {
   27: '/demo/teh-botol.svg'
 }
 
-const DEMO_VERSION = 7
+const DEMO_VERSION = 11
 
 function defaultDemo(): DemoData {
   const d: DemoData = {
@@ -160,7 +175,26 @@ function defaultDemo(): DemoData {
     // KONVENSI `price`: harga per 1 SATUAN DASAR (harga kemasan / isi). Sama dgn seed.sql.
     // small_unit: satuan kecil hasil konversi isi kemasan — dipakai resep langsung.
     ingredients: [
-      { id: 1, name: 'Ayam Potong 9', code: '100001', kind: 'raw', buy_unit: 'pack', small_unit: 'potong', pack_content: 9, price: 5333, stock: 12, min_stock: 6, active: true },
+      {
+        id: 1,
+        name: 'Ayam Potong 9',
+        code: '100001',
+        kind: 'raw',
+        buy_unit: 'pack',
+        small_unit: 'potong',
+        pack_content: 9,
+        price: 5333,
+        stock: 12,
+        min_stock: 6,
+        active: true,
+        // komposisi 1 pack — kasir/dapur tahu berapa sayap/paha/dada yg bisa dijual
+        pack_breakdown: [
+          { name: 'Sayap', qty: 2 },
+          { name: 'Paha Atas', qty: 2 },
+          { name: 'Paha Bawah', qty: 2 },
+          { name: 'Dada', qty: 3 }
+        ]
+      },
       { id: 3, name: 'Tepung Bumbu Fried Chicken', code: '200001', kind: 'raw', buy_unit: 'pack', small_unit: 'gram', pack_content: 1000, price: 24, stock: 2000, min_stock: 2000, active: true },
       { id: 4, name: 'Minyak Goreng Sunco 2L', code: '200002', kind: 'raw', buy_unit: 'pouch', small_unit: 'liter', pack_content: 2, price: 21700, stock: 8, min_stock: 4, active: true },
       { id: 5, name: 'Gas 3 kg', code: '', kind: 'raw', buy_unit: 'tabung', small_unit: '', pack_content: 1, price: 23000, stock: 2, min_stock: 1, active: true },
@@ -222,6 +256,10 @@ function defaultDemo(): DemoData {
     customer: null,
     orders: [],
     heldOrders: [],
+    batches: [],
+    stockAdjustments: [],
+    stockMoves: [],
+    moveSeq: 0,
     session: null,
     seq: 100
   }
@@ -322,6 +360,47 @@ function loadDemo(): DemoData {
         saveDemo(d)
         return d
       }
+      if (d.v === 7) {
+        // v7 -> v8: riwayat batch produksi (audit dapur). Data lama tidak punya.
+        d.batches ??= []
+        d.v = 8
+        saveDemo(d)
+        return d
+      }
+      if (d.v === 8) {
+        // v8 -> v9: komposisi potongan per kemasan (pack_breakdown) — null utk yg belum dirinci;
+        // bahan ayam potong demo langsung diisi contoh 2 sayap + 2 paha atas + 2 paha bawah + 3 dada.
+        for (const i of d.ingredients)
+          if (i.pack_breakdown === undefined) i.pack_breakdown = null
+        const ayam = d.ingredients.find((x) => x.name.toLowerCase().includes('ayam potong 9'))
+        if (ayam && !ayam.pack_breakdown)
+          ayam.pack_breakdown = [
+            { name: 'Sayap', qty: 2 },
+            { name: 'Paha Atas', qty: 2 },
+            { name: 'Paha Bawah', qty: 2 },
+            { name: 'Dada', qty: 3 }
+          ]
+        d.v = 9
+        saveDemo(d)
+        return d
+      }
+      if (d.v === 9) {
+        // v9 -> v10: penyesuaian stok jadi CRUD. Data lama tidak punya riwayat
+        // penyesuaian (opname lama langsung mengubah stok) — mulai kosong.
+        d.stockAdjustments ??= []
+        d.v = 10
+        saveDemo(d)
+        return d
+      }
+      if (d.v === 10) {
+        // v10 -> v11: ledger audit pergerakan stok. Pergerakan lama tidak
+        // direkam ulang (tidak bisa direkonstruksi tanpa snapshot) — mulai kosong.
+        d.stockMoves ??= []
+        d.moveSeq ??= 0
+        d.v = 11
+        saveDemo(d)
+        return d
+      }
     }
   } catch {
     // korup: mulai baru
@@ -367,21 +446,52 @@ function needsOfTxItems(d: DemoData, items: TransactionItem[], recipeByProduct: 
   return out
 }
 
-/** Terapkan kebutuhan bahan ke stok: dipotong (default) atau dikembalikan; opsional di-clamp ke nol (rusak). */
-function moveStock(d: DemoData, needs: Map<number, number>, opts: { add?: boolean; clampZero?: boolean } = {}): void {
+/**
+ * Terapkan kebutuhan bahan ke stok: dipotong (default) atau dikembalikan;
+ * opsional di-clamp ke nol (rusak). `move` = catat tiap perubahan ke ledger
+ * audit (stock_moves) dengan jenis & ref sumber — paritas dgn live.
+ */
+function moveStock(d: DemoData, needs: Map<number, number>, opts: { add?: boolean; clampZero?: boolean; move?: { kind: StockMove['kind']; ref: string | null; note?: string | null } } = {}): void {
   for (const [iid, need] of needs) {
     const ing = d.ingredients.find((i) => i.id === iid)
     if (!ing) continue
+    const before = ing.stock
     const next = opts.add ? ing.stock + need : ing.stock - need
     ing.stock = Math.round((opts.clampZero ? Math.max(0, next) : next) * 10000) / 10000
+    const actual = Math.round((ing.stock - before) * 10000) / 10000
+    if (opts.move && actual !== 0)
+      d.stockMoves.unshift({
+        id: (d.moveSeq = (d.moveSeq ?? 0) + 1),
+        ingredient_id: iid,
+        ingredient_name: ing.name,
+        qty: actual,
+        kind: opts.move.kind,
+        ref: opts.move.ref,
+        note: opts.move.note ?? null,
+        created_at: new Date().toISOString()
+      })
   }
 }
 
-/** Stok kembali sesuai resep item nota (refund / batal / revisi). */
-function returnStockOfTxItems(d: DemoData, items: TransactionItem[], recipeByProduct?: RecipeByProduct, ings?: IngById): void {
+/** Tulis satu baris ledger utk perubahan stok satu bahan. */
+function logMove(d: DemoData, ing: Ingredient, qty: number, kind: StockMove['kind'], ref: string | null = null, note: string | null = null): void {
+  d.stockMoves.unshift({
+    id: (d.moveSeq = (d.moveSeq ?? 0) + 1),
+    ingredient_id: ing.id,
+    ingredient_name: ing.name,
+    qty: Math.round(qty * 10000) / 10000,
+    kind,
+    ref,
+    note,
+    created_at: new Date().toISOString()
+  })
+}
+
+/** Stok kembali sesuai resep item nota (refund / batal / revisi); opsional dicatat ke ledger. */
+function returnStockOfTxItems(d: DemoData, items: TransactionItem[], recipeByProduct?: RecipeByProduct, ings?: IngById, move?: { kind: StockMove['kind']; ref: string | null; note?: string | null }): void {
   const rb = recipeByProduct ?? mapsOf(d).recipeByProduct
   const ig = ings ?? ingIndex(d.ingredients)
-  moveStock(d, needsOfTxItems(d, items, rb, ig), { add: true })
+  moveStock(d, needsOfTxItems(d, items, rb, ig), { add: true, move })
 }
 
 // ================= Katalog & settings (demo) =================
@@ -447,6 +557,8 @@ export function demoCreateTx(p: {
   items: { product_id: number; qty: number }[]
   payments: { method: 'cash' | 'qris' | 'transfer'; amount: number }[]
   discount?: number
+  /** true = terima stok minus (kasir memaksa jual menu habis); bahan stoknya tetap berkurang. */
+  allowNegativeStock?: boolean
   note?: string
 }): TxResult {
   return createTxIn(loadDemo(), p)
@@ -462,6 +574,8 @@ function createTxIn(d: DemoData, p: {
   items: { product_id: number; qty: number }[]
   payments: { method: 'cash' | 'qris' | 'transfer'; amount: number }[]
   discount?: number
+  /** true = terima stok minus (kasir memaksa jual menu habis). */
+  allowNegativeStock?: boolean
   note?: string
 }): TxResult {
   const { recipeByProduct, ingRecipes } = mapsOf(d)
@@ -473,12 +587,12 @@ function createTxIn(d: DemoData, p: {
     if (!shift) err('Buka shift dulu sebelum menjual')
   }
 
-  // validasi kecukupan stok
+  // validasi kecukupan stok — allowNegativeStock = kasir sadar habis & memaksa (dapur produksi dadakan)
   const ings = ingIndex(d.ingredients)
   const totalNeed = needsOfItems(p.items, recipeByProduct, ings)
   for (const [iid, need] of totalNeed) {
     const ing = ings.get(iid)
-    if (ing && ing.stock < need) err(`Stok kurang: ${ing.name} (butuh ${need.toFixed(2)}, tersedia ${ing.stock.toFixed(2)})`)
+    if (ing && ing.stock < need && !p.allowNegativeStock) err(`Stok kurang: ${ing.name} (butuh ${need.toFixed(2)}, tersedia ${ing.stock.toFixed(2)})`)
   }
 
   let subtotal = 0
@@ -497,8 +611,9 @@ function createTxIn(d: DemoData, p: {
   if (!online && paid < total) err('Pembayaran kurang dari total')
   const fee = online ? Math.round((subtotal * d.settings.channels[p.orderType as 'gofood' | 'grabfood' | 'shopeefood'].fee) / 100) : 0
 
-  // potong stok
-  moveStock(d, totalNeed)
+  // potong stok (+ catat ledger penjualan; ref diisi setelah id nota diketahui)
+  const txid = d.seq + 1
+  moveStock(d, totalNeed, { move: { kind: 'penjualan', ref: 'TX' + txid } })
 
   const id = ++d.seq
   const tx: Transaction = {
@@ -564,8 +679,8 @@ export async function demoRefundTx(txId: number, reason: string, ownerPin: strin
     payments: [{ method, amount: -amount }]
   }
   d.txs.push(refundTx)
-  // stok kembali sesuai resep produk asli
-  returnStockOfTxItems(d, tx.items ?? [])
+  // stok kembali sesuai resep produk asli (ledger 'refund', paritas dgn live)
+  returnStockOfTxItems(d, tx.items ?? [], undefined, undefined, { kind: 'refund', ref: 'TX' + id })
   tx.status = 'refund'
   saveDemo(d)
   return { refund_id: id, receipt_no: refundTx.receipt_no!, amount, method }
@@ -577,7 +692,7 @@ export async function demoDeleteTx(txId: number, reason: string, ownerPin: strin
   if ((await hashPin(ownerPin)) !== d.settings.owner_pin_hash) err('PIN owner salah')
   const tx = d.txs.find((t) => t.id === txId) ?? err('Transaksi tidak ditemukan')
   if (!txIsEditable(tx)) err('Transaksi sudah diproses sebelumnya')
-  returnStockOfTxItems(d, tx.items ?? [])
+  returnStockOfTxItems(d, tx.items ?? [], undefined, undefined, { kind: 'batal', ref: 'TX' + txId })
   tx.status = 'batal'
   tx.note = [tx.note, `Dibatalkan: ${reason.trim() || 'tanpa alasan'}`].filter(Boolean).join(' ')
   saveDemo(d)
@@ -617,9 +732,10 @@ export function demoEditTx(txId: number, items: { product_id: number; qty: numbe
     if (ing && ing.stock + (oldReturn.get(iid) ?? 0) < need) err(`Stok kurang: ${ing.name}`)
   }
 
-  // kembalikan stok nota lama, lalu potong stok nota baru
-  returnStockOfTxItems(d, tx.items ?? [], recipeByProduct, ings)
-  moveStock(d, totalNeed)
+  // kembalikan stok nota lama (ledger 'revisi'), lalu potong stok nota baru
+  // (ledger 'penjualan' dgn ref nota revisi) — paritas dgn RPC edit_transaction.
+  returnStockOfTxItems(d, tx.items ?? [], recipeByProduct, ings, { kind: 'revisi', ref: 'TX' + txId })
+  moveStock(d, totalNeed, { move: { kind: 'penjualan', ref: 'TX' + (d.seq + 1) } })
 
   tx.status = 'direvisi'
   tx.note = [tx.note, 'Direvisi: item/diskon diperbarui, lihat nota berikutnya'].filter(Boolean).join(' ')
@@ -710,17 +826,20 @@ export function demoCurrentShift(): Shift | null {
 
 // ================= Pembelian, produksi, fryer (demo) =================
 
-export function demoCreatePurchase(lines: { ingredient_id: number; packs: number; unit_cost: number }[]): void {
+export function demoCreatePurchase(lines: { ingredient_id: number; packs: number; unit_cost: number }[], note = ''): void {
   const d = loadDemo()
+  const pid = (d.purchaseSeq ?? 0) + 1
+  d.purchaseSeq = pid
   for (const l of lines) {
     const ing = d.ingredients.find((i) => i.id === l.ingredient_id) ?? err('Bahan tidak ditemukan')
     ing.stock = Math.round((ing.stock + l.packs * ing.pack_content) * 10000) / 10000
     ing.price = Math.round(l.unit_cost / (ing.pack_content || 1))
+    logMove(d, ing, l.packs * ing.pack_content, 'pembelian', 'PO' + pid, note || null)
   }
   saveDemo(d)
 }
 
-export function demoCreateBatch(p: { outputs: { ingredient_id: number; qty: number }[]; fryer_id: number | null; fried_grams: number }): void {
+export function demoCreateBatch(p: { outputs: { ingredient_id: number; qty: number; origin_unit?: 'buy' }[]; fryer_id: number | null; fried_grams: number; note?: string }): void {
   const d = loadDemo()
   const { ingRecipes } = mapsOf(d)
   for (const o of p.outputs)
@@ -735,19 +854,47 @@ export function demoCreateBatch(p: { outputs: { ingredient_id: number; qty: numb
     cycle = d.oilCycles.find((c) => c.fryer_id === p.fryer_id && c.status === 'aktif')
     if (!cycle) err('Fryer belum diisi minyak (isi fryer dulu)')
   }
+  const bid = (d.batches[0]?.id ?? 0) + 1
   for (const o of p.outputs) {
     const out = d.ingredients.find((i) => i.id === o.ingredient_id)
-    if (out) out.stock = Math.round((out.stock + o.qty) * 10000) / 10000
+    if (out) {
+      out.stock = Math.round((out.stock + o.qty) * 10000) / 10000
+      logMove(d, out, o.qty, 'produksi', 'PR' + bid, p.note ?? null)
+    }
     for (const [iid, need] of ingredientNeeds(o.ingredient_id, o.qty, ingRecipes)) {
       const ing = d.ingredients.find((i) => i.id === iid)
-      if (ing) ing.stock = Math.round((ing.stock - need) * 10000) / 10000
+      if (ing) {
+        ing.stock = Math.round((ing.stock - need) * 10000) / 10000
+        logMove(d, ing, -need, 'produksi', 'PR' + bid, p.note ?? null)
+      }
     }
   }
   if (cycle) {
     cycle.fry_count += 1
     cycle.fried_grams += p.fried_grams
   }
+  // riwayat batch utk audit dapur (simpan nama saat ini; bahan dihapus → tetap tampil "#id")
+  d.batches.unshift({
+    id: (d.batches[0]?.id ?? 0) + 1,
+    created_at: new Date().toISOString(),
+    note: p.note || null,
+    items: p.outputs.map((o) => ({ ingredient_id: o.ingredient_id, qty: o.qty, origin_unit: o.origin_unit ?? null }))
+  })
+  if (d.batches.length > 50) d.batches.length = 50
   saveDemo(d)
+}
+
+export function demoLoadBatches(limit = 20): BatchHistoryItem[] {
+  const d = loadDemo()
+  return d.batches.slice(0, limit).map((b) => ({
+    id: b.id,
+    created_at: b.created_at,
+    note: b.note,
+    items: b.items.map((it) => {
+      const ing = d.ingredients.find((i) => i.id === it.ingredient_id)
+      return { ingredient_id: it.ingredient_id, name: ing?.name ?? `#${it.ingredient_id}`, qty: it.qty, origin_unit: it.origin_unit ?? null }
+    })
+  }))
 }
 
 export function demoFillFryer(fryerId: number, oilIngredientId: number, liters: number): void {
@@ -806,25 +953,106 @@ export function demoSaveFryer(f: { id?: number; name: string; capacity_l: number
 
 // ================= Waste & opname (demo) =================
 
-export function demoLogWaste(lines: ({ ingredient_id: number; qty: number } | { product_id: number; qty: number })[]): void {
+export function demoLogWaste(lines: ({ ingredient_id: number; qty: number } | { product_id: number; qty: number })[], note = ''): void {
   const d = loadDemo()
   const { recipeByProduct } = mapsOf(d)
   const ings = ingIndex(d.ingredients)
   for (const line of lines) {
     if ('ingredient_id' in line) {
       const ing = ings.get(line.ingredient_id)
-      if (ing) ing.stock = Math.max(0, Math.round((ing.stock - line.qty) * 10000) / 10000)
+      if (ing) {
+        const before = ing.stock
+        ing.stock = Math.max(0, Math.round((ing.stock - line.qty) * 10000) / 10000)
+        logMove(d, ing, ing.stock - before, 'waste', null, note || null)
+      }
     } else {
-      moveStock(d, needsOfItems([line], recipeByProduct, ings), { clampZero: true })
+      moveStock(d, needsOfItems([line], recipeByProduct, ings), { clampZero: true, move: { kind: 'waste', ref: null, note: note || null } })
     }
   }
   saveDemo(d)
 }
 
+/** Opname lama (tanpa record CRUD): disetel langsung; tetap dicatat di ledger. */
 export function demoOpname(ingredientId: number, actualQty: number): void {
   const d = loadDemo()
   const ing = d.ingredients.find((i) => i.id === ingredientId) ?? err('Bahan tidak ditemukan')
+  const diff = Math.round((actualQty - ing.stock) * 10000) / 10000
   ing.stock = actualQty
+  if (diff !== 0) logMove(d, ing, diff, 'opname')
+  saveDemo(d)
+}
+
+// ================= Penyesuaian stok (CRUD, demo) =================
+
+/**
+ * Penyesuaian stok bahan (opname/koreksi) sebagai record CRUD: stok disetel ke
+ * qty fisik baru, record menyimpan nilai baru + sebelumnya + catatan — bisa
+ * diedit/dihapus kemudian (update menyesuaikan delta stok terkini).
+ */
+export function demoCreateStockAdjustment(ingredientId: number, qty: number, note: string): number {
+  const d = loadDemo()
+  const ing = d.ingredients.find((i) => i.id === ingredientId) ?? err('Bahan tidak ditemukan')
+  const prev = ing.stock
+  ing.stock = Math.round(qty * 10000) / 10000
+  const adj: StockAdjustment = {
+    id: (d.stockAdjustments[0]?.id ?? 0) + 1,
+    ingredient_id: ingredientId,
+    ingredient_name: ing.name,
+    qty: ing.stock,
+    prev_qty: prev,
+    note: note.trim() || null,
+    created_at: new Date().toISOString()
+  }
+  d.stockAdjustments.unshift(adj)
+  logMove(d, ing, Math.round((ing.stock - prev) * 10000) / 10000, 'opname', 'ADJ' + adj.id, adj.note)
+  saveDemo(d)
+  return adj.id
+}
+
+/** Riwayat penyesuaian terbaru (nama tercatat saat input; bahan dihapus tetap tampil). */
+export function demoLoadStockAdjustments(limit = 30): StockAdjustment[] {
+  const d = loadDemo()
+  return d.stockAdjustments.slice(0, limit)
+}
+
+/**
+ * Ledger audit pergerakan stok: filter bahan (opsional) + rentang tanggal
+ * (ISO lengkap, konvensi sama dgn loadTransactions). Terbaru dulu.
+ */
+export function demoLoadStockMoves(opts: { ingredientId?: number; fromISO: string; toISO: string; limit?: number }): StockMove[] {
+  const d = loadDemo()
+  return d.stockMoves
+    .filter((m) => m.created_at >= opts.fromISO && m.created_at <= opts.toISO)
+    .filter((m) => !opts.ingredientId || m.ingredient_id === opts.ingredientId)
+    .slice(0, opts.limit ?? 500)
+}
+
+/** Edit penyesuaian: stok terkini digeser selisih (qty baru - qty lama); baris ledger ADJ* ikut digeser. */
+export function demoUpdateStockAdjustment(id: number, qty: number, note: string): void {
+  const d = loadDemo()
+  const adj = d.stockAdjustments.find((a) => a.id === id) ?? err('Penyesuaian tidak ditemukan')
+  const ing = d.ingredients.find((i) => i.id === adj.ingredient_id)
+  if (ing) ing.stock = Math.round((ing.stock - adj.qty + qty) * 10000) / 10000
+  const delta = Math.round((qty - adj.qty) * 10000) / 10000
+  adj.qty = Math.round(qty * 10000) / 10000
+  adj.note = note.trim() || null
+  const mv = d.stockMoves.find((m) => m.ref === 'ADJ' + id && m.kind === 'opname')
+  if (mv) {
+    mv.qty = Math.round((mv.qty + delta) * 10000) / 10000
+    mv.note = adj.note
+  }
+  saveDemo(d)
+}
+
+/** Hapus penyesuaian: stok dikembalikan ke nilai sebelum penyesuaian; baris ledger ADJ* ikut dihapus. */
+export function demoDeleteStockAdjustment(id: number): void {
+  const d = loadDemo()
+  const idx = d.stockAdjustments.findIndex((a) => a.id === id)
+  if (idx === -1) err('Penyesuaian tidak ditemukan')
+  const [adj] = d.stockAdjustments.splice(idx, 1)
+  const ing = d.ingredients.find((i) => i.id === adj.ingredient_id)
+  if (ing) ing.stock = Math.round((ing.stock - adj.qty + adj.prev_qty) * 10000) / 10000
+  d.stockMoves = d.stockMoves.filter((m) => !(m.ref === 'ADJ' + id && m.kind === 'opname'))
   saveDemo(d)
 }
 
@@ -899,7 +1127,7 @@ export function demoUpsertCategory(c: { id?: number; name: string; sort: number 
   saveDemo(d)
 }
 
-export function demoUpsertIngredient(i: { id?: number; name: string; code: string | null; kind: 'raw' | 'prepared'; buy_unit: string; pack_content: number; price: number; min_stock: number; active: boolean }): void {
+export function demoUpsertIngredient(i: { id?: number; name: string; code: string | null; kind: 'raw' | 'prepared'; buy_unit: string; small_unit?: string | null; pack_content: number; price: number; min_stock: number; active: boolean; pack_breakdown?: PackBreakdownItem[] | null }): void {
   const d = loadDemo()
   if (i.id) {
     const x = d.ingredients.find((y) => y.id === i.id)

@@ -8,7 +8,7 @@
 // File ini hanya memilih adapter — tidak ada logika bisnis di sini.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { HeldOrder, OrderType, Settings, Shift, Transaction } from './types'
+import type { BatchHistoryItem, HeldOrder, OrderType, Settings, Shift, Transaction } from './types'
 import { endOfDayReport } from './reports'
 import { type Catalog, type TxResult, type SessionInfo, type RefundResult, type PortalAddress, currentOnline, setOnline, emit, onSyncStateChange, txIsEditable, TX_STATUS_LABEL, MENU_BUCKET, requireOwnerPin, hashPin } from './db-shared'
 import * as demo from './db-demo'
@@ -78,6 +78,8 @@ export async function createTx(p: {
   payments: { method: 'cash' | 'qris' | 'transfer'; amount: number }[]
   discount?: number
   note?: string
+  /** true = terima stok minus — kasir memaksa jual menu habis (dapur produksi dadakan). */
+  allowNegativeStock?: boolean
   /** utk offline: tampilan struk sementara (nama + harga dr keranjang) */
   itemsDisplay?: { name: string; qty: number; price: number }[]
 }): Promise<TxResult> {
@@ -277,13 +279,19 @@ export async function currentShift(): Promise<Shift | null> {
 // ================= Pembelian, produksi, fryer =================
 
 export async function createPurchase(lines: { ingredient_id: number; packs: number; unit_cost: number }[], note: string): Promise<void> {
-  if (isDemo) return demo.demoCreatePurchase(lines)
+  if (isDemo) return demo.demoCreatePurchase(lines, note)
   return live.liveCreatePurchase(sb!, lines, note)
 }
 
-export async function createBatch(p: { outputs: { ingredient_id: number; qty: number }[]; fryer_id: number | null; fried_grams: number; note: string }): Promise<void> {
+export async function createBatch(p: { outputs: { ingredient_id: number; qty: number; origin_unit?: 'buy' }[]; fryer_id: number | null; fried_grams: number; note: string }): Promise<void> {
   if (isDemo) return demo.demoCreateBatch(p)
   return live.liveCreateBatch(sb!, p)
+}
+
+/** Riwayat batch produksi terbaru (untuk audit dapur: apa yang diproduksi & satuan asalnya). */
+export async function loadBatches(limit = 20): Promise<BatchHistoryItem[]> {
+  if (isDemo) return demo.demoLoadBatches(limit)
+  return live.liveLoadBatches(sb!, limit)
 }
 
 export async function fillFryer(fryerId: number, oilIngredientId: number, liters: number): Promise<void> {
@@ -316,6 +324,43 @@ export async function logWaste(lines: ({ ingredient_id: number; qty: number } | 
 export async function opname(ingredientId: number, actualQty: number): Promise<void> {
   if (isDemo) return demo.demoOpname(ingredientId, actualQty)
   return live.liveOpname(sb!, ingredientId, actualQty)
+}
+
+// ================= Penyesuaian stok (CRUD) =================
+
+/**
+ * Penyesuaian stok bahan (opname/koreksi) sebagai record: stok disetel ke qty
+ * fisik baru, record bisa dilihat, diedit (delta stok terkini), dan dihapus
+ * (stok kembali ke nilai sebelum penyesuaian).
+ */
+export async function createStockAdjustment(ingredientId: number, qty: number, note = ''): Promise<number> {
+  if (isDemo) return demo.demoCreateStockAdjustment(ingredientId, qty, note)
+  return live.liveCreateStockAdjustment(sb!, ingredientId, qty, note)
+}
+
+export async function loadStockAdjustments(limit = 30): Promise<import('./types').StockAdjustment[]> {
+  if (isDemo) return demo.demoLoadStockAdjustments(limit)
+  return live.liveLoadStockAdjustments(sb!, limit)
+}
+
+/**
+ * Ledger audit pergerakan stok: pembelian, produksi, penjualan, waste,
+ * opname/penyesuaian, refund/batal/revisi — dari tabel stock_movements.
+ * fromISO/toISO lengkap (konvensi loadTransactions, pakai dayStart/dayEnd).
+ */
+export async function loadStockMoves(opts: { ingredientId?: number; fromISO: string; toISO: string; limit?: number }): Promise<import('./types').StockMove[]> {
+  if (isDemo) return demo.demoLoadStockMoves(opts)
+  return live.liveLoadStockMoves(sb!, opts)
+}
+
+export async function updateStockAdjustment(id: number, qty: number, note = ''): Promise<void> {
+  if (isDemo) return demo.demoUpdateStockAdjustment(id, qty, note)
+  return live.liveUpdateStockAdjustment(sb!, id, qty, note)
+}
+
+export async function deleteStockAdjustment(id: number): Promise<void> {
+  if (isDemo) return demo.demoDeleteStockAdjustment(id)
+  return live.liveDeleteStockAdjustment(sb!, id)
 }
 
 // ================= Laporan =================
@@ -382,7 +427,7 @@ export async function upsertCategory(c: { id?: number; name: string; sort: numbe
   return live.liveUpsertCategory(sb!, c)
 }
 
-export async function upsertIngredient(i: { id?: number; name: string; code: string | null; kind: 'raw' | 'prepared'; buy_unit: string; small_unit?: string | null; pack_content: number; price: number; min_stock: number; active: boolean }): Promise<void> {
+export async function upsertIngredient(i: { id?: number; name: string; code: string | null; kind: 'raw' | 'prepared'; buy_unit: string; small_unit?: string | null; pack_content: number; price: number; min_stock: number; active: boolean; pack_breakdown?: import('./types').PackBreakdownItem[] | null }): Promise<void> {
   if (isDemo) return demo.demoUpsertIngredient(i)
   return live.liveUpsertIngredient(sb!, i)
 }
