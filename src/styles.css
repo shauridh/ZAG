@@ -183,3 +183,91 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* ============================================================
+   DENSITY-COMPACT — otomatis untuk tablet 11" landscape
+   (Redmi Pad 2 / MatePad FE 11 ≈ 1280×800 CSS).
+   Class dipasang di shell (App.tsx) saat tinggi ≤ 820px:
+   padding & tinggi kontrol dirapatkan, tabel lebih padat dengan
+   header sticky — semua halaman menampilan lebih banyak baris
+   tanpa mengubah desktop/ponsel. Target sentuh tetap ≥44px
+   untuk tombol aksi utama; rapat hanya di area pasif (sel, chip).
+   ============================================================ */
+.density-compact {
+  --pad-page: 0.5rem;
+  --pad-card: 0.625rem;
+  font-size: 14px;
+}
+.density-compact .p-3,
+.density-compact .lg\:p-4,
+.density-compact .p-4 {
+  padding: var(--pad-page);
+}
+.density-compact .card.p-3,
+.density-compact .card.p-4,
+.density-compact .card.p-5 {
+  padding: var(--pad-card);
+}
+.density-compact .card.strip {
+  box-shadow: inset 0 2px 0 0 var(--c-red), inset 0 3px 0 0 var(--c-gold);
+}
+
+/* Kontrol rapat: chip & tombol sekunder 34px (aksi utama tetap 44px) */
+.density-compact .chip {
+  min-height: 34px;
+}
+.density-compact .btn-ghost,
+.density-compact .btn-danger {
+  min-height: 38px;
+}
+.density-compact .input {
+  min-height: 38px;
+}
+
+/* Tabel: sel rapat + header tetap terlihat saat konten digulir */
+.density-compact .tbl th {
+  padding: 6px 10px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.density-compact .tbl td {
+  padding: 5px 10px;
+}
+
+/* Kartu menu kasir: mode kecil lebih pendek — grid menyisakan 4–5 baris */
+.density-compact .menu-card-kecil {
+  min-height: 0;
+}
+.density-compact .menu-card-kecil .menu-card-foto {
+  height: 52px;
+}
+
+/* Dashboard & halaman data: widget lebih rapat tanpa kehilangan keterbacaan */
+.density-compact .gap-2 {
+  gap: 0.375rem;
+}
+.density-compact .gap-3 {
+  gap: 0.5rem;
+}
+
+/* Kartu menu kasir: tinggi foto per mode ukuran (Pengaturan → Tablet & Layar);
+   grid auto-fill menentukan jumlah kolom, tinggi kartu menentukan jumlah baris */
+.menu-card .menu-card-foto {
+  height: 110px; /* mode besar (default) */
+}
+.menu-card.menu-card-kecil .menu-card-foto {
+  height: 64px;
+}
+.density-compact .menu-card .menu-card-foto {
+  height: 92px; /* tablet 11": cukup untuk thumbnail, baris lebih banyak terlihat */
+}
+.density-compact .menu-card.menu-card-kecil .menu-card-foto {
+  height: 52px;
+}
+
+/* Baris keranjang: rapat di mode padat supaya isi + Bayar selalu muat satu layar */
+.density-compact .cart-line {
+  margin-bottom: 6px;
+  padding: 6px;
+}

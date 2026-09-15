@@ -433,34 +433,36 @@ export default function Cashier(): ReactElement {
           <PreparedStockStrip prepared={(catalog?.ingredients ?? []).filter((i) => i.kind === 'prepared' && i.active)} />
         </div>
         <div className="mb-3 flex flex-wrap items-center gap-2">
+          {/* toolbar 1 baris: cari + toggle sembunyikan habis + bar ketersediaan —
+              di layar pendek tablet 11" wrap ke baris kedua hanya jika benar perlu */}
           <input
-            className="input min-w-40 max-w-56 flex-1"
+            className="input h-9 min-w-36 max-w-56 flex-1"
             placeholder="Cari menu..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
             aria-label="Cari menu"
           />
-          {/* Tanda tangan: bar ketersediaan ala nota — kebenaran stok adalah kebenaran menu kasir */}
-          <div
-            className="flex min-w-36 items-center gap-2"
-            title={`${ready.length} dari ${totalMenu} menu siap dijual`}
-          >
-            <div className="flex h-2.5 flex-1 overflow-hidden rounded border border-brand-line bg-brand-card" role="img" aria-label={`${ready.length} dari ${totalMenu} menu siap dijual`}>
-              <div className="h-full bg-brand-btn" style={{ width: `${readyPct}%` }} />
-            </div>
-            <span className="text-[11px] font-extrabold tabular-nums text-brand-muted">
-              {ready.length}/{totalMenu} siap
-            </span>
-          </div>
           <button
             type="button"
             role="switch"
             aria-checked={hideSoldOut}
             onClick={() => setHideSoldOut(!hideSoldOut)}
-            className={`chip h-9 px-3 ${hideSoldOut ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
+            className={`chip h-9 shrink-0 px-3 ${hideSoldOut ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
           >
             {hideSoldOut ? 'Tampilkan habis' : 'Sembunyikan habis'}
           </button>
+          {/* Tanda tangan: bar ketersediaan ala nota — kebenaran stok adalah kebenaran menu kasir */}
+          <div
+            className="flex min-w-36 flex-1 items-center gap-2"
+            title={`${ready.length} dari ${totalMenu} menu siap dijual`}
+          >
+            <div className="flex h-2.5 flex-1 overflow-hidden rounded border border-brand-line bg-brand-card" role="img" aria-label={`${ready.length} dari ${totalMenu} menu siap dijual`}>
+              <div className="h-full bg-brand-btn" style={{ width: `${readyPct}%` }} />
+            </div>
+            <span className="whitespace-nowrap text-[11px] font-extrabold tabular-nums text-brand-muted">
+              {ready.length}/{totalMenu} siap
+            </span>
+          </div>
           {newOrders && (
             <button
               type="button"
@@ -503,7 +505,9 @@ export default function Cashier(): ReactElement {
             </button>
           ))}
         </div>
-        <div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-2 overflow-y-auto sm:grid-cols-3 xl:grid-cols-4">
+        {/* auto-fill: 4-5 kolom di tablet 11" (1280px) sampai lebih di layar lega —
+            ukuran kartu dari Pengaturan hanya menentukan lebar minimum per kartu */}
+        <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
           {products.map((p) => {
             const habis = maxOf(p.id) <= 0
             const tag = chipOf(p)
@@ -516,22 +520,22 @@ export default function Cashier(): ReactElement {
                 onClick={() => addToCart(p)}
                 title={habis ? `${p.name} — stok habis, tetap bisa dipaksa masuk (akan diberi peringatan)` : p.name}
                 aria-label={habis ? `${p.name} (habis — ketuk untuk tetap masukkan)` : p.name}
-                className={`card group relative flex flex-col overflow-hidden p-0 text-left transition-all duration-150 ${
-                  habis ? 'opacity-60 ring-2 ring-brand-redtext/40' : 'hover:-translate-y-0.5 hover:shadow-lift'
-                } ${besar ? 'min-h-[220px]' : 'min-h-[150px]'}`}
+                className={`card menu-card group relative flex flex-col overflow-hidden p-0 text-left transition-all duration-150 ${
+                  besar ? '' : 'menu-card-kecil'
+                } ${habis ? 'opacity-60 ring-2 ring-brand-redtext/40' : 'hover:-translate-y-0.5 hover:shadow-lift'}`}
               >
                 {/* slot foto tinggi tetap: kartu dengan/tanpa foto selalu sama tinggi; contain agar foto tidak terpotong */}
                 {p.photo ? (
                   <img
                     src={p.photo}
                     alt={p.name}
-                    className={`${besar ? 'h-[110px]' : 'h-[64px]'} w-full shrink-0 border-b border-brand-line object-contain`}
+                    className={`menu-card-foto w-full shrink-0 border-b border-brand-line object-contain`}
                     style={{ background: 'linear-gradient(135deg,#F6E7D8,#EFD9C4)' }}
                     loading="lazy"
                   />
                 ) : (
                   <div
-                    className={`${besar ? 'h-[110px]' : 'h-[64px]'} w-full shrink-0 border-b border-brand-line`}
+                    className="menu-card-foto w-full shrink-0 border-b border-brand-line"
                     style={{ background: 'linear-gradient(135deg,#F6E7D8,#EFD9C4)' }}
                     aria-hidden
                   />
@@ -617,10 +621,11 @@ export default function Cashier(): ReactElement {
           </div>
         )}
         </div>
-        <div className="max-h-[32vh] min-h-0 flex-1 overflow-y-auto px-3 py-2 lg:max-h-none">
+        {/* min-h-0: keranjang panjang menggulir sendiri; tombol Bayar tidak pernah terdorong keluar layar */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
           {cart.length === 0 && <p className="py-10 text-center text-sm text-brand-muted">Keranjang kosong. Ketuk menu di kiri.</p>}
           {cart.map((l) => (
-            <div key={l.product_id} className="mb-2 rounded-lg border border-brand-line p-2">
+            <div key={l.product_id} className="cart-line mb-2 rounded-lg border border-brand-line p-2">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-bold leading-snug">{l.name}</p>
                 <button type="button" className="icon-btn-danger !h-9 !w-9 shrink-0" onClick={() => setQty(l.product_id, 0)} aria-label={`Hapus ${l.name}`}>

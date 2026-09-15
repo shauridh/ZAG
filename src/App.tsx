@@ -87,6 +87,24 @@ const NAV_KASIR: NavGroup[] = [
 
 const LS_SIDEBAR = 'sabana-sidebar-collapsed'
 
+/**
+ * Mode padat otomatis untuk tablet 11" (Redmi Pad 2 / MatePad FE 11).
+ * Viewport CSS-nya landscape ±1280×800 — tingginya ketat, jadi bila tinggi
+ * layar ≤ 820px seluruh shell mendapat class `density-compact` (lihat
+ * styles.css): padding/chip/tabel dirapatkan, sidebar mulai dari mode ikon.
+ * Desktop dan ponsel tidak tersentuh — bukan toggle manual, presisi otomatis.
+ */
+function useCompactDensity(): boolean {
+  const [compact, setCompact] = useState(() => window.innerHeight <= 820 && window.innerWidth >= 700)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-height: 820px) and (min-width: 700px)')
+    const on = (): void => setCompact(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return compact
+}
+
 function Shell(): ReactElement {
   const { session, signOut } = useAuth()
   const nav = useNavigate()
@@ -132,12 +150,13 @@ function Shell(): ReactElement {
       .then((s) => setBrand({ name: s.store.name || 'Sabana Kasir', tagline: s.store.tagline || 'Drieischicken POS' }))
       .catch(() => {})
   }, [session])
+  const compact = useCompactDensity()
   const [collapsed, setCollapsed] = useState(() => {
     const saved = localStorage.getItem(LS_SIDEBAR)
     if (saved !== null) return saved === '1'
-    // tablet (<1280): mulai dari mode ikon supaya konten lega —
-    // di 1024px sidebar terbuka menyisakan terlalu sempit untuk grid menu kasir
-    return window.innerWidth < 1280
+    // tablet (<1280) dan layar pendek (padat): mulai dari mode ikon supaya
+    // konten lega — di 1024px sidebar terbuka menyisakan grid menu terlalu sempit
+    return window.innerWidth < 1280 || window.innerHeight <= 820
   })
   if (!session) return <Login />
   const navGroups = session.role === 'admin' ? NAV_ADMIN : NAV_KASIR
@@ -198,7 +217,7 @@ function Shell(): ReactElement {
   )
 
   return (
-    <div className="flex h-full">
+    <div className={`flex h-full ${compact ? 'density-compact' : ''}`}>
       {/* Sidebar desktop: bisa diciutkan jadi ikon saja */}
       <aside
         className={`hidden shrink-0 border-r-[1.5px] border-brand-line bg-brand-card md:block ${
@@ -261,13 +280,15 @@ function Shell(): ReactElement {
           <OfflineIndicator className="ml-auto" />
           {isDemo && <span className="chip bg-brand-gold">DEMO</span>}
         </header>
-        <div className="hidden items-center gap-2 border-b-[1.5px] border-brand-line bg-brand-card px-4 py-1.5 md:flex">
+        {/* Topbar ikon-only: tipis di semua ukuran — hemat tinggi tanpa kehilangan fungsi */}
+        <div className="hidden items-center gap-2 border-b-[1.5px] border-brand-line bg-brand-card px-4 py-1 md:flex">
           <OfflineIndicator />
           {isDemo && <span className="chip bg-brand-gold">Mode demo: data tersimpan di browser ini</span>}
           <div className="ml-auto">
             <TabletBar />
           </div>
         </div>
+        {/* min-h-0: satu-satunya yang scroll adalah <main> — tak ada scroll ganda */}
         <main className="min-h-0 flex-1 overflow-y-auto">
           <FullscreenGate />
           <AppErrorBoundary>
