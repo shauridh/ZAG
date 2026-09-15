@@ -833,7 +833,9 @@ export function demoCreatePurchase(lines: { ingredient_id: number; packs: number
   for (const l of lines) {
     const ing = d.ingredients.find((i) => i.id === l.ingredient_id) ?? err('Bahan tidak ditemukan')
     ing.stock = Math.round((ing.stock + l.packs * ing.pack_content) * 10000) / 10000
-    ing.price = Math.round(l.unit_cost / (ing.pack_content || 1))
+    // TANPA round: harga per satuan kecil pecahan utuh — harga kemasan yang
+    // diinput harus kembali persis saat ditampilkan (price × pack_content).
+    ing.price = l.unit_cost / (ing.pack_content || 1)
     logMove(d, ing, l.packs * ing.pack_content, 'pembelian', 'PO' + pid, note || null)
   }
   saveDemo(d)
@@ -1165,7 +1167,8 @@ export function demoImportPriceList(
     if (!name) continue
     const code = it.code.trim() || null
     const content = Math.max(it.pack_content || 1, 0.0001)
-    const price = Math.round(it.pack_price / content)
+    // TANPA round: pecahan utuh, paritas dgn RPC live 0016
+    const price = it.pack_price / content
     const found = code ? d.ingredients.find((x) => x.code && x.code === code) : undefined
     if (!found) {
       d.ingredients.push({

@@ -332,9 +332,9 @@ export default function Ingredients(): ReactElement {
                   value={editing.pack_content ?? 1}
                   onChange={(n) => {
                     const next = n || 1
-                    // harga kemasan TETAP, harga per-isi dihitung ulang = harga kemasan ÷ isi baru
+                    // harga kemasan TETAP, harga per-isi dihitung ulang = harga kemasan ÷ isi baru (pecahan utuh)
                     const pack = packPriceDraft ?? packPriceOf({ price: editing.price ?? 0, pack_content: editing.pack_content || 1 })
-                    setEditing({ ...editing, pack_content: next, price: Math.round(pack / next) || 0 })
+                    setEditing({ ...editing, pack_content: next, price: pack / next || 0 })
                   }}
                 />
               </div>
@@ -352,13 +352,15 @@ export default function Ingredients(): ReactElement {
                   parse={(s) => {
                     const pack = parseInt(s.replace(/\D/g, ''), 10) || 0
                     setPackPriceDraft(pack)
-                    return Math.round(pack / (editing.pack_content || 1)) || 0
+                    // TANPA round: pecahan tersimpan utuh (DB numeric) supaya
+                    // harga kemasan tampil balik PERSIS yang diinput (48.000/9 = 5.333,333...)
+                    return pack / (editing.pack_content || 1) || 0
                   }}
                   value={packPriceDraft ?? packPriceOf({ price: editing.price ?? 0, pack_content: editing.pack_content || 1 })}
                   onChange={(n) => setEditing({ ...editing, price: n })}
                 />
                 <p className="mt-1 text-xs text-brand-muted">
-                  ≈ <b>{fmtRpPlain(editing.price ?? 0)}</b>/{smallUnitOf({ buy_unit: editing.buy_unit || 'pack', small_unit: editing.small_unit, pack_content: editing.pack_content || 1 })} — hasil bagi harga pembelian ÷ isi kemasan; ini yang dipakai hitung HPP.
+                  ≈ <b>{fmtQty(editing.price ?? 0)}</b>/{smallUnitOf({ buy_unit: editing.buy_unit || 'pack', small_unit: editing.small_unit, pack_content: editing.pack_content || 1 })} — hasil bagi harga pembelian ÷ isi kemasan (pecahan utuh, tanpa pembulatan); ini yang dipakai hitung HPP.
                 </p>
               </div>
               <div>
