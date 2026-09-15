@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
-import { CircleAlert, Pause, Play, Plus, Printer, Scooter, Share2, ShoppingBag, Utensils, X, type LucideIcon } from 'lucide-react'
+import { CircleAlert, Layers, Pause, Play, Plus, Printer, Scooter, Share2, ShoppingBag, Utensils, X, type LucideIcon } from 'lucide-react'
 import { loadCatalog, loadSettings, createTx, currentShift, openShift, subscribeOrders, saveHeldOrder, loadHeldOrders, payHeldOrder, voidHeldOrder, type Catalog, type TxResult, type HeldOrder } from '../lib/db'
 import { ingIndex, maxAvailableQty } from '../lib/hpp'
+import { bundleMaxQty, bundleSavings, bundleSummary, expandBundle, mergeCartLines } from '../lib/combo'
 import { fmtRp, fmtRpPlain } from '../lib/money'
 import type { OrderType, Payment, Product, Settings, Shift } from '../lib/types'
 import { Numpad } from '../components/Numpad'
@@ -17,6 +18,8 @@ interface CartLine {
   qty: number
   price: number
   max: number
+  /** asal baris: nama paket bila keluar dari klik paket (tampil kecil di bawah nama) */
+  via?: string
 }
 
 // Ikon jenis pesanan — kanal online memakai LOGO RESMI (SVG di /public/brand,
@@ -171,6 +174,49 @@ export default function Cashier(): ReactElement {
   const confirmDone = useRef(false)
 
   const subtotal = cart.reduce((s, l) => s + l.qty * l.price, 0)
+  // Paket hemat: klik = isi keranjang dengan KOMPONEN-komponennya + diskon otomatis
+  // sebesar uang yang dihemat — checkout/stok/HPP tetap lewat jalur produk asli.
+  // Sumber paket = bundles (tab Paket Hemat) + produk combo (resep berisi menu lain,
+  // hasil wizard "Buat Paket Combo") — keduanya diekspansi sama.
+  const productById = useMemo(() => new Map((catalog?.products ?? []).map((p) => [p.id, p])), [catalog])
+  const activeBundles = useMemo(() => {
+    const bundles: { key: string; name: string; price: number; items: { product_id: number; qty: number }[] }[] = (catalog?.bundles ?? [])
+      .filter((b) => b.is_active && (b.items ?? []).length > 0)
+      .map((b) => ({ key: `b-${b.id}`, name: b.name, price: b.price, items: b.items ?? [] }))
+    const combos: typeof bundles = (catalog?.products ?? [])
+      .filter((p) => p.is_active && (catalog?.recipeByProduct.get(p.id) ?? []).some((r) => r.kind === 'product'))
+      .map((p) => ({
+        key: `c-${p.id}`,
+        name: p.name,
+        price: p.price,
+        items: (catalog?.recipeByProduct.get(p.id) ?? []).filter((r) => r.kind === 'product').map((r) => ({ product_id: r.component_id, qty: r.qty }))
+      }))
+    return [...bundles, ...combos]
+  }, [catalog])
+
+  const addBundle = (b: { key: string; name: string; price: number; items: { product_id: number; qty: number }[] }, paketQty = 1): void => {
+    const items = b.items ?? []
+    const incoming = expandBundle({ ...b, items }, paketQty).map((l) => ({
+      product_id: l.product_id,
+      name: productById.get(l.product_id)?.name ?? l.name,
+      price: productById.get(l.product_id)?.price ?? 0,
+      qty: l.qty,
+      via: b.name,
+      max: Math.max(maxOf(l.product_id), l.qty)
+    }))
+    const { lines: merged, rejected } = mergeCartLines(cart, incoming)
+    setCart(merged)
+    const kurang = items.filter((it) => maxOf(it.product_id) < it.qty * paketQty).map((it) => productById.get(it.product_id)?.name ?? '?')
+    if (kurang.length) setCartWarn(`Paket ${b.name}: ${kurang.join(', ')} stok kurang untuk ${paketQty} paket. Pastikan dapur sanggup sebelum jualan.`)
+    else if (rejected.length) setCartWarn(`${rejected.join(', ')} di keranjang mentok batas stok — sebagian paket mungkin tak cukup.`)
+    else setCartWarn('')
+    const hemat = bundleSavings(b.price, items, productById) * paketQty
+    if (hemat > 0) {
+      const newSubtotal = merged.reduce((s, l) => s + l.price * l.qty, 0)
+      setDiscount(Math.min(newSubtotal, discount + hemat))
+    }
+  }
+
   const total = Math.max(0, subtotal - discount)
 
   const closeCheckout = (): void => {
@@ -432,6 +478,39 @@ export default function Cashier(): ReactElement {
         <div className="sticky top-0 z-10 -mx-3 mb-2 lg:-mx-4">
           <PreparedStockStrip prepared={(catalog?.ingredients ?? []).filter((i) => i.kind === 'prepared' && i.active)} />
         </div>
+        {/* Paket hemat: klik sekali = semua komponen masuk keranjang + hemat otomatis */}
+        {activeBundles.length > 0 && (
+          <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto pb-1" role="list" aria-label={`Paket hemat, ${activeBundles.length} paket`}>
+            {activeBundles.map((b) => {
+              const items = b.items ?? []
+              const sisa = bundleMaxQty(items, maxOf)
+              const hemat = bundleSavings(b.price, items, productById)
+              return (
+                <button
+                  key={b.key}
+                  type="button"
+                  role="listitem"
+                  onClick={() => addBundle(b)}
+                  title={`Ketuk: ${bundleSummary(items, productById)} masuk keranjang${hemat > 0 ? `, hemat ${fmtRp(hemat)}` : ''}`}
+                  className={`card strip relative w-64 shrink-0 p-2.5 text-left transition-all duration-150 ${
+                    sisa <= 0 ? 'opacity-60 ring-2 ring-brand-redtext/40' : 'hover:-translate-y-0.5 hover:shadow-lift'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-extrabold">{b.name}</span>
+                    {sisa > 0 && sisa <= 5 && <span className="chip shrink-0 bg-brand-gold">sisa {sisa}</span>}
+                    {sisa <= 0 && <span className="chip shrink-0 bg-brand-redtext text-white">Habis</span>}
+                  </div>
+                  <p className="mt-0.5 line-clamp-2 text-xs text-brand-muted">{bundleSummary(items, productById)}</p>
+                  <div className="mt-1 flex items-baseline justify-between gap-2">
+                    <span className="text-base font-extrabold tabular-nums">{fmtRp(b.price)}</span>
+                    {hemat > 0 && <span className="chip shrink-0 bg-brand-redsoft text-brand-redtext">Hemat {fmtRp(hemat)}</span>}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {/* toolbar 1 baris: cari + toggle sembunyikan habis + bar ketersediaan —
               di layar pendek tablet 11" wrap ke baris kedua hanya jika benar perlu */}
@@ -627,7 +706,15 @@ export default function Cashier(): ReactElement {
           {cart.map((l) => (
             <div key={l.product_id} className="cart-line mb-2 rounded-lg border border-brand-line p-2">
               <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-bold leading-snug">{l.name}</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold leading-snug">{l.name}</p>
+                  {l.via && (
+                    <p className="text-[11px] font-bold text-brand-muted">
+                      <Layers size={11} className="mr-0.5 inline-block align-[-1px]" aria-hidden />
+                      {l.via}
+                    </p>
+                  )}
+                </div>
                 <button type="button" className="icon-btn-danger !h-9 !w-9 shrink-0" onClick={() => setQty(l.product_id, 0)} aria-label={`Hapus ${l.name}`}>
                   <X size={16} strokeWidth={2.5} aria-hidden />
                 </button>
