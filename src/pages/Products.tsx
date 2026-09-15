@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
-import { LayoutGrid, List, Package, Pencil, Plus, Power, Trash, Zap, type LucideIcon } from 'lucide-react'
+import { ChefHat, LayoutGrid, List, Package, PackagePlus, Pencil, Plus, Power, Trash, Zap, type LucideIcon } from 'lucide-react'
+import { bundleComponentTotal, comboRecipeLines } from '../lib/combo'
 import { loadCatalog, loadSettings, upsertProduct, upsertCategory, saveRecipe, saveTargets, saveBundle, saveBundleItems, deleteBundle, deleteProduct, uploadProductPhoto, removeProductPhoto, type Catalog } from '../lib/db'
 import { fmtHppQty, hppLines, hppTotal, ingIndex, marginPct, maxAvailableQty } from '../lib/hpp'
 import { fmtRp, fmtRpPlain } from '../lib/money'
@@ -579,18 +580,65 @@ function BundlesTab({
   setErr: (s: string) => void
 }): ReactElement {
   const [editing, setEditing] = useState<{ id?: number; name: string; price: number; items: { product_id: number; qty: number }[] } | null>(null)
+  // Wizard combo: pilih beberapa menu → otomatis jadi produk baru + resep komposit
+  const [wizard, setWizard] = useState<{ step: 1 | 2; picks: { product_id: number; qty: number }[]; name: string; price: number } | null>(null)
+  const [wizardQ, setWizardQ] = useState('')
+  const [wizardBusy, setWizardBusy] = useState(false)
   const componentPrice = (items: { product_id: number; qty: number }[]): number =>
     items.reduce((s, i) => s + (catalog.products.find((p) => p.id === i.product_id)?.price ?? 0) * i.qty, 0)
 
+  const wizardTotal = wizard ? bundleComponentTotal(wizard.picks, new Map(catalog.products.map((p) => [p.id, p]))) : 0
+
+  const saveCombo = async (): Promise<void> => {
+    if (!wizard || wizard.picks.length === 0 || !wizard.name.trim()) return
+    setWizardBusy(true)
+    try {
+      // kategori "Paket" dibuat otomatis sekali supaya combo mudah difilter di kasir
+      let paketCat = catalog.categories.find((c) => c.name.toLowerCase() === 'paket')
+      if (!paketCat) {
+        await upsertCategory({ name: 'Paket', sort: 99 })
+        const f1 = await loadCatalog()
+        paketCat = f1.categories.find((c) => c.name.toLowerCase() === 'paket')
+      }
+      await upsertProduct({ name: wizard.name.trim(), category_id: paketCat?.id ?? null, price: wizard.price, unit: 'paket', is_active: true, sort: 95 })
+      const fresh = await loadCatalog()
+      // menu baru = id terbesar (identity) — nama diverifikasi biar tak salah sasaran
+      const created = fresh.products.reduce((a, b) => (b.id > a.id ? b : a), fresh.products[0])
+      if (!created || created.name !== wizard.name.trim()) throw new Error('Menu paket tidak ditemukan setelah disimpan')
+      await saveRecipe(created.id, comboRecipeLines(created.id, wizard.picks))
+      setWizard(null)
+      setWizardQ('')
+      await reload()
+      toast(`Menu "${created.name}" dibuat lengkap dengan resep ${wizard.picks.length} komponen — langsung tampil di kasir.`)
+    } catch (ex) {
+      setErr((ex as Error).message)
+    } finally {
+      setWizardBusy(false)
+    }
+  }
+
+  const wizardProducts = catalog.products.filter((p) => p.name.toLowerCase().includes(wizardQ.trim().toLowerCase()))
+
   return (
     <div>
-      <button
-        type="button"
-        className="btn-primary mb-2"
-        onClick={() => setEditing({ name: '', price: 0, items: [] })}
-      >
-        + Paket Baru
-      </button>
+      <div className="mb-2 flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="btn-gold"
+          onClick={() => setWizard({ step: 1, picks: [], name: '', price: 0 })}
+        >
+          <ChefHat size={17} strokeWidth={2.25} aria-hidden />
+          Buat Paket Combo
+        </button>
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => setEditing({ name: '', price: 0, items: [] })}
+        >
+          <PackagePlus size={17} strokeWidth={2.25} aria-hidden />
+          Paket Baru
+        </button>
+      </div>
       {catalog.bundles.length === 0 && <p className="py-6 text-center text-sm text-brand-muted">Belum ada paket hemat.</p>}
       <div className="grid gap-2 sm:grid-cols-2">
         {catalog.bundles.map((b) => {
@@ -717,6 +765,106 @@ function BundlesTab({
             >
               Simpan Paket
             </button>
+          </div>
+        )}
+      </Modal>
+
+      {/* ===== Wizard: Buat Paket Combo (menu baru + resep otomatis) ===== */}
+      <Modal open={wizard !== null} title="Buat Paket Combo" onClose={() => setWizard(null)}>
+        {wizard && (
+          <div className="flex flex-col gap-3">
+            {wizard.step === 1 && (
+              <>
+                <p className="text-sm text-brand-muted">
+                  Pilih menu penyusun paket. Nanti dibuatkan menu baru berisi resep komposit — HPP, sisa porsi, dan stok terhitung otomatis.
+                </p>
+                <input
+                  className="input"
+                  placeholder="Cari menu..."
+                  value={wizardQ}
+                  onChange={(e) => setWizardQ(e.target.value)}
+                  aria-label="Cari menu penyusun"
+                />
+                <div className="max-h-[40vh] overflow-y-auto pr-1">
+                  {wizardProducts.map((p) => {
+                    const pick = wizard.picks.find((x) => x.product_id === p.id)
+                    return (
+                      <div key={p.id} className={`mb-1.5 flex items-center gap-2 rounded-lg border p-2 ${pick ? 'border-brand-btn bg-brand-redsoft' : 'border-brand-line bg-brand-card'}`}>
+                        <button
+                          type="button"
+                          className={`chip h-9 min-w-20 justify-center px-3 ${pick ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
+                          onClick={() =>
+                            setWizard({
+                              ...wizard,
+                              picks: pick ? wizard.picks.filter((x) => x.product_id !== p.id) : [...wizard.picks, { product_id: p.id, qty: 1 }]
+                            })
+                          }
+                          aria-pressed={!!pick}
+                        >
+                          {pick ? '✓ Dipilih' : '+ Pilih'}
+                        </button>
+                        <span className="min-w-0 flex-1 truncate text-sm font-bold">{p.name}</span>
+                        <span className="text-sm font-bold tabular-nums text-brand-muted">{fmtRp(p.price)}</span>
+                        {pick && (
+                          <div className="flex items-center gap-1">
+                            <button type="button" className="btn-ghost !min-h-0 !h-9 !w-9 !px-0 text-lg" onClick={() => setWizard({ ...wizard, picks: wizard.picks.map((x) => (x.product_id === p.id ? { ...x, qty: Math.max(1, x.qty - 1) } : x)) })} aria-label={`Kurangi ${p.name}`}>
+                              −
+                            </button>
+                            <span className="w-8 text-center text-sm font-extrabold tabular-nums">{pick.qty}</span>
+                            <button type="button" className="btn-ghost !min-h-0 !h-9 !w-9 !px-0 text-lg" onClick={() => setWizard({ ...wizard, picks: wizard.picks.map((x) => (x.product_id === p.id ? { ...x, qty: x.qty + 1 } : x)) })} aria-label={`Tambah ${p.name}`}>
+                              +
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {wizardProducts.length === 0 && <p className="py-4 text-center text-sm text-brand-muted">Tidak ada menu yang cocok.</p>}
+                </div>
+                <div className="card strip flex items-center justify-between p-3">
+                  <span className="text-sm font-bold">Total normal {wizard.picks.length} komponen</span>
+                  <span className="text-lg font-extrabold tabular-nums">{fmtRp(wizardTotal)}</span>
+                </div>
+                <button type="button" className="btn-primary" disabled={wizard.picks.length < 2} onClick={() => setWizard({ ...wizard, step: 2, name: wizard.name || `Paket Combo ${wizard.picks.length} Menu`, price: Math.round(wizardTotal * 0.9) })}>
+                  Lanjut: nama & harga
+                </button>
+                {wizard.picks.length < 2 && <p className="text-center text-xs font-bold text-brand-muted">Pilih minimal 2 menu untuk combo.</p>}
+              </>
+            )}
+            {wizard.step === 2 && (
+              <>
+                <p className="text-sm text-brand-muted">
+                  Isi: {wizard.picks.map((x) => `${x.qty}× ${catalog.products.find((p) => p.id === x.product_id)?.name ?? '?'}`).join(' + ')}
+                </p>
+                <div>
+                  <label className="lbl" htmlFor="wname">
+                    Nama menu combo
+                  </label>
+                  <input id="wname" className="input" value={wizard.name} onChange={(e) => setWizard({ ...wizard, name: e.target.value })} placeholder="mis. Paket Combo Paha" />
+                </div>
+                <div>
+                  <label className="lbl" htmlFor="wprice">
+                    Harga jual (Rp)
+                  </label>
+                  <input
+                    id="wprice"
+                    className="input text-right"
+                    inputMode="numeric"
+                    value={wizard.price ? fmtRpPlain(wizard.price) : ''}
+                    onChange={(e) => setWizard({ ...wizard, price: parseInt(e.target.value.replace(/\D/g, ''), 10) || 0 })}
+                  />
+                  <p className="mt-1 text-xs font-bold text-brand-muted">
+                    Total normal komponen {fmtRp(wizardTotal)} · <span className="text-brand-redtext">hemat {fmtRp(Math.max(0, wizardTotal - wizard.price))}</span> ({wizardTotal > 0 ? Math.round(((wizardTotal - wizard.price) / wizardTotal) * 100) : 0}%)
+                  </p>
+                </div>
+                <button type="button" className="btn-primary" disabled={wizardBusy || !wizard.name.trim() || wizard.price <= 0} onClick={() => void saveCombo()}>
+                  {wizardBusy ? 'Menyimpan...' : 'Buat Menu Combo + Resep'}
+                </button>
+                <button type="button" className="btn-ghost !min-h-0 !py-1.5 text-xs" onClick={() => setWizard({ ...wizard, step: 1 })}>
+                  ← Kembali pilih menu
+                </button>
+              </>
+            )}
           </div>
         )}
       </Modal>
