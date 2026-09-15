@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { loadCatalog, loadTransactions, upsertIngredient, saveIngredientRecipe, deleteIngredient, createPurchase, opname, logWaste, importPriceList, type Catalog, type PriceListItem } from '../lib/db'
+import { loadCatalog, loadTransactions, upsertIngredient, saveIngredientRecipe, deleteIngredient, createPurchase, logWaste, importPriceList, createStockAdjustment, loadStockAdjustments, updateStockAdjustment, deleteStockAdjustment, loadStockMoves, type Catalog, type PriceListItem } from '../lib/db'
 import { ingIndex, preparedCost, smallUnitOf, packPriceOf, hppLines, hppTotal, marginPct, fmtHppQty } from '../lib/hpp'
 import { buyPlanFromSales, buyPlanToText, dailySalesOf, type BuyPlan } from '../lib/forecast'
 import { fmtRp, fmtRpPlain, fmtQty, parseNum } from '../lib/money'
-import type { Ingredient, IngredientRecipe, Product } from '../lib/types'
+import type { Ingredient, IngredientRecipe, Product, StockAdjustment, StockMove } from '../lib/types'
+import { dayStart, dayEnd, todayISO, addDaysISO } from '../lib/dates'
 import { Modal } from '../components/Modal'
 import { NumInput } from '../components/NumInput'
 import { useToast } from '../components/Toast'
@@ -45,6 +46,12 @@ export default function Ingredients(): ReactElement {
   const [toggling, setToggling] = useState<number | null>(null)
   // keranjang pembelian: id bahan tercentang di tabel bahan
   const [checked, setChecked] = useState<Set<number>>(new Set())
+  // tampilan daftar bahan: tabel (ala price list) atau kartu — tersimpan per perangkat
+  const [bahanView, setBahanView] = useState<'table' | 'grid'>(() => (localStorage.getItem('sabana-bahan-view') === 'grid' ? 'grid' : 'table'))
+  const setBahanViewPersist = (v: 'table' | 'grid'): void => {
+    setBahanView(v)
+    localStorage.setItem('sabana-bahan-view', v)
+  }
 
   const tab = (searchParams.get('tab') as Tab) === 'stok' ? 'stok' : (searchParams.get('tab') as Tab) === 'menu' ? 'menu' : 'bahan'
   const setTab = (t: Tab): void => setSearchParams(t === 'bahan' ? {} : { tab: t })
@@ -184,6 +191,8 @@ export default function Ingredients(): ReactElement {
             toggleCk={toggleCk}
             toggleActive={toggleActive}
             toggling={toggling}
+            view={bahanView}
+            setViewPersist={setBahanViewPersist}
             setEditing={setEditing}
             setDeleting={setDeleting}
             setRecipeFor={setRecipeFor}
@@ -232,7 +241,9 @@ export default function Ingredients(): ReactElement {
                   pack_content: editing.pack_content ?? 1,
                   price: editing.price ?? 0,
                   min_stock: editing.min_stock ?? 0,
-                  active: editing.active ?? true
+                  active: editing.active ?? true,
+                  // komposisi potongan per kemasan (audit jual) — baris kosong dibuang
+                  pack_breakdown: (editing.pack_breakdown ?? []).filter((b) => b.name.trim() && b.qty > 0)
                 })
                 setEditing(null)
                 await reload()
@@ -361,6 +372,61 @@ export default function Ingredients(): ReactElement {
                 />
               </div>
             </div>
+            {/* Komposisi potongan per kemasan (opsional): 1 pack isi 9 = 2 sayap +
+                2 paha atas + 2 paha bawah + 3 dada — kasir/dapur tahu yg bisa dijual. */}
+            <details className="rounded-lg border-[1.5px] border-brand-line p-2.5" open={!!editing.pack_breakdown?.length}>
+              <summary className="cursor-pointer text-xs font-extrabold text-brand-muted">
+                Rincian isi kemasan per potongan (opsional)
+              </summary>
+              <p className="mt-1.5 mb-2 text-[11px] text-brand-muted">\n               cth: pack Ayam isi 9 = 2 Sayap + 2 Paha Atas + 2 Paha Bawah + 3 Dada. Hanya utk tampilan & audit jual — tidak mengubah stok/HPP.
+              </p>
+              {(editing.pack_breakdown ?? []).map((b, bi) => (
+                <div key={bi} className="mb-1.5 grid grid-cols-[1fr_80px_32px] gap-2">
+                  <input
+                    className="input !h-9"
+                    value={b.name}
+                    placeholder="cth: Sayap"
+                    onChange={(e) =>
+                      setEditing({
+                        ...editing,
+                        pack_breakdown: (editing.pack_breakdown ?? []).map((x, j) => (j === bi ? { ...x, name: e.target.value } : x))
+                      })
+                    }
+                    aria-label={`Nama potongan ${bi + 1}`}
+                  />
+                  <NumInput
+                    className="input !h-9 text-right"
+                    value={b.qty}
+                    ariaLabel={`Jumlah ${b.name || `potongan ${bi + 1}`}`}
+                    onChange={(n) =>
+                      setEditing({
+                        ...editing,
+                        pack_breakdown: (editing.pack_breakdown ?? []).map((x, j) => (j === bi ? { ...x, qty: n } : x))
+                      })
+                    }
+                  />
+                  <button type="button" className="icon-btn-danger !h-9 !w-9" aria-label={`Hapus ${b.name || `potongan ${bi + 1}`}`} onClick={() => setEditing({ ...editing, pack_breakdown: (editing.pack_breakdown ?? []).filter((_, j) => j !== bi) })}>
+                    🗑
+                  </button>
+                </div>
+              ))}
+              <div className="mt-1 flex items-center gap-2">
+                <button type="button" className="btn-ghost !min-h-0 !py-1.5 text-xs" onClick={() => setEditing({ ...editing, pack_breakdown: [...(editing.pack_breakdown ?? []), { name: '', qty: 1 }] })}>
+                  + Potongan
+                </button>
+                {(() => {
+                  const sum = (editing.pack_breakdown ?? []).reduce((s, b) => s + (b.qty || 0), 0)
+                  const target = editing.pack_content || 1
+                  if ((editing.pack_breakdown ?? []).length === 0) return null
+                  const ok = Math.abs(sum - target) < 0.0001
+                  return (
+                    <span className={`text-[11px] font-extrabold ${ok ? 'text-brand-muted' : 'text-brand-redtext'}`}>
+                      total {fmtQty(sum)} / isi kemasan {fmtQty(target)}{ok ? ' ✓' : ' — belum cocok!'}
+                    </span>
+                  )
+                })()}
+              </div>
+            </details>
             <button type="submit" className="btn-primary">
               Simpan Barang
             </button>
@@ -551,7 +617,9 @@ function BahanTable({
   toggling,
   setEditing,
   setDeleting,
-  setRecipeFor
+  setRecipeFor,
+  view,
+  setViewPersist
 }: {
   catalog: Catalog
   list: Ingredient[]
@@ -568,6 +636,8 @@ function BahanTable({
   setEditing: (i: Partial<Ingredient> | null) => void
   setDeleting: (i: Ingredient | null) => void
   setRecipeFor: (i: Ingredient | null) => void
+  view: 'table' | 'grid'
+  setViewPersist: (v: 'table' | 'grid') => void
 }): ReactElement {
   const { toast } = useToast()
   // saran beli: kebutuhan buffer satu siklus belanja (min×2 − stok, satuan kecil)
@@ -615,7 +685,27 @@ function BahanTable({
         {checked.size > 0 && (
           <span className="chip h-9 bg-brand-gold px-3">{checked.size} dipilih — lanjut di tab Pembelian</span>
         )}
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex items-center gap-2">
+          {/* tampilan: tabel / kartu */}
+          <div className="flex gap-1" role="radiogroup" aria-label="Tampilan">
+            {(
+              [
+                ['table', '☰ Tabel'],
+                ['grid', '▦ Kartu']
+              ] as ['table' | 'grid', string][]
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                role="radio"
+                aria-checked={view === k}
+                className={`chip h-9 px-3 ${view === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+                onClick={() => setViewPersist(k)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <ImportPriceListButton reload={async () => {}} setErr={() => undefined} toast={toast} />
           <button type="button" className="btn-primary" onClick={() => setEditing({ kind: 'raw', buy_unit: 'pack', small_unit: '', pack_content: 1, price: 0, min_stock: 0, active: true })}>
             + Barang Baru
@@ -623,7 +713,68 @@ function BahanTable({
         </div>
       </div>
 
-      <div className="card overflow-x-auto">
+      {/* Tampilan kartu: ringkas per barang, stok & harga terlihat sekilas */}
+      {view === 'grid' && (
+        <div className="grid grid-cols-2 content-start gap-2 sm:grid-cols-3 xl:grid-cols-4">
+          {list.map((i) => {
+            const su = smallUnitOf(i)
+            const low = i.stock <= i.min_stock && i.min_stock > 0
+            const kritis = i.stock <= 0
+            return (
+              <div key={i.id} className={`card flex flex-col p-2.5 ${!i.active ? 'opacity-60' : ''}`}>
+                <div className="flex items-start justify-between gap-1">
+                  <p className="line-clamp-2 text-sm font-bold leading-snug">
+                    {i.name}
+                    {i.code && <span className="ml-1 font-mono text-[10px] font-normal text-brand-muted">{i.code}</span>}
+                  </p>
+                  <span className={`chip shrink-0 text-[10px] ${kritis ? 'bg-brand-redtext text-white' : low ? 'bg-brand-gold' : 'bg-brand-gold/30'}`}>
+                    {kritis ? 'Habis' : low ? 'Menipis' : 'Aman'}
+                  </span>
+                </div>
+                <p className="mt-1 text-lg font-extrabold tabular-nums">
+                  {fmtQty(i.stock)} <span className="text-[10px] font-bold text-brand-muted">{su}</span>
+                </p>
+                <p className="mt-0.5 text-[11px] font-bold text-brand-muted">
+                  {fmtRp(packPriceOf(i))}/{i.buy_unit} · isi {fmtQty(i.pack_content)}
+                  {i.kind === 'prepared' && ' · prepared'}
+                </p>
+                <p className="text-[11px] text-brand-muted">min {fmtQty(i.min_stock)} {su}</p>
+                {i.pack_breakdown?.length ? (
+                  <p className="mt-0.5 text-[11px] font-bold text-brand-muted" title="Komposisi 1 kemasan — dipakai audit jual per potongan">
+                    {i.pack_breakdown.map((b) => `${b.qty} ${b.name}`).join(' + ')}
+                  </p>
+                ) : null}
+                <div className="mt-auto flex justify-center gap-1.5 pt-2">
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    disabled={toggling === i.id}
+                    title={i.active ? 'Matikan: hilang dari dropdown produksi, resep & saran beli' : 'Nyalakan lagi: bahan kembali dipakai'}
+                    aria-label={i.active ? `Nonaktifkan ${i.name}` : `Aktifkan ${i.name}`}
+                    onClick={() => void toggleActive(i)}
+                  >
+                    {i.active ? '⏻' : '⚡'}
+                  </button>
+                  {i.kind === 'prepared' && (
+                    <button type="button" className="icon-btn" title="Resep produksi" aria-label={`Resep ${i.name}`} onClick={() => setRecipeFor(i)}>
+                      🧾
+                    </button>
+                  )}
+                  <button type="button" className="icon-btn" title="Edit barang" aria-label={`Edit ${i.name}`} onClick={() => setEditing(i)}>
+                    ✏️
+                  </button>
+                  <button type="button" className="icon-btn-danger" title="Hapus barang" aria-label={`Hapus ${i.name}`} onClick={() => setDeleting(i)}>
+                    🗑
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+          {list.length === 0 && <p className="col-span-full py-8 text-center text-sm text-brand-muted">Tidak ada barang yang cocok.</p>}
+        </div>
+      )}
+
+      <div className={view === 'table' ? 'card overflow-x-auto' : 'hidden'}>
         <table className="tbl min-w-[820px]">
           <thead>
             <tr>
@@ -656,6 +807,11 @@ function BahanTable({
                     {i.code && <span className="ml-1 font-mono text-[10px] font-normal text-brand-muted">{i.code}</span>}
                     {i.kind === 'prepared' && <span className="chip ml-1 border-[1.5px] border-brand-line bg-brand-paper">prepared</span>}
                     {!i.active && <span className="chip ml-1 bg-brand-line">nonaktif</span>}
+                    {i.pack_breakdown?.length ? (
+                      <span className="ml-1 text-[10px] font-bold text-brand-muted" title="Komposisi 1 kemasan">
+                        ({i.pack_breakdown.map((b) => `${b.qty} ${b.name}`).join(' + ')})
+                      </span>
+                    ) : null}
                   </td>
                   <td>{i.buy_unit}</td>
                   <td className="whitespace-nowrap text-xs">{fmtQty(i.pack_content)} {su}</td>
@@ -874,6 +1030,7 @@ function StokTab({
         <WasteForm catalog={catalog} reload={reload} setErr={setErr} toast={toast} />
       </div>
       <StokTable catalog={catalog} />
+      <StockMoveTable catalog={catalog} />
     </div>
   )
 }
@@ -942,6 +1099,137 @@ function StokTable({ catalog }: { catalog: Catalog }): ReactElement {
   )
 }
 
+/** Chip warna jenis pergerakan stok. */
+const MOVE_CHIP: Record<StockMove['kind'], string> = {
+  pembelian: 'bg-[#22aa55] text-white',
+  produksi: 'bg-[#2563eb] text-white',
+  penjualan: 'bg-brand-ink/10',
+  opname: 'bg-brand-gold',
+  waste: 'bg-brand-redtext text-white',
+  isifryer: 'bg-brand-ink/10',
+  refund: 'bg-brand-redtext/20',
+  batal: 'bg-brand-redtext/20',
+  revisi: 'bg-brand-gold/40',
+  lainnya: 'bg-brand-ink/10'
+}
+
+/**
+ * Riwayat Stok: ledger audit semua pergerakan (pembelian, produksi, penjualan,
+ * waste, opname/penyesuaian, refund/batal/revisi) dalam satu tabel — filter
+ * bahan, rentang tanggal, dan jenis pergerakan.
+ */
+function StockMoveTable({ catalog }: { catalog: Catalog }): ReactElement {
+  const [ingId, setIngId] = useState(0) // 0 = semua bahan
+  const [from, setFrom] = useState(addDaysISO(todayISO(), -7))
+  const [to, setTo] = useState(todayISO())
+  const [kind, setKind] = useState('') // '' = semua jenis
+  const [moves, setMoves] = useState<StockMove[] | null>(null)
+  const [err, setErrLocal] = useState('')
+
+  const load = useCallback(async () => {
+    try {
+      setMoves(await loadStockMoves({ ingredientId: ingId || undefined, fromISO: dayStart(from), toISO: dayEnd(to) }))
+      setErrLocal('')
+    } catch (ex) {
+      setErrLocal((ex as Error).message)
+    }
+  }, [ingId, from, to])
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const shown = useMemo(() => (moves ?? []).filter((m) => !kind || m.kind === kind), [moves, kind])
+  const totalIn = shown.filter((m) => m.qty > 0).reduce((s, m) => s + m.qty, 0)
+  const totalOut = shown.filter((m) => m.qty < 0).reduce((s, m) => s + m.qty, 0)
+  const ingName = (id: number): string => catalog.ingredients.find((i) => i.id === id)?.name ?? `#${id}`
+  const unitOf = (id: number): string => {
+    const i = catalog.ingredients.find((x) => x.id === id)
+    return i ? smallUnitOf(i) : ''
+  }
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="flex flex-wrap items-center gap-2 border-b-[1.5px] border-brand-line px-4 py-2.5">
+        <p className="mr-auto text-sm font-extrabold">Riwayat Stok (audit)</p>
+        <select className="input !h-9 !w-48" value={ingId} onChange={(e) => setIngId(parseInt(e.target.value, 10))} aria-label="Filter bahan">
+          <option value={0}>Semua bahan</option>
+          {catalog.ingredients.map((i) => (
+            <option key={i.id} value={i.id}>
+              {i.name}
+            </option>
+          ))}
+        </select>
+        <select className="input !h-9 !w-40" value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Filter jenis">
+          <option value="">Semua jenis</option>
+          {Object.keys(MOVE_CHIP).map((k) => (
+            <option key={k} value={k}>
+              {k}
+            </option>
+          ))}
+        </select>
+        <input type="date" className="input !h-9 !w-36" value={from} max={to} onChange={(e) => e.target.value && setFrom(e.target.value)} aria-label="Dari tanggal" />
+        <input type="date" className="input !h-9 !w-36" value={to} min={from} max={todayISO()} onChange={(e) => e.target.value && setTo(e.target.value)} aria-label="Sampai tanggal" />
+        <button type="button" className="icon-btn !h-9 !w-9" title="Muat ulang riwayat" aria-label="Muat ulang riwayat stok" onClick={() => void load()}>
+          ⟳
+        </button>
+      </div>
+      {err && <p className="px-4 py-2 text-sm text-brand-redtext">{err}</p>}
+      <div className="overflow-x-auto">
+        <table className="tbl min-w-[560px]">
+          <thead>
+            <tr>
+              <th>Waktu</th>
+              <th>Bahan</th>
+              <th>Jenis</th>
+              <th className="text-right">Qty</th>
+              <th>Sumber / catatan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((m) => (
+              <tr key={m.id}>
+                <td className="whitespace-nowrap text-xs text-brand-muted">{new Date(m.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+                <td className="font-bold">{m.ingredient_name ?? ingName(m.ingredient_id)}</td>
+                <td>
+                  <span className={`chip ${MOVE_CHIP[m.kind] ?? 'bg-brand-ink/10'}`}>{m.kind}</span>
+                </td>
+                <td className={`whitespace-nowrap text-right font-bold tabular-nums ${m.qty > 0 ? 'text-[#22aa55]' : 'text-brand-redtext'}`}>
+                  {m.qty > 0 ? '+' : ''}
+                  {fmtQty(m.qty)} {unitOf(m.ingredient_id)}
+                </td>
+                <td className="text-xs text-brand-muted">{[m.ref, m.note].filter(Boolean).join(' · ') || '—'}</td>
+              </tr>
+            ))}
+            {shown.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-6 text-center text-sm text-brand-muted">
+                  {moves === null ? 'Memuat…' : 'Tidak ada pergerakan pada filter ini.'}
+                </td>
+              </tr>
+            )}
+          </tbody>
+          {shown.length > 0 && (
+            <tfoot>
+              <tr>
+                <td colSpan={3} className="text-right text-xs font-bold text-brand-muted">Total masuk / keluar</td>
+                <td className="whitespace-nowrap text-right text-xs font-bold tabular-nums">
+                  <span className="text-[#22aa55]">+{fmtQty(totalIn)}</span> / <span className="text-brand-redtext">{fmtQty(totalOut)}</span>
+                </td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+      <p className="px-4 py-2 text-xs text-brand-muted">Maks 500 baris terakhir per muatan — persempit filter untuk melihat lebih detail.</p>
+    </div>
+  )
+}
+
+/**
+ * Stok opname sebagai penyesuaian CRUD: catat hasil hitung fisik (+ catatan),
+ * lalu riwayat penyesuaian bisa diedit/hapus — salah ketik tidak permanen lagi.
+ */
 function OpnameForm({
   catalog,
   reload,
@@ -955,11 +1243,26 @@ function OpnameForm({
 }): ReactElement {
   const [ingId, setIngId] = useState(catalog.ingredients[0]?.id ?? 0)
   const [qty, setQty] = useState('')
+  const [note, setNote] = useState('')
+  const [history, setHistory] = useState<StockAdjustment[]>([])
+  const [editing, setEditing] = useState<{ adj: StockAdjustment; qty: string; note: string } | null>(null)
   const ing = catalog.ingredients.find((i) => i.id === ingId)
+
+  const refreshHistory = useCallback(async () => {
+    try {
+      setHistory(await loadStockAdjustments(30))
+    } catch {
+      setHistory([])
+    }
+  }, [])
+  useEffect(() => {
+    void refreshHistory()
+  }, [refreshHistory])
+
   return (
     <div className="card strip h-fit p-4">
       <p className="mb-1 text-sm font-extrabold">Stok opname</p>
-      <p className="mb-3 text-sm text-brand-muted">Samakan stok sistem dengan hitungan fisik (stok opname).</p>
+      <p className="mb-3 text-sm text-brand-muted">Samakan stok sistem dengan hitungan fisik. Tercatat sebagai penyesuaian — bisa diedit/dihapus bila keliru.</p>
       <div className="mb-2">
         <label className="lbl" htmlFor="oing">
           Bahan
@@ -972,21 +1275,29 @@ function OpnameForm({
           ))}
         </select>
       </div>
-      <div className="mb-3">
+      <div className="mb-2">
         <label className="lbl" htmlFor="oqty">
           Hasil hitung fisik ({ing ? smallUnitOf(ing) : ''})
         </label>
         <input id="oqty" className="input" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d.,]/g, ''))} />
       </div>
+      <div className="mb-3">
+        <label className="lbl" htmlFor="onote">
+          Catatan (opsional)
+        </label>
+        <input id="onote" className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="cth: beda 1 pack — pecah di rak" />
+      </div>
       <button
         type="button"
         className="btn-primary"
+        disabled={!qty.trim()}
         onClick={async () => {
           try {
-            await opname(ingId, parseNum(qty))
+            await createStockAdjustment(ingId, parseNum(qty), note)
             setQty('')
-            await reload()
-            toast('Stok disesuaikan.')
+            setNote('')
+            await Promise.all([reload(), refreshHistory()])
+            toast('Stok disesuaikan — tercatat di riwayat penyesuaian.')
           } catch (ex) {
             setErr((ex as Error).message)
           }
@@ -994,6 +1305,105 @@ function OpnameForm({
       >
         Sesuaikan Stok
       </button>
+
+      {history.length > 0 && (
+        <div className="mt-4 border-t border-brand-line pt-3">
+          <p className="mb-2 text-sm font-extrabold">Riwayat penyesuaian</p>
+          <ul className="flex flex-col gap-2">
+            {history.map((h) => {
+              const delta = h.qty - h.prev_qty
+              const su = smallUnitOf(catalog.ingredients.find((i) => i.id === h.ingredient_id) ?? ({ buy_unit: '', small_unit: null, pack_content: 1 } as Ingredient))
+              return (
+                <li key={h.id} className="flex items-center justify-between gap-2 rounded-lg border border-brand-line px-2 py-1.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold">
+                      {h.ingredient_name ?? `#${h.ingredient_id}`}{' '}
+                      <span className="tabular-nums">
+                        {fmtQty(h.prev_qty)} → {fmtQty(h.qty)} {su}
+                      </span>{' '}
+                      <span className={delta > 0 ? 'text-xs font-bold text-[#22aa55]' : delta < 0 ? 'text-xs font-bold text-brand-redtext' : 'text-xs text-brand-muted'}>
+                        ({delta > 0 ? '+' : ''}
+                        {fmtQty(delta)})
+                      </span>
+                    </p>
+                    <p className="truncate text-xs text-brand-muted">
+                      {new Date(h.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {h.note ? ` · ${h.note}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <button type="button" className="icon-btn !h-8 !w-8" title="Edit penyesuaian" aria-label={`Edit penyesuaian ${h.ingredient_name ?? h.id}`} onClick={() => setEditing({ adj: h, qty: String(h.qty), note: h.note ?? '' })}>
+                      ✏️
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn-danger !h-8 !w-8"
+                      title="Hapus penyesuaian (stok kembali ke nilai sebelum)"
+                      aria-label={`Hapus penyesuaian ${h.ingredient_name ?? h.id}`}
+                      onClick={async () => {
+                        if (!window.confirm(`Hapus penyesuaian ${h.ingredient_name ?? '#'+h.ingredient_id}? Stok kembali ke ${fmtQty(h.prev_qty)}.`)) return
+                        try {
+                          await deleteStockAdjustment(h.id)
+                          await Promise.all([reload(), refreshHistory()])
+                          toast('Penyesuaian dihapus — stok dikembalikan.')
+                        } catch (ex) {
+                          setErr((ex as Error).message)
+                        }
+                      }}
+                    >
+                      🗑
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+
+      <Modal open={editing !== null} title="Edit Penyesuaian Stok" onClose={() => setEditing(null)}>
+        {editing && (
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              try {
+                await updateStockAdjustment(editing.adj.id, parseNum(editing.qty), editing.note)
+                setEditing(null)
+                await Promise.all([reload(), refreshHistory()])
+                toast('Penyesuaian diperbarui — stok ikut disesuaikan.')
+              } catch (ex) {
+                setErr((ex as Error).message)
+              }
+            }}
+          >
+            <p className="text-sm text-brand-muted">
+              Ubah hasil hitung fisik <b>{editing.adj.ingredient_name ?? `#${editing.adj.ingredient_id}`}</b>. Stok terkini akan digeser selisihnya — penjualan setelah penyesuaian ini tetap terhitung.
+            </p>
+            <div>
+              <label className="lbl" htmlFor="eadjq">Jumlah fisik yang benar</label>
+              <input
+                id="eadjq"
+                className="input"
+                inputMode="decimal"
+                autoFocus
+                value={editing.qty}
+                onChange={(e) => setEditing({ ...editing, qty: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="lbl" htmlFor="eadjn">Catatan</label>
+              <input
+                id="eadjn"
+                className="input"
+                value={editing.note}
+                onChange={(e) => setEditing({ ...editing, note: e.target.value })}
+              />
+            </div>
+            <button type="submit" className="btn-primary">Simpan Perubahan</button>
+          </form>
+        )}
+      </Modal>
     </div>
   )
 }
