@@ -19,7 +19,7 @@ export function ErrorSummary({ err, label = 'Terjadi masalah' }: { err: string; 
       role="alert"
       tabIndex={-1}
       aria-labelledby="errsum-title"
-      className="mb-2 rounded-lg border-[1.5px] border-brand-redtext bg-brand-redtext/10 px-3 py-2 outline-none"
+      className="mb-2 rounded-lg border border-brand-redtext bg-brand-redtext/10 px-3 py-2 outline-none"
     >
       <h2 id="errsum-title" className="text-sm font-extrabold text-brand-redtext">
         {label}

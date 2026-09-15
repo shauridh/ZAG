@@ -342,7 +342,7 @@ function PortalMain({
         {screen === 'katalog' && (
           <>
             {/* Toggle ambil/diantar di atas katalog: keputusan utama pelanggan, bukan tersembunyi di form akhir */}
-            <div className="mb-3 flex items-center gap-1 rounded-lg border-[1.5px] border-brand-line bg-brand-card p-1" role="radiogroup" aria-label="Cara pesanan diterima">
+            <div className="mb-3 flex items-center gap-1 rounded-lg border border-brand-line bg-brand-card p-1" role="radiogroup" aria-label="Cara pesanan diterima">
               {(
                 [
                   ['ambil', 'Ambil di kasir'],
@@ -670,7 +670,7 @@ function CheckoutScreen({
           return (
             <label
               key={a.id}
-              className={`mb-2 block cursor-pointer rounded-lg border-[1.5px] p-2.5 ${selected === a.id ? 'border-brand-btn' : 'border-brand-line'}`}
+              className={`mb-2 block cursor-pointer rounded-ctl border p-2.5 ${selected === a.id ? 'border-brand-btn' : 'border-brand-line'}`}
             >
               <span className="flex items-start gap-2">
                 <input type="radio" name="addr" checked={selected === a.id} onChange={() => setSelected(a.id)} aria-label={a.label} />
@@ -723,7 +723,7 @@ function CheckoutScreen({
 
         {/* Form alamat */}
         {addOpen && (
-          <div className="mt-2 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3">
+          <div className="mt-2 rounded-lg border border-brand-line bg-brand-paper p-3">
             <label className="lbl" htmlFor="clabel">
               Label
             </label>
@@ -855,7 +855,7 @@ function OrderStatusCard({
       {order.status === 'qris_dikirim' && (
         <div className="mt-3 text-center">
           {settings.qris.image ? (
-            <img src={settings.qris.image} alt="Kode QRIS pembayaran" className="mx-auto max-w-[240px] rounded-lg border-[1.5px] border-brand-line" />
+            <img src={settings.qris.image} alt="Kode QRIS pembayaran" className="mx-auto max-w-[240px] rounded-lg border border-brand-line" />
           ) : (
             <p className="rounded-lg bg-brand-gold/20 p-3 text-sm font-bold">QRIS belum dipasang outlet. Hubungi kasir untuk bayar tunai/transfer.</p>
           )}

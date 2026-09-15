@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { loadTransactions, loadCatalog, refundTx, deleteTx, editTx, txIsEditable, TX_STATUS_LABEL, type Catalog } from '../lib/db'
 import { fmtRp, fmtRpPlain } from '../lib/money'
 import type { Transaction, TxStatus } from '../lib/types'
@@ -93,8 +94,8 @@ export default function History(): ReactElement {
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-extrabold">Riwayat Transaksi</h1>
         <div className="ml-auto flex items-center gap-2">
-          <button type="button" className="btn-ghost !min-h-0 !px-3 !py-2" onClick={() => setDate((d) => prevDay(d))} aria-label="Hari sebelumnya">
-            ‹
+          <button type="button" className="btn-ghost !min-h-10 !h-10 !w-10 !px-0" onClick={() => setDate((d) => prevDay(d))} aria-label="Hari sebelumnya">
+            <ChevronLeft size={18} strokeWidth={2.5} aria-hidden />
           </button>
           <input
             type="date"
@@ -104,12 +105,12 @@ export default function History(): ReactElement {
             onChange={(e) => e.target.value && setDate(e.target.value)}
             aria-label="Pilih tanggal"
           />
-          <button type="button" className="btn-ghost !min-h-0 !px-3 !py-2" onClick={() => setDate((d) => nextDay(d))} aria-label="Hari berikutnya">
-            ›
+          <button type="button" className="btn-ghost !min-h-10 !h-10 !w-10 !px-0" onClick={() => setDate((d) => nextDay(d))} aria-label="Hari berikutnya">
+            <ChevronRight size={18} strokeWidth={2.5} aria-hidden />
           </button>
           {date !== todayISO() && (
-            <button type="button" className="btn-ghost !min-h-0 !px-3 !py-2" onClick={() => setDate(todayISO())}>
-              Hari ini
+            <button type="button" className="btn-ghost !min-h-10 !px-3" onClick={() => setDate(todayISO())}>
+              <CalendarDays size={15} strokeWidth={2.25} className="mr-1 inline-block align-[-2px]" aria-hidden /> Hari ini
             </button>
           )}
         </div>
@@ -424,7 +425,7 @@ function EditModal({
       </p>
       <div className="mb-3 flex flex-wrap gap-1.5">
         {catalog.products.filter((p) => p.is_active).map((p) => (
-          <button key={p.id} type="button" className="chip h-8 border-[1.5px] border-brand-line bg-brand-card" onClick={() => setLines((ls) => (ls.some((l) => l.product_id === p.id) ? ls : [...ls, { product_id: p.id, qty: 1 }]))}>
+          <button key={p.id} type="button" className="chip h-8 border border-brand-line bg-brand-card" onClick={() => setLines((ls) => (ls.some((l) => l.product_id === p.id) ? ls : [...ls, { product_id: p.id, qty: 1 }]))}>
             + {p.name}
           </button>
         ))}

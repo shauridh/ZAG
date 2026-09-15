@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { ClipboardList, LayoutGrid, List, Package, Pencil, Plus, Power, RefreshCw, Siren, SquareCheck, Trash, TriangleAlert, Zap, Download as DownloadIc, Drumstick as DrumstickIc, TrendingUp as ChartLineIc, type LucideIcon } from 'lucide-react'
 import { loadCatalog, loadTransactions, upsertIngredient, saveIngredientRecipe, deleteIngredient, createPurchase, logWaste, importPriceList, createStockAdjustment, loadStockAdjustments, updateStockAdjustment, deleteStockAdjustment, loadStockMoves, type Catalog, type PriceListItem } from '../lib/db'
 import { ingIndex, preparedCost, smallUnitOf, packPriceOf, hppLines, hppTotal, marginPct, fmtHppQty } from '../lib/hpp'
 import { buyPlanFromSales, buyPlanToText, dailySalesOf, type BuyPlan } from '../lib/forecast'
@@ -144,20 +145,20 @@ export default function Ingredients(): ReactElement {
         <div className="flex gap-1" role="tablist" aria-label="Bagian">
           {(
             [
-              ['bahan', '🥘 Bahan Baku'],
-              ['stok', '📦 Pembelian & Stok'],
-              ['menu', '🍗 Menu & HPP']
-            ] as [Tab, string][]
-          ).map(([k, label]) => (
+              ['bahan', Package, 'Bahan Baku'],
+              ['stok', ClipboardList, 'Pembelian & Stok'],
+              ['menu', DrumstickIc, 'Menu & HPP']
+            ] as [Tab, LucideIcon, string][]
+          ).map(([k, Ic, label]) => (
             <button
               key={k}
               type="button"
               role="tab"
               aria-selected={tab === k}
-              className={`chip h-9 px-3 ${tab === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+              className={`chip h-9 px-3 ${tab === k ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
               onClick={() => setTab(k)}
             >
-              {label}
+              <Ic size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> {label}
             </button>
           ))}
         </div>
@@ -172,10 +173,10 @@ export default function Ingredients(): ReactElement {
         <>
           {/* Bar ringkasan: keputusan belanja dibaca dari sini, bukan dari tiap baris */}
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="chip h-9 border-[1.5px] border-brand-line bg-brand-card px-3">📦 {catalog.ingredients.filter((i) => i.kind === 'raw').length} barang</span>
-            <span className="chip h-9 border-[1.5px] border-brand-line bg-brand-card px-3">Nilai stok {fmtRp(stockValue)}</span>
-            {lowCount > 0 && <span className="chip h-9 bg-brand-gold px-3">⚠ {lowCount} perlu beli</span>}
-            {kritisCount > 0 && <span className="chip h-9 bg-brand-redtext px-3 text-white">🚨 {kritisCount} kritis</span>}
+            <span className="chip h-9 border border-brand-line bg-brand-card px-3"><Package size={13} strokeWidth={2.25} className="mr-1 inline-block align-[-2px]" aria-hidden /> {catalog.ingredients.filter((i) => i.kind === 'raw').length} barang</span>
+            <span className="chip h-9 border border-brand-line bg-brand-card px-3">Nilai stok {fmtRp(stockValue)}</span>
+            {lowCount > 0 && <span className="chip h-9 bg-brand-gold px-3"><TriangleAlert size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> {lowCount} perlu beli</span>}
+            {kritisCount > 0 && <span className="chip h-9 bg-brand-redtext px-3 text-white"><Siren size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> {kritisCount} kritis</span>}
           </div>
 
           <BahanTable
@@ -374,7 +375,7 @@ export default function Ingredients(): ReactElement {
             </div>
             {/* Komposisi potongan per kemasan (opsional): 1 pack isi 9 = 2 sayap +
                 2 paha atas + 2 paha bawah + 3 dada — kasir/dapur tahu yg bisa dijual. */}
-            <details className="rounded-lg border-[1.5px] border-brand-line p-2.5" open={!!editing.pack_breakdown?.length}>
+            <details className="rounded-lg border border-brand-line p-2.5" open={!!editing.pack_breakdown?.length}>
               <summary className="cursor-pointer text-xs font-extrabold text-brand-muted">
                 Rincian isi kemasan per potongan (opsional)
               </summary>
@@ -406,7 +407,7 @@ export default function Ingredients(): ReactElement {
                     }
                   />
                   <button type="button" className="icon-btn-danger !h-9 !w-9" aria-label={`Hapus ${b.name || `potongan ${bi + 1}`}`} onClick={() => setEditing({ ...editing, pack_breakdown: (editing.pack_breakdown ?? []).filter((_, j) => j !== bi) })}>
-                    🗑
+                    <Trash size={15} strokeWidth={2.25} aria-hidden />
                   </button>
                 </div>
               ))}
@@ -577,7 +578,7 @@ function ImportPriceListButton({ reload, setErr, toast, disabled }: { reload: ()
   return (
     <>
       <button type="button" className="btn-ghost" disabled={disabled} onClick={() => setConfirming(true)}>
-        📥 Impor Price List
+        <DownloadIc size={15} strokeWidth={2.25} className="mr-1 inline-block align-[-2px]" aria-hidden /> Impor Price List
       </button>
       <Modal open={confirming} title="Impor Price List" onClose={() => setConfirming(false)}>
         <p className="mb-2 text-sm">
@@ -672,7 +673,7 @@ function BahanTable({
               type="button"
               role="radio"
               aria-checked={activeFilter === k}
-              className={`chip h-9 px-3 ${activeFilter === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+              className={`chip h-9 px-3 ${activeFilter === k ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
               onClick={() => setActiveFilter(k)}
             >
               {label}
@@ -680,7 +681,7 @@ function BahanTable({
           ))}
         </div>
         <button type="button" className="btn-ghost" onClick={() => checkAll(true)} title="Centang semua barang yang perlu dibeli">
-          ✅ Pilih yang perlu beli
+          <SquareCheck size={15} strokeWidth={2.25} className="mr-1 inline-block align-[-2px]" aria-hidden /> Pilih yang perlu beli
         </button>
         {checked.size > 0 && (
           <span className="chip h-9 bg-brand-gold px-3">{checked.size} dipilih — lanjut di tab Pembelian</span>
@@ -689,26 +690,26 @@ function BahanTable({
           {/* tampilan: tabel / kartu */}
           <div className="flex gap-1" role="radiogroup" aria-label="Tampilan">
             {(
-              [
-                ['table', '☰ Tabel'],
-                ['grid', '▦ Kartu']
-              ] as ['table' | 'grid', string][]
-            ).map(([k, label]) => (
+            [
+              ['table', List, 'Tabel'],
+              ['grid', LayoutGrid, 'Kartu']
+            ] as ['table' | 'grid', LucideIcon, string][]
+            ).map(([k, Ic, label]) => (
               <button
                 key={k}
                 type="button"
                 role="radio"
                 aria-checked={view === k}
-                className={`chip h-9 px-3 ${view === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+                className={`chip h-9 px-3 ${view === k ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
                 onClick={() => setViewPersist(k)}
               >
-                {label}
+                <Ic size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> {label}
               </button>
             ))}
           </div>
           <ImportPriceListButton reload={async () => {}} setErr={() => undefined} toast={toast} />
           <button type="button" className="btn-primary" onClick={() => setEditing({ kind: 'raw', buy_unit: 'pack', small_unit: '', pack_content: 1, price: 0, min_stock: 0, active: true })}>
-            + Barang Baru
+            <Plus size={15} strokeWidth={2.75} className="mr-1 inline-block align-[-2px]" aria-hidden /> Barang Baru
           </button>
         </div>
       </div>
@@ -753,18 +754,18 @@ function BahanTable({
                     aria-label={i.active ? `Nonaktifkan ${i.name}` : `Aktifkan ${i.name}`}
                     onClick={() => void toggleActive(i)}
                   >
-                    {i.active ? '⏻' : '⚡'}
+                    {i.active ? <Power size={15} strokeWidth={2.25} aria-hidden /> : <Zap size={15} strokeWidth={2.25} aria-hidden />}
                   </button>
                   {i.kind === 'prepared' && (
                     <button type="button" className="icon-btn" title="Resep produksi" aria-label={`Resep ${i.name}`} onClick={() => setRecipeFor(i)}>
-                      🧾
+                      <ClipboardList size={15} strokeWidth={2.25} aria-hidden />
                     </button>
                   )}
                   <button type="button" className="icon-btn" title="Edit barang" aria-label={`Edit ${i.name}`} onClick={() => setEditing(i)}>
-                    ✏️
+                    <Pencil size={15} strokeWidth={2.25} aria-hidden />
                   </button>
                   <button type="button" className="icon-btn-danger" title="Hapus barang" aria-label={`Hapus ${i.name}`} onClick={() => setDeleting(i)}>
-                    🗑
+                    <Trash size={15} strokeWidth={2.25} aria-hidden />
                   </button>
                 </div>
               </div>
@@ -805,7 +806,7 @@ function BahanTable({
                   <td className="font-bold">
                     {i.name}
                     {i.code && <span className="ml-1 font-mono text-[10px] font-normal text-brand-muted">{i.code}</span>}
-                    {i.kind === 'prepared' && <span className="chip ml-1 border-[1.5px] border-brand-line bg-brand-paper">prepared</span>}
+                    {i.kind === 'prepared' && <span className="chip ml-1 border border-brand-line bg-brand-paper">prepared</span>}
                     {!i.active && <span className="chip ml-1 bg-brand-line">nonaktif</span>}
                     {i.pack_breakdown?.length ? (
                       <span className="ml-1 text-[10px] font-bold text-brand-muted" title="Komposisi 1 kemasan">
@@ -870,18 +871,18 @@ function BahanTable({
                         aria-label={i.active ? `Nonaktifkan ${i.name}` : `Aktifkan ${i.name}`}
                         onClick={() => void toggleActive(i)}
                       >
-                        {i.active ? '⏻' : '⚡'}
+                        {i.active ? <Power size={15} strokeWidth={2.25} aria-hidden /> : <Zap size={15} strokeWidth={2.25} aria-hidden />}
                       </button>
                       {i.kind === 'prepared' && (
                         <button type="button" className="icon-btn" title="Resep produksi" aria-label={`Resep ${i.name}`} onClick={() => setRecipeFor(i)}>
-                          🧾
+                          <ClipboardList size={15} strokeWidth={2.25} aria-hidden />
                         </button>
                       )}
                       <button type="button" className="icon-btn" title="Edit barang" aria-label={`Edit ${i.name}`} onClick={() => setEditing(i)}>
-                        ✏️
+                        <Pencil size={15} strokeWidth={2.25} aria-hidden />
                       </button>
                       <button type="button" className="icon-btn-danger" title="Hapus barang" aria-label={`Hapus ${i.name}`} onClick={() => setDeleting(i)}>
-                        🗑
+                        <Trash size={15} strokeWidth={2.25} aria-hidden />
                       </button>
                     </div>
                   </td>
@@ -1005,7 +1006,7 @@ function StokTab({
                   aria-label="Harga per kemasan"
                 />
                 <button type="button" className="icon-btn-danger" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} aria-label="Hapus baris">
-                  🗑
+                  <Trash size={15} strokeWidth={2.25} aria-hidden />
                 </button>
               </div>
             )
@@ -1170,7 +1171,7 @@ function StockMoveTable({ catalog }: { catalog: Catalog }): ReactElement {
         <input type="date" className="input !h-9 !w-36" value={from} max={to} onChange={(e) => e.target.value && setFrom(e.target.value)} aria-label="Dari tanggal" />
         <input type="date" className="input !h-9 !w-36" value={to} min={from} max={todayISO()} onChange={(e) => e.target.value && setTo(e.target.value)} aria-label="Sampai tanggal" />
         <button type="button" className="icon-btn !h-9 !w-9" title="Muat ulang riwayat" aria-label="Muat ulang riwayat stok" onClick={() => void load()}>
-          ⟳
+          <RefreshCw size={15} strokeWidth={2.25} aria-hidden />
         </button>
       </div>
       {err && <p className="px-4 py-2 text-sm text-brand-redtext">{err}</p>}
@@ -1333,7 +1334,7 @@ function OpnameForm({
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <button type="button" className="icon-btn !h-8 !w-8" title="Edit penyesuaian" aria-label={`Edit penyesuaian ${h.ingredient_name ?? h.id}`} onClick={() => setEditing({ adj: h, qty: String(h.qty), note: h.note ?? '' })}>
-                      ✏️
+                      <Pencil size={14} strokeWidth={2.25} aria-hidden />
                     </button>
                     <button
                       type="button"
@@ -1351,7 +1352,7 @@ function OpnameForm({
                         }
                       }}
                     >
-                      🗑
+                      <Trash size={14} strokeWidth={2.25} aria-hidden />
                     </button>
                   </div>
                 </li>
@@ -1435,7 +1436,7 @@ function WasteForm({
             ['produk', 'Produk jadi']
           ] as ['bahan' | 'produk', string][]
         ).map(([k, label]) => (
-          <button key={k} type="button" role="radio" aria-checked={mode === k} className={`chip h-9 px-3 ${mode === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`} onClick={() => setMode(k)}>
+          <button key={k} type="button" role="radio" aria-checked={mode === k} className={`chip h-9 px-3 ${mode === k ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`} onClick={() => setMode(k)}>
             {label}
           </button>
         ))}
@@ -1555,10 +1556,10 @@ function MenuHppTab({
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="chip h-9 border-[1.5px] border-brand-line bg-brand-card px-3">🍗 {catalog.products.length} menu</span>
-        <span className="chip h-9 border-[1.5px] border-brand-line bg-brand-card px-3">📈 Margin rata-rata {avgMargin.toFixed(0)}%</span>
-        <span className={`chip h-9 px-3 ${tipisCount > 0 ? 'bg-brand-gold' : 'border-[1.5px] border-brand-line bg-brand-card'}`}>⚠ {tipisCount} menu margin &lt; {warnPct}%</span>
-        <span className="chip h-9 border-[1.5px] border-brand-line bg-brand-card px-3">🔁 HPP otomatis ikut harga bahan</span>
+        <span className="chip h-9 border border-brand-line bg-brand-card px-3"><DrumstickIc size={13} strokeWidth={2.25} className="mr-1 inline-block align-[-2px]" aria-hidden /> {catalog.products.length} menu</span>
+        <span className="chip h-9 border border-brand-line bg-brand-card px-3"><ChartLineIc size={13} strokeWidth={2.25} className="mr-1 inline-block align-[-2px]" aria-hidden /> Margin rata-rata {avgMargin.toFixed(0)}%</span>
+        <span className={`chip h-9 px-3 ${tipisCount > 0 ? 'bg-brand-gold' : 'border border-brand-line bg-brand-card'}`}><TriangleAlert size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> {tipisCount} menu margin &lt; {warnPct}%</span>
+        <span className="chip h-9 border border-brand-line bg-brand-card px-3"><RefreshCw size={13} strokeWidth={2.25} className="mr-1 inline-block align-[-2px]" aria-hidden /> HPP otomatis ikut harga bahan</span>
         <div className="ml-auto flex gap-2">
           <input className="input max-w-52" placeholder="Cari menu…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cari menu" />
           <button type="button" className={`btn-ghost ${onlyTipis ? '!border-brand-redtext !text-brand-redtext' : ''}`} onClick={() => setOnlyTipis(!onlyTipis)}>
@@ -1707,7 +1708,7 @@ function RecipeEditorInline({
               </div>
               <span className="text-right text-xs font-bold tabular-nums">{line ? fmtRp(line.cost) : '—'}</span>
               <button type="button" className="icon-btn-danger" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} aria-label="Hapus baris">
-                🗑
+                <Trash size={15} strokeWidth={2.25} aria-hidden />
               </button>
             </div>
           )
@@ -1851,7 +1852,7 @@ function BuyInsight({ catalog, setErr }: { catalog: Catalog; setErr: (s: string)
               </div>
               {lowSoon.length > 0 && (
                 <p className="mt-1 text-xs font-bold text-brand-redtext">
-                  ⚠ Segera habis (&lt;2 hari): {lowSoon.map((i) => i.name).join(', ')}
+                  <TriangleAlert size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> Segera habis (&lt;2 hari): {lowSoon.map((i) => i.name).join(', ')}
                 </p>
               )}
               <button type="button" className="btn-ghost !min-h-0 mt-2 !py-1.5 text-xs" onClick={() => setOpen(!open)}>
@@ -1953,7 +1954,7 @@ function IngRecipeEditor({
               <span className="text-xs font-bold text-brand-muted">{comp ? smallUnitOf(comp) : ''}</span>
             </div>
             <button type="button" className="icon-btn-danger" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} aria-label="Hapus">
-              🗑
+              <Trash size={15} strokeWidth={2.25} aria-hidden />
             </button>
           </div>
         )

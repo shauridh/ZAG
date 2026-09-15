@@ -104,7 +104,7 @@ export default function Orders(): ReactElement {
           <>
             <button
               type="button"
-              className={`!min-h-0 !py-2 text-xs font-extrabold ${manualOn ? 'btn-primary' : 'btn-ghost border-[1.5px] border-brand-gold text-brand-ink'}`}
+              className={`!min-h-0 !py-2 text-xs font-extrabold ${manualOn ? 'btn-primary' : 'btn-ghost border border-brand-gold text-brand-ink'}`}
               disabled={savingDelivery}
               aria-pressed={manualOn}
               onClick={() => void toggleDelivery()}

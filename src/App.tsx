@@ -1,5 +1,9 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactElement } from 'react'
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import {
+  Clock, Drumstick, Factory, History, LayoutDashboard, LogOut, Menu, ReceiptText, ScanSearch,
+  Settings, ShoppingBag, UtensilsCrossed, Wallet, X, type LucideIcon
+} from 'lucide-react'
 import { AuthProvider, useAuth } from './auth'
 import { isDemo, loadSettings } from './lib/db'
 import { OfflineIndicator } from './components/OfflineIndicator'
@@ -25,7 +29,7 @@ const SettingsPage = lazy(() => import('./pages/Settings'))
 interface NavItem {
   to: string
   label: string
-  icon: string
+  Icon: LucideIcon
   end?: boolean
 }
 interface NavGroup {
@@ -39,45 +43,45 @@ const NAV_ADMIN: NavGroup[] = [
   {
     label: 'Operasional',
     items: [
-      { to: '/', label: 'Dashboard', icon: '📊', end: true },
-      { to: '/kasir', label: 'Kasir', icon: '🧾' },
-      { to: '/pesanan', label: 'Pesanan', icon: '🛍️' },
-      { to: '/riwayat', label: 'Riwayat Transaksi', icon: '🕘' },
-      { to: '/laporan-detail', label: 'Laporan Detail', icon: '🔍' },
-      { to: '/produksi', label: 'Produksi & Fryer', icon: '🍟' },
-      { to: '/shift', label: 'Shift', icon: '🔄' }
+      { to: '/', label: 'Dashboard', Icon: LayoutDashboard, end: true },
+      { to: '/kasir', label: 'Kasir', Icon: ReceiptText },
+      { to: '/pesanan', label: 'Pesanan', Icon: ShoppingBag },
+      { to: '/riwayat', label: 'Riwayat Transaksi', Icon: History },
+      { to: '/laporan-detail', label: 'Laporan Detail', Icon: ScanSearch },
+      { to: '/produksi', label: 'Produksi & Fryer', Icon: Factory },
+      { to: '/shift', label: 'Shift', Icon: Clock }
     ]
   },
   {
     label: 'Produk & Stok',
     items: [
-      { to: '/menu', label: 'Menu & Paket', icon: '🍗' },
-      { to: '/bahan', label: 'Bahan Baku & HPP', icon: '🥘' }
+      { to: '/menu', label: 'Menu & Paket', Icon: Drumstick },
+      { to: '/bahan', label: 'Bahan Baku & HPP', Icon: UtensilsCrossed }
     ]
   },
   {
     label: 'Keuangan',
-    items: [{ to: '/keuangan', label: 'Keuangan', icon: '💰' }]
+    items: [{ to: '/keuangan', label: 'Keuangan', Icon: Wallet }]
   },
   {
     label: 'Sistem',
-    items: [{ to: '/pengaturan', label: 'Pengaturan', icon: '⚙️' }]
+    items: [{ to: '/pengaturan', label: 'Pengaturan', Icon: Settings }]
   }
 ]
 const NAV_KASIR: NavGroup[] = [
   {
     label: 'Operasional',
     items: [
-      { to: '/kasir', label: 'Kasir', icon: '🧾' },
-      { to: '/pesanan', label: 'Pesanan', icon: '🛍️' },
-      { to: '/riwayat', label: 'Riwayat Transaksi', icon: '🕘' },
-      { to: '/produksi', label: 'Produksi & Fryer', icon: '🍟' },
-      { to: '/shift', label: 'Shift', icon: '🔄' }
+      { to: '/kasir', label: 'Kasir', Icon: ReceiptText },
+      { to: '/pesanan', label: 'Pesanan', Icon: ShoppingBag },
+      { to: '/riwayat', label: 'Riwayat Transaksi', Icon: History },
+      { to: '/produksi', label: 'Produksi & Fryer', Icon: Factory },
+      { to: '/shift', label: 'Shift', Icon: Clock }
     ]
   },
   {
     label: 'Produk & Stok',
-    items: [{ to: '/bahan', label: 'Bahan Baku & HPP', icon: '🥘' }]
+    items: [{ to: '/bahan', label: 'Bahan Baku & HPP', Icon: UtensilsCrossed }]
   }
 ]
 
@@ -160,13 +164,13 @@ function Shell(): ReactElement {
               onClick={() => setOpen(false)}
               title={compact ? n.label : undefined}
               className={({ isActive }) =>
-                `flex items-center rounded-lg text-sm font-bold ${
+                `flex items-center rounded-ctl text-sm font-bold ${
                   compact ? 'justify-center px-0 py-2.5' : 'gap-2.5 px-3 py-2.5'
-                } ${isActive ? 'bg-brand-btn text-white' : 'text-brand-ink hover:bg-brand-paper'}`
+                } ${isActive ? 'bg-brand-btn text-white shadow-lift' : 'text-brand-ink hover:bg-brand-paper'}`
               }
             >
-              <span aria-hidden className="w-5 text-center text-base leading-none">
-                {n.icon}
+              <span aria-hidden className="flex w-5 justify-center leading-none">
+                <n.Icon size={17} strokeWidth={2.25} />
               </span>
               {!compact && <span>{n.label}</span>}
             </NavLink>
@@ -185,8 +189,8 @@ function Shell(): ReactElement {
           nav('/')
         }}
       >
-        <span aria-hidden className="w-5 text-center text-base leading-none">
-          🚪
+        <span aria-hidden className="flex w-5 justify-center leading-none">
+          <LogOut size={17} strokeWidth={2.25} />
         </span>
         {!compact && <span>Keluar ({session.name})</span>}
       </button>
@@ -235,11 +239,11 @@ function Shell(): ReactElement {
               <p className="text-lg font-extrabold leading-tight">{brand.name}</p>
               <button
                 type="button"
-                className="btn-ghost !min-h-[44px] !w-[44px] !min-w-[44px] !px-0 text-lg"
+                className="btn-ghost !min-h-[44px] !w-[44px] !min-w-[44px] !px-0"
                 onClick={() => setOpen(false)}
                 aria-label="Tutup menu"
               >
-                ✕
+                <X size={18} strokeWidth={2.5} aria-hidden />
               </button>
             </div>
             {brand.tagline && <p className="px-4 text-xs font-bold text-brand-muted">{brand.tagline}</p>}
@@ -250,8 +254,8 @@ function Shell(): ReactElement {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b-[1.5px] border-brand-line bg-brand-card px-4 py-2 md:hidden">
-          <button type="button" className="btn-ghost !min-h-0 !px-3 !py-2 text-lg" onClick={() => setOpen(true)} aria-label="Buka menu">
-            ☰
+          <button type="button" className="btn-ghost !min-h-0 !h-11 !w-11 !px-0" onClick={() => setOpen(true)} aria-label="Buka menu">
+            <Menu size={20} strokeWidth={2.25} aria-hidden />
           </button>
           <p className="truncate text-base font-extrabold">{brand.name}</p>
           <OfflineIndicator className="ml-auto" />

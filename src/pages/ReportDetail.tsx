@@ -2,6 +2,7 @@
 // Filter: waktu (preset + rentang kustom), channel, metode bayar, kategori/menu,
 // status, shift, cari nomor nota — plus ringkasan ter-filter & unduh CSV.
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
+import { Download, RotateCcw, X } from 'lucide-react'
 import { loadTransactions, loadCatalog, type Catalog } from '../lib/db'
 import { applyDetailFilters, CHANNELS, METHODS, detailCsv, detailRangeOf, type DetailFilters } from '../lib/report-detail'
 import { downloadCsv } from '../lib/csv'
@@ -109,11 +110,11 @@ export default function ReportDetail(): ReactElement {
         <h1 className="text-xl font-extrabold">Laporan Detail</h1>
         <p className="text-xs font-bold text-brand-muted">Data transaksi ter-filter: waktu, channel, metode bayar, kategori/menu, status, shift &amp; nomor nota.</p>
         <div className="ml-auto flex gap-1">
-          <button type="button" className="btn-ghost !min-h-0 !h-9 !px-3" onClick={() => void reload()} title="Muat ulang data">
-            ↻ Muat ulang
+          <button type="button" className="btn-ghost !min-h-10 !h-10 !px-3" onClick={() => void reload()} title="Muat ulang data">
+            <RotateCcw size={15} strokeWidth={2.25} className="mr-1 inline-block align-[-2px]" aria-hidden /> Muat ulang
           </button>
-          <button type="button" className="btn-primary !min-h-0 !h-9 !px-3" onClick={download} disabled={!result || result.filteredCount === 0}>
-            ⬇ Unduh CSV
+          <button type="button" className="btn-primary !min-h-10 !h-10 !px-3" onClick={download} disabled={!result || result.filteredCount === 0}>
+            <Download size={15} strokeWidth={2.25} className="mr-1 inline-block align-[-2px]" aria-hidden /> Unduh CSV
           </button>
         </div>
       </div>
@@ -127,7 +128,7 @@ export default function ReportDetail(): ReactElement {
               type="button"
               role="tab"
               aria-selected={filters.period === k}
-              className={`chip h-9 px-3 ${filters.period === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+              className={`chip h-9 px-3 ${filters.period === k ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
               onClick={() => set({ period: k })}
             >
               {lbl}
@@ -196,7 +197,7 @@ export default function ReportDetail(): ReactElement {
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {activeFilterCount > 0 && (
             <button type="button" className="btn-ghost !min-h-0 !py-1 text-[11px]" onClick={() => set({ channel: '', method: '', status: '', productId: null, categoryId: null, shiftId: null, q: '' })}>
-              ✕ Reset {activeFilterCount} filter
+              <X size={12} strokeWidth={2.75} className="mr-1 inline-block align-[-1px]" aria-hidden /> Reset {activeFilterCount} filter
             </button>
           )}
           <span className="text-[11px] text-brand-muted">Filter tersimpan di perangkat ini.</span>

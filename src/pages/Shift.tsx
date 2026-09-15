@@ -245,7 +245,7 @@ export default function ShiftPage(): ReactElement {
         </p>
         {/* Selisih kas hidup: kasir lihat dulu hasil hitungannya sebelum menekan tombol */}
         <div
-          className={`mb-3 rounded-lg border-[1.5px] p-3 text-center ${
+          className={`mb-3 rounded-ctl border p-3 text-center ${
             closeDiff < 0
               ? 'border-brand-redtext bg-brand-redtext/10'
               : closeDiff > 0

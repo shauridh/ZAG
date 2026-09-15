@@ -78,7 +78,7 @@ export function MapPicker({
 
   return (
     <div>
-      <div ref={ref} className="h-64 w-full rounded-lg border-[1.5px] border-brand-line" />
+      <div ref={ref} className="h-64 w-full rounded-lg border border-brand-line" />
       <p className="mt-2 text-xs text-brand-muted">Ketuk peta untuk menandai lokasi, geser penanda untuk memperbaiki.</p>
     </div>
   )

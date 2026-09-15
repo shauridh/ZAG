@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import { useEffect, useRef, type ReactNode } from 'react'
 
 const FOCUSABLE =
@@ -99,11 +100,11 @@ export function Modal({
           <h2 className="text-base font-extrabold">{title}</h2>
           <button
             type="button"
-            className="btn-ghost !min-h-[44px] !w-[44px] !min-w-[44px] !px-0 text-lg"
+            className="btn-ghost !min-h-[44px] !w-[44px] !min-w-[44px] !px-0"
             onClick={onClose}
             aria-label="Tutup"
           >
-            ✕
+            <X size={18} strokeWidth={2.5} aria-hidden />
           </button>
         </div>
         <div className="p-4">{children}</div>

@@ -2,6 +2,7 @@
 // Fullscreen butuh satu ketukan pengguna (kebijakan browser), jadi ini chip
 // yang bisa ditekan — bukan sesuatu yang dipaksa saat aplikasi dibuka.
 import { useEffect, useState, type ReactElement } from 'react'
+import { Maximize, Minimize, Moon, Sun } from 'lucide-react'
 import {
   enableWakeLock,
   disableWakeLock,
@@ -52,22 +53,24 @@ export function TabletBar(): ReactElement {
         <button
           type="button"
           onClick={toggleWake}
-          className={`chip !min-h-0 px-2.5 py-1.5 text-xs ${awake ? 'bg-brand-gold' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+          className={`chip !min-h-0 px-2.5 py-1.5 text-xs ${awake ? 'bg-brand-gold' : 'border border-brand-line bg-brand-card'}`}
           aria-pressed={awake}
           title={awake ? 'Layar akan tetap menyala (wake lock aktif)' : 'Layar bisa mati sendiri — ketuk untuk biarkan menyala'}
         >
-          {awake ? '☀ Layar menyala' : '☾ Layar boleh mati'}
+          {awake ? <Sun size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> : <Moon size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden />}
+          {awake ? 'Layar menyala' : 'Layar boleh mati'}
         </button>
       )}
       {isFullscreenSupported() && (
         <button
           type="button"
           onClick={() => void toggleFullscreen()}
-          className={`chip !min-h-0 px-2.5 py-1.5 text-xs ${fs ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+          className={`chip !min-h-0 px-2.5 py-1.5 text-xs ${fs ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
           aria-pressed={fs}
           title={fs ? 'Keluar dari layar penuh' : 'Layar penuh — sembunyikan bilah browser untuk mode kasir'}
         >
-          {fs ? '⤢ Keluar layar penuh' : '⛶ Layar penuh'}
+          {fs ? <Minimize size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> : <Maximize size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden />}
+          {fs ? 'Keluar layar penuh' : 'Layar penuh'}
         </button>
       )}
     </div>

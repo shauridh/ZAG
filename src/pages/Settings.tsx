@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactElement } from 'react'
+import { CircleAlert, Printer, QrCode, ReceiptText, RotateCcw, ShoppingBag, Smartphone, Store, Tags, Trash, TriangleAlert } from 'lucide-react'
 import { loadSettings, saveSetting, loadZones, saveZones, resetDemoData, isDemo, resetOperationalData, clearOwnerPin } from '../lib/db'
 import { fmtRpPlain, parseNum } from '../lib/money'
 import { QtyInput } from '../components/QtyInput'
@@ -59,15 +60,15 @@ export default function SettingsPage(): ReactElement {
         <nav className="card h-fit gap-1 p-2 max-lg:grid max-lg:grid-cols-2" aria-label="Topik pengaturan">
           {(
             [
-              ['toko', '🏪 Toko & Operasional'],
-              ['struk', '🧾 Template Struk'],
-              ['printer', '🖨️ Printer'],
-              ['qris', '📲 Halaman QRIS'],
-              ['outlet', '🛍️ Outlet & Ongkir'],
-              ['tablet', '📱 Tablet & Layar'],
-              ['biaya', '🏷️ Beban Tetap']
-            ] as [Tab, string][]
-          ).map(([k, label]) => (
+              ['toko', Store, 'Toko & Operasional'],
+              ['struk', ReceiptText, 'Template Struk'],
+              ['printer', Printer, 'Printer'],
+              ['qris', QrCode, 'Halaman QRIS'],
+              ['outlet', ShoppingBag, 'Outlet & Ongkir'],
+              ['tablet', Smartphone, 'Tablet & Layar'],
+              ['biaya', Tags, 'Beban Tetap']
+            ] as [Tab, typeof Store, string][]
+          ).map(([k, Ic, label]) => (
             <button
               key={k}
               type="button"
@@ -75,7 +76,7 @@ export default function SettingsPage(): ReactElement {
               className={`rounded-lg px-3 py-2.5 text-left text-sm font-bold ${tab === k ? 'bg-brand-btn text-white' : 'text-brand-ink hover:bg-brand-paper'}`}
               onClick={() => setTab(k)}
             >
-              {label}
+              <Ic size={15} strokeWidth={2.25} className="mr-1.5 inline-block align-[-2px]" aria-hidden /> {label}
             </button>
           ))}
         </nav>
@@ -213,7 +214,7 @@ export default function SettingsPage(): ReactElement {
               <span>
                 <span className="block text-sm font-extrabold">Layar tetap menyala (wake lock)</span>
                 <span className="block text-xs text-brand-muted">
-                  Cegah layar tablet mati saat jam jualan. Bisa juga diaktifkan kapan saja dari tombol ☀ di bilah atas.
+                  Cegah layar tablet mati saat jam jualan. Bisa juga diaktifkan kapan saja dari tombol matahari di bilah atas.
                 </span>
               </span>
             </label>
@@ -247,7 +248,7 @@ export default function SettingsPage(): ReactElement {
                       role="radio"
                       aria-checked={aktif}
                       onClick={() => void upd('tablet', { ...(settings.tablet ?? { keep_awake: true, fullscreen: false }), card_size: o.v })}
-                      className={`flex-1 rounded-lg border-[1.5px] p-3 text-left ${aktif ? 'border-brand-btn bg-brand-btn text-white' : 'border-brand-line bg-white hover:bg-brand-paper'}`}
+                      className={`flex-1 rounded-ctl border p-3 text-left ${aktif ? 'border-brand-btn bg-brand-btn text-white' : 'border-brand-line bg-white hover:bg-brand-paper'}`}
                     >
                       <span className="block text-sm font-extrabold">{o.label}</span>
                       <span className={`block text-xs ${aktif ? 'text-white/85' : 'text-brand-muted'}`}>{o.desc}</span>
@@ -292,7 +293,7 @@ export default function SettingsPage(): ReactElement {
           />
           {settings.qris.image && (
             <div className="mt-3">
-              <img src={settings.qris.image} alt="QRIS tersimpan" className="max-w-[220px] rounded-lg border-[1.5px] border-brand-line" />
+              <img src={settings.qris.image} alt="QRIS tersimpan" className="max-w-[220px] rounded-lg border border-brand-line" />
               <button type="button" className="btn-danger mt-2" onClick={() => void upd('qris', { image: '' })}>
                 Hapus Gambar
               </button>
@@ -386,7 +387,7 @@ export default function SettingsPage(): ReactElement {
                   />
                 </div>
                 <button type="button" className="icon-btn-danger mt-4" onClick={() => setZones(zones.filter((_, j) => j !== i))} aria-label="Hapus zona">
-                  🗑
+                  <Trash size={15} strokeWidth={2.25} aria-hidden />
                 </button>
               </div>
             ))}
@@ -444,7 +445,7 @@ export default function SettingsPage(): ReactElement {
                 onClick={() => setSettings({ ...settings, fixed_costs: settings.fixed_costs.filter((_, j) => j !== i) })}
                 aria-label="Hapus beban"
               >
-                🗑
+                <Trash size={15} strokeWidth={2.25} aria-hidden />
               </button>
             </div>
           ))}
@@ -475,11 +476,11 @@ function Switch({ checked, onChange, label }: { checked: boolean; onChange: (v: 
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={`relative h-6 w-11 shrink-0 rounded-lg border-[1.5px] border-brand-line ${checked ? 'bg-brand-btn' : 'bg-brand-paper'}`}
+      className={`relative h-6 w-11 shrink-0 rounded-lg border border-brand-line ${checked ? 'bg-brand-btn' : 'bg-brand-paper'}`}
     >
       <span
         aria-hidden
-        className={`absolute top-[1px] h-[18px] w-[18px] rounded-md bg-brand-card shadow-pop ${checked ? 'left-[24px]' : 'left-[2px]'}`}
+        className={`absolute top-[1px] h-[18px] w-[18px] rounded-md bg-brand-card shadow ${checked ? 'left-[24px]' : 'left-[2px]'}`}
       />
     </button>
   )
@@ -565,7 +566,7 @@ function PrinterTab({ autoPrint, onAutoPrint, mode, onMode, setErr }: { autoPrin
         Sambungkan printer thermal sekali lewat Chrome/Edge (Android, Windows, macOS) — printer tersimpan dan dipakai ulang otomatis tanpa dialog lagi.
         Safari/iOS belum mendukung Bluetooth; struk otomatis jatuh ke print dialog. Bluetooth membandel? Lihat panduan <b>RawBT</b> di bawah.
       </p>
-      <div className="mb-3 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3">
+      <div className="mb-3 rounded-lg border border-brand-line bg-brand-paper p-3">
         {printer ? (
           <div className="flex items-center justify-between gap-2">
             <div>
@@ -652,7 +653,7 @@ function PrinterTab({ autoPrint, onAutoPrint, mode, onMode, setErr }: { autoPrin
           Print otomatis setiap transaksi selesai
         </label>
       </div>
-      <details className="mt-3 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3 text-sm">
+      <details className="mt-3 rounded-lg border border-brand-line bg-brand-paper p-3 text-sm">
         <summary className="cursor-pointer font-extrabold">Masih gagal juga? Jalankan Diagnostik</summary>
         <p className="mt-2">Menyambung ke printer lewat dialog lalu memetakan semua service/karakteristik dan mengirim tes cetak — hasilnya diperlihatkan persis gagal di tahap mana. Jalankan saat printer nyala. Salin hasilnya dan kirim ke saya bila masih buntu.</p>
         <button type="button" className="btn-ghost mt-2" disabled={busy} onClick={() => void runDiag()}>
@@ -676,7 +677,7 @@ function PrinterTab({ autoPrint, onAutoPrint, mode, onMode, setErr }: { autoPrin
           </div>
         )}
       </details>
-      <details className="mt-3 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3 text-sm">
+      <details className="mt-3 rounded-lg border border-brand-line bg-brand-paper p-3 text-sm">
         <summary className="cursor-pointer font-extrabold">Printer bandel? 3 cara alternatif</summary>
         <ol className="mt-2 list-decimal space-y-2 pl-5">
           <li>
@@ -884,7 +885,7 @@ function ReceiptForm({ settings, onSave }: { settings: Settings; onSave: (v: Set
         <div className="overflow-x-auto">
           <div
             style={{ width: v.width_mm >= 80 ? 300 : 220 }}
-            className="rounded border-[1.5px] border-dashed border-brand-line p-2 font-mono text-[11px] leading-tight"
+            className="rounded border border-dashed border-brand-line p-2 font-mono text-[11px] leading-tight"
           >
             <p className="text-center font-bold uppercase">{v.header || 'SABANA'}</p>
             <p className="text-center">SB260909-0001 09:41</p>
@@ -935,8 +936,8 @@ function ResetZone(): ReactElement {
     }
   }
   return (
-    <div className="card mt-4 border-[1.5px] !border-brand-redtext p-4">
-      <h2 className="font-extrabold text-brand-redtext">⚠ Mulai dari Nol</h2>
+    <div className="card mt-4 border !border-brand-redtext p-4">
+      <h2 className="font-extrabold text-brand-redtext"><CircleAlert size={16} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> Mulai dari Nol</h2>
       <p className="mt-1 text-sm text-brand-muted">
         Menghapus <b>semua</b> data operasional &amp; master: transaksi, riwayat, shift, pesanan portal, pelanggan, pembelian, produksi, stok, bahan baku, menu, resep, paket, dan fryer.
         Pengaturan toko, printer, dan akun login <b>tidak</b> tersentuh. Cocok saat pertama go-live sebelum data asli mengalir.
@@ -950,7 +951,7 @@ function ResetZone(): ReactElement {
           aria-label="Ketik HAPUS untuk mengaktifkan tombol reset"
         />
         <button type="button" className="btn-danger" disabled={!armed || busy} onClick={() => void doReset()}>
-          {busy ? 'Menghapus…' : '🗑 Hapus Semua Data (mulai dari nol)'}
+          {busy ? 'Menghapus…' : <><Trash size={15} strokeWidth={2.25} className="mr-1 inline-block align-[-2px]" aria-hidden /> Hapus Semua Data (mulai dari nol)</>}
         </button>
         <button
           type="button"
@@ -983,7 +984,7 @@ function ResetZone(): ReactElement {
             setTimeout(() => setDemoResetArmed(false), 4000)
           }}
         >
-          {demoResetArmed ? '⚠ Yakin? Klik sekali lagi' : '↩ Reset Data Demo (kembali ke seed)'}
+          {demoResetArmed ? <><TriangleAlert size={15} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> Yakin? Klik sekali lagi</> : <><RotateCcw size={15} strokeWidth={2.25} className="mr-1 inline-block align-[-2px]" aria-hidden /> Reset Data Demo (kembali ke seed)</>}
         </button>
       )}
     </div>

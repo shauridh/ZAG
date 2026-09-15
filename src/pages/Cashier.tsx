@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { CircleAlert, Pause, Play, Plus, Printer, Scooter, Share2, ShoppingBag, Utensils, X, type LucideIcon } from 'lucide-react'
 import { loadCatalog, loadSettings, createTx, currentShift, openShift, subscribeOrders, saveHeldOrder, loadHeldOrders, payHeldOrder, voidHeldOrder, type Catalog, type TxResult, type HeldOrder } from '../lib/db'
 import { ingIndex, maxAvailableQty } from '../lib/hpp'
 import { fmtRp, fmtRpPlain } from '../lib/money'
@@ -18,13 +19,15 @@ interface CartLine {
   max: number
 }
 
-const ORDER_TYPES: { key: OrderType; label: string; icon: string; online: boolean }[] = [
-  { key: 'dinein', label: 'Makan di tempat', icon: '🍽', online: false },
-  { key: 'takeaway', label: 'Bungkus', icon: '🥡', online: false },
-  { key: 'gofood', label: 'GoFood', icon: '🟢', online: true },
-  { key: 'grabfood', label: 'GrabFood', icon: '🟩', online: true },
-  { key: 'shopeefood', label: 'ShopeeFood', icon: '🟠', online: true },
-  { key: 'delivery', label: 'Delivery sendiri', icon: '🛵', online: false }
+// Ikon jenis pesanan — kanal online memakai LOGO RESMI (SVG di /public/brand,
+// tajam di semua resolusi & ikut precache offline). Kanal lain pakai ikon lucide.
+const ORDER_TYPES: { key: OrderType; label: string; Icon?: LucideIcon; logo?: string; online: boolean }[] = [
+  { key: 'dinein', label: 'Makan di tempat', Icon: Utensils, online: false },
+  { key: 'takeaway', label: 'Bungkus', Icon: ShoppingBag, online: false },
+  { key: 'gofood', label: 'GoFood', logo: `${import.meta.env.BASE_URL}brand/gofood.svg`, online: true },
+  { key: 'grabfood', label: 'GrabFood', logo: `${import.meta.env.BASE_URL}brand/grabfood.svg`, online: true },
+  { key: 'shopeefood', label: 'ShopeeFood', logo: `${import.meta.env.BASE_URL}brand/shopeefood.svg`, online: true },
+  { key: 'delivery', label: 'Delivery sendiri', Icon: Scooter, online: false }
 ]
 
 const METHOD_LABEL: Record<string, string> = { cash: 'Tunai', qris: 'QRIS', transfer: 'Transfer' }
@@ -454,7 +457,7 @@ export default function Cashier(): ReactElement {
             role="switch"
             aria-checked={hideSoldOut}
             onClick={() => setHideSoldOut(!hideSoldOut)}
-            className={`chip h-9 px-3 ${hideSoldOut ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+            className={`chip h-9 px-3 ${hideSoldOut ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
           >
             {hideSoldOut ? 'Tampilkan habis' : 'Sembunyikan habis'}
           </button>
@@ -482,7 +485,7 @@ export default function Cashier(): ReactElement {
             type="button"
             role="tab"
             aria-selected={cat === 'all'}
-            className={`chip h-9 shrink-0 px-3 ${cat === 'all' ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+            className={`chip h-9 shrink-0 px-3 ${cat === 'all' ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
             onClick={() => setCat('all')}
           >
             Semua
@@ -493,7 +496,7 @@ export default function Cashier(): ReactElement {
               type="button"
               role="tab"
               aria-selected={cat === c.id}
-              className={`chip h-9 shrink-0 px-3 ${cat === c.id ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+              className={`chip h-9 shrink-0 rounded-ctl px-3 ${cat === c.id ? 'bg-brand-btn text-white shadow-lift' : 'border border-brand-line bg-brand-card'}`}
               onClick={() => setCat(c.id)}
             >
               {c.name}
@@ -513,20 +516,22 @@ export default function Cashier(): ReactElement {
                 onClick={() => addToCart(p)}
                 title={habis ? `${p.name} — stok habis, tetap bisa dipaksa masuk (akan diberi peringatan)` : p.name}
                 aria-label={habis ? `${p.name} (habis — ketuk untuk tetap masukkan)` : p.name}
-                className={`card relative flex flex-col overflow-hidden p-0 text-left ${habis ? 'opacity-60 ring-2 ring-brand-redtext/40' : 'hover:border-brand-btn'} ${besar ? 'min-h-[220px]' : 'min-h-[150px]'}`}
+                className={`card group relative flex flex-col overflow-hidden p-0 text-left transition-all duration-150 ${
+                  habis ? 'opacity-60 ring-2 ring-brand-redtext/40' : 'hover:-translate-y-0.5 hover:shadow-lift'
+                } ${besar ? 'min-h-[220px]' : 'min-h-[150px]'}`}
               >
                 {/* slot foto tinggi tetap: kartu dengan/tanpa foto selalu sama tinggi; contain agar foto tidak terpotong */}
                 {p.photo ? (
                   <img
                     src={p.photo}
                     alt={p.name}
-                    className={`${besar ? 'h-[110px]' : 'h-[64px]'} w-full shrink-0 border-b-[1.5px] border-brand-line object-contain`}
+                    className={`${besar ? 'h-[110px]' : 'h-[64px]'} w-full shrink-0 border-b border-brand-line object-contain`}
                     style={{ background: 'linear-gradient(135deg,#F6E7D8,#EFD9C4)' }}
                     loading="lazy"
                   />
                 ) : (
                   <div
-                    className={`${besar ? 'h-[110px]' : 'h-[64px]'} w-full shrink-0 border-b-[1.5px] border-brand-line`}
+                    className={`${besar ? 'h-[110px]' : 'h-[64px]'} w-full shrink-0 border-b border-brand-line`}
                     style={{ background: 'linear-gradient(135deg,#F6E7D8,#EFD9C4)' }}
                     aria-hidden
                   />
@@ -572,8 +577,18 @@ export default function Cashier(): ReactElement {
                 title={o.label}
                 aria-label={o.label}
                 onClick={() => setOrderType(o.key)}
-                className={`icon-btn !h-8 !w-8 !min-w-0 text-base ${orderType === o.key ? 'bg-brand-btn text-white shadow' : 'border-[1.5px] border-brand-line bg-brand-card'}`}>
-                {o.icon}
+                className={`icon-btn !min-h-11 !h-11 !w-11 !min-w-0 ${
+                  orderType === o.key
+                    ? o.logo
+                      ? 'bg-white ring-2 ring-brand-btn shadow' // logo asli tetap berwarna di atas putih
+                      : 'bg-brand-btn text-white shadow'
+                    : 'border border-brand-line bg-brand-card'
+                }`}>
+                {o.logo ? (
+                  <img src={o.logo} alt="" width={30} height={24} draggable={false} style={{ objectFit: 'contain' }} aria-hidden />
+                ) : o.Icon ? (
+                  <o.Icon size={18} strokeWidth={2.5} className={orderType === o.key ? 'text-white' : undefined} aria-hidden />
+                ) : null}
               </button>
             ))}
           </div>
@@ -588,7 +603,7 @@ export default function Cashier(): ReactElement {
                 role="listitem"
                 onClick={() => recallBill(h)}
                 className={`chip h-auto shrink-0 flex-col items-start !gap-0 !py-1 pl-2.5 pr-2 text-left ${
-                  recallConfirmId === h.id ? 'bg-brand-redtext text-white' : 'border-[1.5px] border-brand-line bg-brand-paper'
+                  recallConfirmId === h.id ? 'bg-brand-redtext text-white' : 'border border-brand-line bg-brand-paper'
                 }`}
                 title={recallConfirmId === h.id ? 'Ketuk lagi: ganti keranjang dengan bill ini' : 'Panggil bill ke keranjang'}
               >
@@ -608,8 +623,8 @@ export default function Cashier(): ReactElement {
             <div key={l.product_id} className="mb-2 rounded-lg border border-brand-line p-2">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-bold leading-snug">{l.name}</p>
-                <button type="button" className="text-sm font-extrabold text-brand-redtext" onClick={() => setQty(l.product_id, 0)} aria-label={`Hapus ${l.name}`}>
-                  ✕
+                <button type="button" className="icon-btn-danger !h-9 !w-9 shrink-0" onClick={() => setQty(l.product_id, 0)} aria-label={`Hapus ${l.name}`}>
+                  <X size={16} strokeWidth={2.5} aria-hidden />
                 </button>
               </div>
               <div className="mt-1 flex items-center justify-between">
@@ -658,12 +673,14 @@ export default function Cashier(): ReactElement {
           </div>
           {cartWarn && (
             <p className="mb-2 rounded-lg bg-brand-gold/20 px-3 py-2 text-xs font-bold text-brand-ink" role="alert">
-              ⚠ {cartWarn}
+              <CircleAlert size={14} className="mr-1 inline-block shrink-0 align-[-2px]" aria-hidden />
+              {cartWarn}
             </p>
           )}
           {cartHabis.length > 0 && !cartWarn && (
             <p className="mb-2 rounded-lg bg-brand-redtext/10 px-3 py-2 text-xs font-bold text-brand-redtext" role="alert">
-              ⚠ Di keranjang: {cartHabis.join(', ')} — stok catatan HABIS. Jangan dijual bila dapur tidak sanggup.
+              <CircleAlert size={14} className="mr-1 inline-block shrink-0 align-[-2px]" aria-hidden />
+              Di keranjang: {cartHabis.join(', ')} — stok catatan HABIS. Jangan dijual bila dapur tidak sanggup.
             </p>
           )}
           {err && (
@@ -696,13 +713,13 @@ export default function Cashier(): ReactElement {
             />
             <button
               type="button"
-              className="btn-ghost relative !h-10 !w-10 shrink-0 !px-0 text-lg"
+              className="btn-ghost relative !min-h-11 !h-11 !w-11 shrink-0 !px-0"
               disabled={cart.length === 0 || busy || (!shift && !online)}
               onClick={() => void doSaveBill()}
               title="Simpan pesanan — tunda pembayaran (stok belum dipotong)"
               aria-label="Simpan pesanan sebagai bill — tunda pembayaran"
             >
-              ⏸
+              <Pause size={18} strokeWidth={2.5} aria-hidden />
               {held.length > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-btn px-1 text-[10px] font-extrabold text-white">
                   {held.length}
@@ -711,12 +728,12 @@ export default function Cashier(): ReactElement {
             </button>
             <button
               type="button"
-              className="btn-ghost relative !h-10 !w-10 shrink-0 !px-0 text-lg"
+              className="btn-ghost relative !min-h-11 !h-11 !w-11 shrink-0 !px-0"
               onClick={() => setBillsOpen(true)}
               title={`Daftar bill tersimpan (${held.length}) — panggil untuk dilanjutkan / dibayar`}
               aria-label={`Daftar bill tersimpan, ${held.length} bill`}
             >
-              ▶
+              <Play size={18} strokeWidth={2.5} aria-hidden />
               {held.length > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-redtext px-1 text-[10px] font-extrabold text-white">
                   {held.length}
@@ -736,7 +753,7 @@ export default function Cashier(): ReactElement {
         {held.length === 0 && <p className="py-6 text-center text-sm text-brand-muted">Belum ada bill tersimpan.</p>}
         <div className="flex flex-col gap-2">
           {held.map((h) => (
-            <div key={h.id} className="rounded-lg border-[1.5px] border-brand-line p-2.5">
+            <div key={h.id} className="rounded-lg border border-brand-line p-2.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-extrabold">{h.label || 'Tanpa nama'} · {fmtRp(h.total)}</p>
@@ -776,7 +793,7 @@ export default function Cashier(): ReactElement {
       <Modal open={billPay !== null} title={billPay ? `Bayar Bill — ${billPay.label || 'Tanpa nama'}` : ''} onClose={() => { setBillPay(null); setErr('') }}>
         {billPay && (
           <>
-            <div className="mb-3 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-2.5">
+            <div className="mb-3 rounded-lg border border-brand-line bg-brand-paper p-2.5">
               <p className="text-xs text-brand-muted">Total bill</p>
               <p className="text-2xl font-extrabold tabular-nums">{fmtRp(billPay.total)}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-brand-muted">{billPay.items.map((i) => `${i.qty}× ${i.name}`).join(', ')}</p>
@@ -789,7 +806,7 @@ export default function Cashier(): ReactElement {
                   role="radio"
                   aria-checked={billMethod === m}
                   onClick={() => setBillMethod(m)}
-                  className={`chip h-10 flex-1 px-3 ${billMethod === m ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+                  className={`chip h-10 flex-1 px-3 ${billMethod === m ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
                 >
                   {METHOD_LABEL[m]}
                 </button>
@@ -844,14 +861,14 @@ export default function Cashier(): ReactElement {
                       {(settings.printer.mode ?? 'bt') === 'rawbt' ? 'Cetak (RawBT)' : 'Cetak'}
                     </button>
                     <button type="button" className="btn-ghost flex-1" onClick={() => doPrint('dialog')} title="Kirim struk ke dialog cetak sistem">
-                      Dialog
+                      <Printer size={16} strokeWidth={2.25} className="mr-1 inline-block align-[-3px]" aria-hidden /> Dialog
                     </button>
                     <button type="button" className="btn-ghost flex-1" onClick={() => void shareReceipt()}>
-                      Bagikan
+                      <Share2 size={16} strokeWidth={2.25} className="mr-1 inline-block align-[-3px]" aria-hidden /> Bagikan
                     </button>
                   </div>
                   <button type="button" className="btn-primary mt-auto w-full !py-3 text-base" onClick={closeCheckout}>
-                    Transaksi Baru
+                    <Plus size={18} strokeWidth={2.75} className="mr-1 inline-block align-[-3px]" aria-hidden /> Transaksi Baru
                   </button>
                   <p className="text-center text-xs text-brand-muted">
                     Mode cetak {(settings.printer.mode ?? 'bt') === 'rawbt' ? 'RawBT — satu ketuk CETAK di jendela struk' : 'Bluetooth langsung'} · Print otomatis {settings.printer.auto_print ? 'aktif' : 'nonaktif'} · atur di Pengaturan → Printer
@@ -870,7 +887,7 @@ export default function Cashier(): ReactElement {
                           setPayMethod(m)
                           if (m !== 'cash') setCashVal(total)
                         }}
-                        className={`chip h-10 flex-1 px-3 ${payMethod === m ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+                        className={`chip h-10 flex-1 px-3 ${payMethod === m ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
                       >
                         {METHOD_LABEL[m]}
                       </button>
@@ -898,7 +915,7 @@ export default function Cashier(): ReactElement {
 
             {/* Kanan: struk (preview hidup → struk asli) */}
             <section
-              className="mx-auto max-w-full overflow-y-auto rounded-lg border-[1.5px] border-brand-line bg-white p-2"
+              className="mx-auto max-w-full overflow-y-auto rounded-lg border border-brand-line bg-white p-2"
               aria-label="Pratinjau struk"
             >
               <div dangerouslySetInnerHTML={{ __html: receiptHtml }} />

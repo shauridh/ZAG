@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
+import { CircleAlert, Flame, Pencil, Play, Trash } from 'lucide-react'
 import { loadCatalog, loadFryers, loadBatches, createBatch, fillFryer, endOilCycle, saveFryer, saveSetting, createStockAdjustment, type Catalog } from '../lib/db'
 import type { BatchHistoryItem } from '../lib/types'
 import { ingIndex, ingredientNeeds, smallUnitOf } from '../lib/hpp'
@@ -57,7 +58,7 @@ export default function Production(): ReactElement {
       {err && <ErrorSummary err={err} label="Batch produksi gagal" />}
       {bannerCycle && (
         <div className={`card strip mb-3 flex flex-col items-start gap-3 p-4 sm:flex-row sm:items-center ${bannerWarn ? 'bg-brand-gold/15' : ''}`}>
-          <div className="text-2xl">🍟</div>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-gold/30"><Flame size={22} strokeWidth={2} className="text-brand-btn" aria-hidden /></div>
           <div className="min-w-0 flex-1">
             <p className="text-base font-extrabold">
               {fryers.find((f) => f.id === bannerCycle.fryer_id)?.name ?? 'Fryer'} — minyak hari ke-{bannerDays} dari {settings.oil.max_days}
@@ -108,7 +109,7 @@ export default function Production(): ReactElement {
                   aria-label={`Sesuaikan stok ${p.name}`}
                   onClick={() => { setAdjust({ ing: p, qty: String(p.stock) }) }}
                 >
-                  ✏️
+                  <Pencil size={14} strokeWidth={2.25} aria-hidden />
                 </button>
               </div>
               <p className="text-lg font-extrabold tabular-nums">
@@ -289,7 +290,7 @@ function BatchForm({
                 {packContent > 1 && <option value="buy">{buyUnit}</option>}
               </select>
               <button type="button" className="icon-btn-danger" onClick={() => setOutputs((os) => os.filter((_, j) => j !== i))} aria-label="Hapus">
-                🗑
+                <Trash size={15} strokeWidth={2.25} aria-hidden />
               </button>
             </div>
             {mode === 'buy' && (
@@ -300,7 +301,7 @@ function BatchForm({
             )}
             {mode === 'buy' && breakdownMismatch(prep?.pack_breakdown, packContent) !== null && (
               <p className="mt-0.5 text-[11px] font-extrabold text-brand-redtext">
-                ⚠ Komposisi {prep?.name} tidak cocok: total {fmtQty(breakdownMismatch(prep?.pack_breakdown, packContent) ?? 0)} ≠ isi kemasan {fmtQty(packContent)} — perbaiki di Bahan & HPP supaya rincian potongan akurat.
+                <CircleAlert size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> Komposisi {prep?.name} tidak cocok: total {fmtQty(breakdownMismatch(prep?.pack_breakdown, packContent) ?? 0)} ≠ isi kemasan {fmtQty(packContent)} — perbaiki di Bahan & HPP supaya rincian potongan akurat.
               </p>
             )}
             {prep && o.qty > maxOut(prep.id) && (
@@ -562,15 +563,15 @@ function QuickProduce({
             const short = [...needs.entries()].filter(([iid, need]) => (ingById.get(iid)?.stock ?? 0) < need)
             const disabled = missing.length > 0 || busyId !== null
             return (
-              <div key={t.id} className={`rounded-lg border-[1.5px] p-3 ${missing.length ? 'border-brand-line opacity-60' : short.length ? 'border-brand-gold' : 'border-brand-line'}`}>
+              <div key={t.id} className={`rounded-ctl border p-3 ${missing.length ? 'border-brand-line opacity-60' : short.length ? 'border-brand-gold' : 'border-brand-line'}`}>
                 <div className="flex items-start justify-between gap-1">
                   <p className="min-w-0 font-extrabold">{t.name}</p>
                   <span className="flex shrink-0 gap-1">
                     <button type="button" className="icon-btn !h-7 !w-7 text-xs" title="Edit templat" aria-label={`Edit templat ${t.name}`} onClick={() => { setTUnitMode({}); setBuyDraft({}); setEditing({ ...t }) }}>
-                      ✏️
+                      <Pencil size={13} strokeWidth={2.25} aria-hidden />
                     </button>
                     <button type="button" className="icon-btn-danger !h-7 !w-7 text-xs" title="Hapus templat" aria-label={`Hapus templat ${t.name}`} onClick={() => void deleteTemplate(t.id)}>
-                      🗑
+                      <Trash size={13} strokeWidth={2.25} aria-hidden />
                     </button>
                   </span>
                 </div>
@@ -597,12 +598,12 @@ function QuickProduce({
                   if (!bad.length) return null
                   return (
                     <p className="mt-1 text-[11px] font-extrabold text-brand-redtext">
-                      ⚠ Komposisi {bad.map(({ ing }) => ing?.name).join(', ')} tidak cocok dgn isi kemasan — rincian potongan akan salah.
+                      <CircleAlert size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> Komposisi {bad.map(({ ing }) => ing?.name).join(', ')} tidak cocok dgn isi kemasan — rincian potongan akan salah.
                     </p>
                   )
                 })()}
                 <button type="button" className="btn-primary mt-2 w-full !min-h-0 !py-2 text-sm" disabled={disabled} onClick={() => void run(t)}>
-                  {busyId === t.id ? 'Memproses…' : '▶ Produksi Sekarang'}
+                  {busyId === t.id ? 'Memproses…' : <><Play size={15} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> Produksi Sekarang</>}
                 </button>
               </div>
             )
@@ -684,13 +685,13 @@ function QuickProduce({
                       {packContent > 1 && <option value="buy">{buyUnit}</option>}
                     </select>
                     <button type="button" className="icon-btn-danger" onClick={() => setEditing({ ...editing, outputs: editing.outputs.filter((_, j) => j !== i) })} aria-label="Hapus baris">
-                      🗑
+                      <Trash size={15} strokeWidth={2.25} aria-hidden />
                     </button>
                   </div>
                   <p className="mt-0.5 text-[11px] font-bold text-brand-muted">disimpan sebagai {fmtQty(o.qty)} {smallUnit}{packContent > 1 ? ` · 1 ${buyUnit} = ${fmtQty(packContent)} ${smallUnit}` : ''}</p>
                   {mode === 'buy' && breakdownMismatch(prep?.pack_breakdown, packContent) !== null && (
                     <p className="mt-0.5 text-[11px] font-extrabold text-brand-redtext">
-                      ⚠ Komposisi {prep?.name} tidak cocok: total {fmtQty(breakdownMismatch(prep?.pack_breakdown, packContent) ?? 0)} ≠ isi kemasan {fmtQty(packContent)} — perbaiki di Bahan & HPP.
+                      <CircleAlert size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> Komposisi {prep?.name} tidak cocok: total {fmtQty(breakdownMismatch(prep?.pack_breakdown, packContent) ?? 0)} ≠ isi kemasan {fmtQty(packContent)} — perbaiki di Bahan & HPP.
                     </p>
                   )}
                 </div>
@@ -781,7 +782,7 @@ function FryerPanel({
           const oil = c?.oil_ingredient_id ? ingById.get(c.oil_ingredient_id) : undefined
           const warn = c ? oilExceeded(c) : false
           return (
-            <div key={f.id} className={`rounded-lg border-[1.5px] p-3 ${warn ? 'border-brand-gold bg-brand-gold/10' : 'border-brand-line'}`}>
+            <div key={f.id} className={`rounded-ctl border p-3 ${warn ? 'border-brand-gold bg-brand-gold/10' : 'border-brand-line'}`}>
               <div className="flex flex-wrap items-center gap-2">
                 <p className="mr-auto font-extrabold">{f.name}</p>
                 {c ? (

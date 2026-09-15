@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
+import { LayoutGrid, List, Package, Pencil, Plus, Power, Trash, Zap, type LucideIcon } from 'lucide-react'
 import { loadCatalog, loadSettings, upsertProduct, upsertCategory, saveRecipe, saveTargets, saveBundle, saveBundleItems, deleteBundle, deleteProduct, uploadProductPhoto, removeProductPhoto, type Catalog } from '../lib/db'
 import { fmtHppQty, hppLines, hppTotal, ingIndex, marginPct, maxAvailableQty } from '../lib/hpp'
 import { fmtRp, fmtRpPlain } from '../lib/money'
@@ -54,7 +55,7 @@ export default function Products(): ReactElement {
               type="button"
               role="tab"
               aria-selected={tab === k}
-              className={`chip h-9 px-3 ${tab === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+              className={`chip h-9 px-3 ${tab === k ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
               onClick={() => setTab(k)}
             >
               {label}
@@ -152,7 +153,7 @@ function ProductsTab({
               type="button"
               role="radio"
               aria-checked={activeFilter === k}
-              className={`chip h-9 px-3 ${activeFilter === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+              className={`chip h-9 px-3 ${activeFilter === k ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
               onClick={() => setActiveFilter(k)}
             >
               {label}
@@ -160,28 +161,28 @@ function ProductsTab({
           ))}
         </div>
         <button type="button" className="btn-primary" onClick={() => setEditProd({ unit: 'porsi', is_active: true, sort: 99 })}>
-          + Produk Baru
+          <Plus size={15} strokeWidth={2.75} className="mr-1 inline-block align-[-2px]" aria-hidden /> Produk Baru
         </button>
         <button type="button" className="btn-ghost" onClick={() => setEditCat({ name: '', sort: 99 })}>
-          + Kategori
+          <Plus size={15} strokeWidth={2.75} className="mr-1 inline-block align-[-2px]" aria-hidden /> Kategori
         </button>
         {/* tampilan: kartu / tabel */}
         <div className="ml-auto flex gap-1" role="radiogroup" aria-label="Tampilan">
           {(
             [
-              ['grid', '▦ Kartu'],
-              ['table', '☰ Tabel']
-            ] as ['grid' | 'table', string][]
-          ).map(([k, label]) => (
+              ['grid', LayoutGrid, 'Kartu'],
+              ['table', List, 'Tabel']
+            ] as ['grid' | 'table', LucideIcon, string][]
+          ).map(([k, Ic, label]) => (
             <button
               key={k}
               type="button"
               role="radio"
               aria-checked={view === k}
-              className={`chip h-9 px-3 ${view === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+              className={`chip h-9 px-3 ${view === k ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
               onClick={() => setViewPersist(k)}
             >
-              {label}
+              <Ic size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> {label}
             </button>
           ))}
         </div>
@@ -234,10 +235,10 @@ function ProductsTab({
                           aria-label={`Resep ${p.name}`}
                           onClick={() => setRecipeFor(p)}
                         >
-                          🧾
+                          <Package size={15} strokeWidth={2.25} aria-hidden />
                         </button>
                         <button type="button" className="icon-btn" title="Edit menu" aria-label={`Edit ${p.name}`} onClick={() => setEditProd(p)}>
-                          ✏️
+                          <Pencil size={15} strokeWidth={2.25} aria-hidden />
                         </button>
                         <button
                           type="button"
@@ -247,10 +248,10 @@ function ProductsTab({
                           aria-label={p.is_active ? `Matikan ${p.name}` : `Nyalakan ${p.name}`}
                           onClick={() => void toggleActive(p)}
                         >
-                          {p.is_active ? '⏻' : '⚡'}
+                          {p.is_active ? <Power size={15} strokeWidth={2.25} aria-hidden /> : <Zap size={15} strokeWidth={2.25} aria-hidden />}
                         </button>
                         <button type="button" className="icon-btn-danger" title="Hapus menu" aria-label={`Hapus ${p.name}`} onClick={() => setDeleting(p)}>
-                          🗑
+                          <Trash size={15} strokeWidth={2.25} aria-hidden />
                         </button>
                       </div>
                     </td>
@@ -320,10 +321,10 @@ function ProductsTab({
                     aria-label={`Resep ${p.name}`}
                     onClick={() => setRecipeFor(p)}
                   >
-                    🧾
+                    <Package size={15} strokeWidth={2.25} aria-hidden />
                   </button>
                   <button type="button" className="icon-btn" title="Edit menu" aria-label={`Edit ${p.name}`} onClick={() => setEditProd(p)}>
-                    ✏️
+                    <Pencil size={15} strokeWidth={2.25} aria-hidden />
                   </button>
                   {/* toggle aktif langsung di kartu: menu kosong/habis musiman cukup dimatikan */}
                   <button
@@ -334,7 +335,7 @@ function ProductsTab({
                     aria-label={p.is_active ? `Matikan ${p.name}` : `Nyalakan ${p.name}`}
                     onClick={() => void toggleActive(p)}
                   >
-                    {p.is_active ? '⏻' : '⚡'}
+                    {p.is_active ? <Power size={15} strokeWidth={2.25} aria-hidden /> : <Zap size={15} strokeWidth={2.25} aria-hidden />}
                   </button>
                   <button
                     type="button"
@@ -343,7 +344,7 @@ function ProductsTab({
                     aria-label={`Hapus ${p.name}`}
                     onClick={() => setDeleting(p)}
                   >
-                    🗑
+                    <Trash size={15} strokeWidth={2.25} aria-hidden />
                   </button>
                 </span>
               </div>
@@ -520,7 +521,7 @@ function RecipeEditor({
               />
               <span className="text-right text-xs font-bold tabular-nums">{line ? fmtRp(line.cost) : '—'}</span>
               <button type="button" className="icon-btn-danger" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} aria-label="Hapus baris">
-                🗑
+                <Trash size={15} strokeWidth={2.25} aria-hidden />
               </button>
             </div>
           )
@@ -608,7 +609,7 @@ function BundlesTab({
               </p>
               <div className="mt-2 flex gap-1.5">
                 <button type="button" className="icon-btn" title="Edit paket" aria-label={`Edit ${b.name}`} onClick={() => setEditing({ id: b.id, name: b.name, price: b.price, items: [...(b.items ?? [])] })}>
-                  ✏️
+                  <Pencil size={15} strokeWidth={2.25} aria-hidden />
                 </button>
                 <button
                   type="button"
@@ -624,7 +625,7 @@ function BundlesTab({
                     }
                   }}
                 >
-                  🗑
+                  <Trash size={15} strokeWidth={2.25} aria-hidden />
                 </button>
               </div>
             </div>
@@ -680,7 +681,7 @@ function BundlesTab({
                     aria-label="Qty"
                   />
                   <button type="button" className="icon-btn-danger" onClick={() => setEditing({ ...editing, items: editing.items.filter((_, j) => j !== i) })} aria-label="Hapus">
-                    🗑
+                    <Trash size={15} strokeWidth={2.25} aria-hidden />
                   </button>
                 </div>
               ))}
@@ -919,7 +920,7 @@ function ProductForm({
         <div className="flex flex-wrap items-center gap-3">
           {shownPhoto && (
             <>
-              <img src={shownPhoto} alt="" className="h-16 w-16 rounded-lg border-[1.5px] border-brand-line object-cover" />
+              <img src={shownPhoto} alt="" className="h-16 w-16 rounded-lg border border-brand-line object-cover" />
               <button
                 type="button"
                 className="btn-ghost !min-h-0 !py-1.5 text-xs"

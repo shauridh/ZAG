@@ -30,7 +30,7 @@ export function ToastProvider({ children }: { children: ReactNode }): ReactEleme
           aria-live="polite"
           className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex justify-center px-4"
         >
-          <p className="max-w-md rounded-lg border-[1.5px] border-brand-line bg-brand-card px-4 py-2.5 text-sm font-bold shadow-pop">
+          <p className="max-w-md rounded-ctl border border-brand-line bg-brand-card px-4 py-2.5 text-sm font-bold shadow-lift">
             {msg}
           </p>
         </div>

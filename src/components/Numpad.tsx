@@ -86,7 +86,7 @@ export function Numpad({
         </div>
       )}
       <div
-        className={`mb-2 rounded-lg border-[1.5px] px-3 py-1.5 text-right ${
+        className={`mb-2 rounded-ctl border px-3 py-1.5 text-right ${
           hasChange ? 'border-brand-btn bg-brand-gold/30' : 'border-brand-line bg-brand-paper'
         }`}
       >

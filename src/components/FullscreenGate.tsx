@@ -27,7 +27,7 @@ export function FullscreenGate(): ReactElement | null {
   }
 
   return (
-    <div className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-md items-center gap-3 rounded-xl border-[1.5px] border-brand-line bg-brand-card p-3 shadow-lg">
+    <div className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-md items-center gap-3 rounded-xl border border-brand-line bg-brand-card p-3 shadow-lg">
       <p className="flex-1 text-sm font-bold">Mode layar penuh tablet aktif di pengaturan — pamerkan kasir tanpa bilah browser?</p>
       <button
         type="button"

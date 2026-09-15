@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { Link } from 'react-router-dom'
+import { ArrowRight, CircleAlert, Flame, SlidersHorizontal } from 'lucide-react'
 import { loadCatalog, loadTransactions, loadFinance, loadSettings, loadFryers, loadPortalOrders, upsertProduct, saveRecipe, type Catalog } from '../lib/db'
 import { totalsOf, byChannel, byItem, byHour, byPayment, methodLabel } from '../lib/reports'
 import { stockTrendsFrom } from '../lib/stock-trend'
@@ -428,7 +429,7 @@ export default function Dashboard(): ReactElement {
               type="button"
               role="tab"
               aria-selected={period === k}
-              className={`chip h-9 px-3 ${period === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+              className={`chip h-9 px-3 ${period === k ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
               onClick={() => setPeriod(k)}
             >
               {lbl}
@@ -439,13 +440,13 @@ export default function Dashboard(): ReactElement {
           </button>
           <button
             type="button"
-            className={`chip h-9 px-3 ${widgetsOpen ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+            className={`chip h-9 px-3 ${widgetsOpen ? 'bg-brand-btn text-white' : 'border border-brand-line bg-brand-card'}`}
             aria-expanded={widgetsOpen}
             aria-haspopup="dialog"
             title="Pilih kartu yang tampil di dashboard"
             onClick={() => setWidgetsOpen((v) => !v)}
           >
-            ⚙ Widget
+            <SlidersHorizontal size={13} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> Widget
           </button>
         </div>
       </div>
@@ -555,33 +556,33 @@ export default function Dashboard(): ReactElement {
           <h2 className="mb-2 font-extrabold">Perlu tindakan</h2>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {pendingOrders > 0 && (
-              <Link to="/pesanan" className="flex items-center gap-2.5 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3 hover:border-brand-btn">
+              <Link to="/pesanan" className="flex items-center gap-2.5 rounded-lg border border-brand-line bg-brand-paper p-3 hover:border-brand-btn">
                 <span className="chip h-7 bg-brand-gold px-2 text-sm">{pendingOrders}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-extrabold">Pesanan online menunggu</span>
                   <span className="block text-xs text-brand-muted">verifikasi / proses sekarang</span>
                 </span>
-                <span className="text-xs font-extrabold text-brand-btn">Proses →</span>
+                <span className="inline-flex items-center gap-0.5 text-xs font-extrabold text-brand-btn">Proses <ArrowRight size={12} strokeWidth={2.75} aria-hidden /></span>
               </Link>
             )}
             {lowStock.length > 0 && (
-              <Link to="/stok" className="flex items-center gap-2.5 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3 hover:border-brand-btn">
+              <Link to="/stok" className="flex items-center gap-2.5 rounded-lg border border-brand-line bg-brand-paper p-3 hover:border-brand-btn">
                 <span className="chip h-7 bg-brand-redtext px-2 text-sm text-white">{lowStock.length}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-extrabold">Bahan di bawah minimum</span>
                   <span className="block truncate text-xs text-brand-muted">{lowStock.slice(0, 3).map((i) => i.name).join(' · ')}</span>
                 </span>
-                <span className="text-xs font-extrabold text-brand-btn">Stok →</span>
+                <span className="inline-flex items-center gap-0.5 text-xs font-extrabold text-brand-btn">Stok <ArrowRight size={12} strokeWidth={2.75} aria-hidden /></span>
               </Link>
             )}
             {oilAlert.length > 0 && (
-              <Link to="/produksi" className="flex items-center gap-2.5 rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3 hover:border-brand-btn">
-                <span className="chip h-7 bg-brand-gold px-2 text-sm">🍟</span>
+              <Link to="/produksi" className="flex items-center gap-2.5 rounded-lg border border-brand-line bg-brand-paper p-3 hover:border-brand-btn">
+                <span className="chip flex h-7 w-7 items-center justify-center bg-brand-gold px-0"><Flame size={14} strokeWidth={2.25} aria-hidden /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-extrabold">{oilAlert.length} fryer wajib ganti minyak</span>
                   <span className="block text-xs text-brand-muted">batas {settings.oil.max_days} hari / {settings.oil.max_fry_count} gorengan</span>
                 </span>
-                <span className="text-xs font-extrabold text-brand-btn">Cek →</span>
+                <span className="inline-flex items-center gap-0.5 text-xs font-extrabold text-brand-btn">Cek <ArrowRight size={12} strokeWidth={2.75} aria-hidden /></span>
               </Link>
             )}
           </div>
@@ -592,7 +593,7 @@ export default function Dashboard(): ReactElement {
         {/* Peringatan resep rusak: bahan nonaktif masih dipakai resep — taruh paling atas grid supaya terlihat */}
         {widgets.has('recipeIssues') && recipeIssues.length > 0 && (
           <div className="card strip p-3 lg:col-span-3" style={{ borderColor: 'var(--c-redtext)' }}>
-            <h2 className="mb-1 font-extrabold">⚠ Resep memakai bahan nonaktif</h2>
+            <h2 className="mb-1 font-extrabold"><CircleAlert size={15} strokeWidth={2.5} className="mr-1 inline-block align-[-2px]" aria-hidden /> Resep memakai bahan nonaktif</h2>
             <p className="mb-2 text-xs font-bold text-brand-muted">
               HPP &amp; ketersediaan menu ini bisa melompat / batch produksi bisa gagal. Aktifkan lagi bahan di halaman Bahan, atau ganti komponen resepnya.
             </p>
@@ -609,7 +610,7 @@ export default function Dashboard(): ReactElement {
                 </li>
               ))}
             </ul>
-            <Link to="/bahan" className="btn-ghost mt-2 !min-h-0 !py-1.5 inline-flex text-xs">Periksa di Bahan Baku →</Link>
+            <Link to="/bahan" className="btn-ghost mt-2 !min-h-0 !py-1.5 inline-flex items-center text-xs">Periksa di Bahan Baku <ArrowRight size={12} strokeWidth={2.75} className="ml-0.5" aria-hidden /></Link>
           </div>
         )}
 
@@ -994,7 +995,7 @@ export default function Dashboard(): ReactElement {
                 const linePts = t.points.map((p, i) => `${(i / Math.max(1, t.points.length - 1)) * 100},${40 - ((p.stock - minY) / (max - minY || 1)) * 36}`).join(' ')
                 const minLine = 40 - ((t.ingredient.min_stock - minY) / (max - minY || 1)) * 36
                 return (
-                  <div key={t.ingredient.id} className="rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-3">
+                  <div key={t.ingredient.id} className="rounded-lg border border-brand-line bg-brand-paper p-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="min-w-0 truncate text-sm font-extrabold">{t.ingredient.name}</p>
                       <span className={`chip shrink-0 ${chipCls}`}>
@@ -1037,7 +1038,7 @@ export default function Dashboard(): ReactElement {
               ))}
             </ul>
           )}
-          <Link to="/produksi" className="mt-2 inline-flex text-xs font-extrabold text-brand-btn">Ke Produksi →</Link>
+          <Link to="/produksi" className="mt-2 inline-flex items-center text-xs font-extrabold text-brand-btn">Ke Produksi <ArrowRight size={12} strokeWidth={2.75} className="ml-0.5" aria-hidden /></Link>
         </div>
         )}
 
@@ -1052,7 +1053,7 @@ export default function Dashboard(): ReactElement {
           ) : (
             <ul className="flex flex-col gap-2">
               {ideas.map((idea) => (
-                <li key={idea.name} className="rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-2.5">
+                <li key={idea.name} className="rounded-lg border border-brand-line bg-brand-paper p-2.5">
                   <div className="flex flex-wrap items-baseline justify-between gap-1">
                     <span className="text-sm font-extrabold">{idea.name}</span>
                     <span className="text-base font-extrabold tabular-nums">{fmtRp(idea.suggestedPrice)}</span>
@@ -1095,7 +1096,7 @@ export default function Dashboard(): ReactElement {
                   const habis = i.stock <= 0
                   const pct = Math.min(100, Math.round((Math.max(i.stock, 0) / Math.max(i.min_stock, 1)) * 100))
                   return (
-                    <div key={i.id} className="rounded-lg border-[1.5px] border-brand-line bg-brand-paper p-2.5">
+                    <div key={i.id} className="rounded-lg border border-brand-line bg-brand-paper p-2.5">
                       <div className="flex items-start justify-between gap-1">
                         <p className="line-clamp-2 text-xs font-bold leading-snug">{i.name}</p>
                         <span className={`chip shrink-0 text-[10px] ${habis ? 'bg-brand-redtext text-white' : 'bg-brand-gold'}`}>

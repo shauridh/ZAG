@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactElement } from 'react'
+import { ArrowDownLeft, ArrowUpRight, KeyRound, Tags, Trash } from 'lucide-react'
 import { loadFinance, loadTransactions, loadSettings, addExpense, addOtherIncome, saveSetting, setOwnerPin, verifyOwnerPin } from '../lib/db'
 import { fmtRp, fmtRpPlain } from '../lib/money'
 import { todayISO, fmtDate, dayStart, dayEnd } from '../lib/dates'
@@ -54,16 +55,16 @@ export default function Finance(): ReactElement {
         <h1 className="mr-auto text-xl font-extrabold">Keuangan</h1>
         <input type="month" className="input !h-10 !w-44" value={month.slice(0, 7)} onChange={(e) => setMonth(e.target.value + '-01')} aria-label="Pilih bulan" />
         <button type="button" className="btn-ghost" onClick={() => setExpOpen(true)}>
-          + Pengeluaran
+          <ArrowDownLeft size={16} strokeWidth={2.25} className="mr-1 inline-block align-[-3px] text-brand-redtext" aria-hidden /> Pengeluaran
         </button>
         <button type="button" className="btn-ghost" onClick={() => setIncOpen(true)}>
-          + Pemasukan Lain
+          <ArrowUpRight size={16} strokeWidth={2.25} className="mr-1 inline-block align-[-3px] text-[#16A34A]" aria-hidden /> Pemasukan Lain
         </button>
         <button type="button" className="btn-ghost" onClick={() => setCatsOpen(true)}>
-          Kategori
+          <Tags size={16} strokeWidth={2.25} className="mr-1 inline-block align-[-3px]" aria-hidden /> Kategori
         </button>
         <button type="button" className="btn-ghost" onClick={() => setPinOpen(true)}>
-          {settings.owner_pin_set ? 'Ganti PIN Owner' : 'Atur PIN Owner'}
+          <KeyRound size={16} strokeWidth={2.25} className="mr-1 inline-block align-[-3px]" aria-hidden /> {settings.owner_pin_set ? 'Ganti PIN Owner' : 'Atur PIN Owner'}
         </button>
       </div>
       {err && (
@@ -275,7 +276,7 @@ function CategoriesModal({ open, settings, onClose, setErr }: { open: boolean; s
             aria-label="Nama kategori"
           />
           <button type="button" className="icon-btn-danger" onClick={() => setCats(cats.filter((_, j) => j !== i))} aria-label="Hapus kategori">
-            🗑
+            <Trash size={15} strokeWidth={2.25} aria-hidden />
           </button>
         </div>
       ))}
