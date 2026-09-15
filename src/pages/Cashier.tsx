@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { loadCatalog, loadSettings, createTx, currentShift, openShift, subscribeOrders, saveHeldOrder, loadHeldOrders, payHeldOrder, voidHeldOrder, type Catalog, type TxResult, type HeldOrder } from '../lib/db'
 import { ingIndex, maxAvailableQty } from '../lib/hpp'
 import { fmtRp, fmtRpPlain } from '../lib/money'
 import type { OrderType, Payment, Product, Settings, Shift } from '../lib/types'
 import { Numpad } from '../components/Numpad'
 import { Modal } from '../components/Modal'
+import { PreparedStockStrip } from '../components/PreparedStockStrip'
 import { beepRegister, startOrderAlert, stopOrderAlert, vibrateSuccess } from '../lib/sound'
 import { buildReceiptHtml, buildReceiptText, receiptFromTx, CHANNEL_LABEL } from '../lib/escpos'
 import { printTextBluetooth, printHtmlFallback, openRawBtReceipt } from '../lib/bluetooth-printer'
@@ -46,6 +47,8 @@ export default function Cashier(): ReactElement {
   const [cashVal, setCashVal] = useState(0)
   const [done, setDone] = useState<{ tx: TxResult; change: number } | null>(null)
   const [err, setErr] = useState('')
+  // peringatan sesaat saat menu habis diklik ke keranjang
+  const [cartWarn, setCartWarn] = useState('')
   const [loadError, setLoadError] = useState('')
   const [busy, setBusy] = useState(false)
   const [newOrders, setNewOrders] = useState(false)
@@ -139,14 +142,18 @@ export default function Cashier(): ReactElement {
 
   const addToCart = (p: { id: number; name: string; price: number }): void => {
     const max = maxOf(p.id)
+    // menu habis (max 0) TETAP BOLEH masuk keranjang: dapur bisa produksi dadakan /
+    // stok opname tertinggal — tapi kasir diberi peringatan jelas (lihat cartWarn).
+    const effMax = max >= 1 ? max : 99
+    if (max < 1) setCartWarn(`${p.name} sedang HABIS menurut stok. Pastikan dapur sanggup sebelum jualan — sisa porsi dihitung dari resep × stok bahan.`)
+    else setCartWarn('')
     setCart((c) => {
       const found = c.find((x) => x.product_id === p.id)
       if (found) {
         if (found.qty + 1 > found.max) return c
         return c.map((x) => (x.product_id === p.id ? { ...x, qty: x.qty + 1 } : x))
       }
-      if (max < 1) return c
-      return [...c, { product_id: p.id, name: p.name, qty: 1, price: p.price, max }]
+      return [...c, { product_id: p.id, name: p.name, qty: 1, price: p.price, max: effMax }]
     })
   }
 
@@ -154,6 +161,11 @@ export default function Cashier(): ReactElement {
     setCart((c) =>
       c.map((x) => (x.product_id === pid ? { ...x, qty: Math.max(0, Math.min(x.max, qty)) } : x)).filter((x) => x.qty > 0)
     )
+
+  // peringatan item habis yang sedang di keranjang (bukan sekadar notifikasi sesaat)
+  const cartHabis = useMemo(() => (catalog ? cart.filter((l) => maxOf(l.product_id) <= 0).map((l) => l.name) : []), [cart, catalog, maxOf])
+  // penanda konfirmasi memaksa-jual sudah dilakukan (agar submit ke-2 tak ditanya ulang)
+  const confirmDone = useRef(false)
 
   const subtotal = cart.reduce((s, l) => s + l.qty * l.price, 0)
   const total = Math.max(0, subtotal - discount)
@@ -249,14 +261,26 @@ export default function Cashier(): ReactElement {
     setErr('')
     try {
       const payments: Payment[] = online ? [] : [{ method: payMethod, amount: cashVal }]
+      // ada menu habis di keranjang → konfirmasi sekali, lalu kirim dgn stok minus
+      const habisList = cartHabis
+      if (habisList.length && !confirmDone.current) {
+        setBusy(false)
+        if (!window.confirm(`⚠ ${habisList.join(', ')} stok catatan HABIS. Tetap jual? (stok bahan jadi minus — segera produksi & opname)`)) {
+          return
+        }
+        confirmDone.current = true
+        setBusy(true)
+      }
       const tx = await createTx({
         orderType,
         items: cart.map((l) => ({ product_id: l.product_id, qty: l.qty })),
         payments,
         discount,
         note: note || undefined,
+        allowNegativeStock: habisList.length > 0,
         itemsDisplay: cart.map((l) => ({ name: l.name, qty: l.qty, price: l.price }))
       })
+      confirmDone.current = false
       beepRegister()
       vibrateSuccess()
       const change = payMethod === 'cash' ? Math.max(0, cashVal - total) : 0
@@ -401,6 +425,10 @@ export default function Cashier(): ReactElement {
     <div className="flex h-full flex-col lg:flex-row">
       {/* Katalog — min-h agar grid menu tak pernah gepeng saat keranjang tinggi (layout kolom <lg) */}
       <section className="flex min-h-[300px] flex-1 flex-col p-3 lg:min-h-0 lg:p-4">
+        {/* Strip stok siap jual: sticky di atas — kasir langsung notice sisa porsi */}
+        <div className="sticky top-0 z-10 -mx-3 mb-2 lg:-mx-4">
+          <PreparedStockStrip prepared={(catalog?.ingredients ?? []).filter((i) => i.kind === 'prepared' && i.active)} />
+        </div>
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <input
             className="input min-w-40 max-w-56 flex-1"
@@ -483,9 +511,9 @@ export default function Cashier(): ReactElement {
                 key={p.id}
                 type="button"
                 onClick={() => addToCart(p)}
-                disabled={habis}
-                title={p.name}
-                className={`card relative flex flex-col overflow-hidden p-0 text-left ${habis ? 'opacity-50' : 'hover:border-brand-btn'} ${besar ? 'min-h-[220px]' : 'min-h-[150px]'}`}
+                title={habis ? `${p.name} — stok habis, tetap bisa dipaksa masuk (akan diberi peringatan)` : p.name}
+                aria-label={habis ? `${p.name} (habis — ketuk untuk tetap masukkan)` : p.name}
+                className={`card relative flex flex-col overflow-hidden p-0 text-left ${habis ? 'opacity-60 ring-2 ring-brand-redtext/40' : 'hover:border-brand-btn'} ${besar ? 'min-h-[220px]' : 'min-h-[150px]'}`}
               >
                 {/* slot foto tinggi tetap: kartu dengan/tanpa foto selalu sama tinggi; contain agar foto tidak terpotong */}
                 {p.photo ? (
@@ -625,6 +653,16 @@ export default function Cashier(): ReactElement {
             <span>Total</span>
             <span className="tabular-nums">{fmtRp(total)}</span>
           </div>
+          {cartWarn && (
+            <p className="mb-2 rounded-lg bg-brand-gold/20 px-3 py-2 text-xs font-bold text-brand-ink" role="alert">
+              ⚠ {cartWarn}
+            </p>
+          )}
+          {cartHabis.length > 0 && !cartWarn && (
+            <p className="mb-2 rounded-lg bg-brand-redtext/10 px-3 py-2 text-xs font-bold text-brand-redtext" role="alert">
+              ⚠ Di keranjang: {cartHabis.join(', ')} — stok catatan HABIS. Jangan dijual bila dapur tidak sanggup.
+            </p>
+          )}
           {err && (
             <p className="mb-2 rounded-lg bg-brand-redtext/10 px-3 py-2 text-sm font-bold text-brand-redtext" role="alert">
               {err}
