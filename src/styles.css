@@ -2,17 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Palet Sabana (lihat DESIGN.md): merah gerai + emas aksen + kertas hangat */
+/* ============================================================
+   DESIGN SYSTEM v2 — "Hangat Modern" (lihat DESIGN.md)
+   Brand tetap: merah Sabana + emas + kertas hangat + Plus Jakarta Sans.
+   Bahasa baru: permukaan lapang, radius besar, bayangan lembut berlapis,
+   garis tipis hangat, merah presisi (aksi & identitas — bukan dinding).
+   ============================================================ */
 :root {
-  --c-red: #e11b22; /* brand: header, strip, badge aktif (teks putih hanya utk teks besar/bold) */
-  --c-btn: #c4151b; /* tombol utama: putih di atasnya lolos AA */
-  --c-redtext: #a31217; /* teks merah di atas terang */
-  --c-gold: #f5a302; /* aksen tunggal: peringatan & sorotan terlaris */
-  --c-paper: #fff8f2;
+  --c-red: #e11b22;      /* brand: strip identitas, header, badge aktif */
+  --c-btn: #c4151b;      /* tombol utama: putih di atasnya kontras 5.9:1 (AA) */
+  --c-redtext: #a31217;  /* teks merah di atas terang */
+  --c-red-soft: #fdecec; /* latar badge merah lembut (baru v2) */
+  --c-gold: #f5a302;     /* aksen tunggal: peringatan & tombol cepat */
+  --c-gold-soft: #fef3dd;/* latar badge emas lembut (baru v2) */
+  --c-paper: #fff9f4;    /* latar utama, hangat */
   --c-card: #ffffff;
-  --c-ink: #1a1512;
-  --c-muted: #6e6159; /* abu hangat, lolos AA di atas kertas */
-  --c-line: #e8d9cd;
+  --c-ink: #201a16;
+  --c-muted: #6e6159;    /* abu hangat, AA di atas kertas */
+  --c-line: #f0e4d8;     /* garis tipis hangat (baru v2, jauh lebih terang) */
+  --c-line-strong: #e2d2c2; /* garis penegas (baru v2) */
 }
 
 html,
@@ -26,59 +34,102 @@ body {
   font-size: 15px;
 }
 
-/* Fokus selalu terlihat (R-32) */
+/* Fokus selalu terlihat: ring merah lembut (v2) */
 :focus-visible {
   outline: 2px solid var(--c-btn);
   outline-offset: 2px;
+  border-radius: 4px;
 }
 
 @layer components {
+  /* Kartu: permukaan lapang — tanpa border tebal, bayangan lembut 2 lapis */
   .card {
-    @apply rounded-card border-[1.5px] border-brand-line bg-brand-card;
+    @apply rounded-card bg-brand-card;
+    box-shadow: 0 1px 2px rgba(32, 26, 22, 0.05), 0 4px 12px rgba(32, 26, 22, 0.06);
   }
-  /* Motif identitas: strip merah + garis emas di bawahnya (lihat DESIGN.md) */
+
+  /* Motif identitas: strip merah-emas dipertipis (3px + 1px) — aksen, bukan garis ganda tebal */
   .strip {
-    box-shadow: inset 0 6px 0 0 var(--c-red), inset 0 7px 0 0 var(--c-gold);
+    box-shadow: inset 0 3px 0 0 var(--c-red), inset 0 4px 0 0 var(--c-gold);
   }
+
   .btn {
-    @apply inline-flex min-h-[44px] select-none items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-[44px] select-none items-center justify-center gap-2 rounded-ctl px-4 text-sm font-bold transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-brand-btn text-white shadow-pop hover:bg-brand-redtext active:translate-y-[1px] active:shadow-none;
+    @apply btn bg-brand-btn text-white;
+    box-shadow: 0 4px 12px rgba(196, 21, 27, 0.35);
+  }
+  .btn-primary:hover {
+    filter: brightness(1.06);
+  }
+  .btn-primary:active {
+    transform: translateY(1px);
+    box-shadow: none;
   }
   .btn-ghost {
-    @apply btn border-[1.5px] border-brand-line bg-brand-card text-brand-ink hover:bg-brand-paper;
+    @apply btn border bg-brand-card text-brand-ink;
+    border-color: var(--c-line);
+  }
+  .btn-ghost:hover {
+    background: #fff3e8;
   }
   .btn-danger {
-    @apply btn border-[1.5px] border-brand-redtext bg-brand-card text-brand-redtext hover:bg-brand-paper;
+    @apply btn border bg-brand-card text-brand-redtext;
+    border-color: #f3c6c6;
+  }
+  .btn-danger:hover {
+    background: var(--c-red-soft);
   }
   .btn-gold {
-    @apply btn bg-brand-gold text-brand-ink hover:brightness-95;
+    @apply btn bg-brand-gold text-brand-ink;
+    box-shadow: 0 4px 12px rgba(245, 163, 2, 0.3);
   }
-  /* Tombol aksi ikon di tabel: ringkas, satu baris per baris tabel */
+  .btn-gold:active {
+    transform: translateY(1px);
+    box-shadow: none;
+  }
+
+  /* Tombol aksi ikon di tabel: ringkas, sentuh nyaman (40px), radius kontrol */
   .icon-btn {
-    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border-[1.5px] border-brand-line bg-brand-card text-base leading-none transition-colors hover:bg-brand-paper disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-ctl border bg-brand-card leading-none transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    border-color: var(--c-line);
+  }
+  .icon-btn:hover {
+    background: #fff3e8;
   }
   .icon-btn-danger {
-    @apply icon-btn border-brand-redtext text-brand-redtext hover:bg-brand-paper;
+    @apply icon-btn text-brand-redtext;
+    border-color: #f3c6c6;
   }
+
   .input {
-    @apply min-h-[44px] w-full rounded-lg border-[1.5px] border-brand-line bg-white px-3 text-[15px] text-brand-ink placeholder:text-brand-muted focus:border-brand-btn;
+    @apply min-h-[44px] w-full rounded-ctl border bg-white px-3 text-[15px] text-brand-ink transition-shadow placeholder:text-[#b4a79c] focus:border-brand-btn;
+    border-color: var(--c-line);
+  }
+  .input:focus {
+    box-shadow: 0 0 0 4px rgba(196, 21, 27, 0.12);
+    outline: none;
   }
   .lbl {
     @apply mb-1 block text-[13px] font-semibold text-brand-muted;
   }
+
+  /* Tabel: header uppercase kecil di atas paper, garis tipis hangat */
   .tbl {
     @apply w-full border-collapse text-sm;
   }
   .tbl th {
-    @apply border-b-[1.5px] border-brand-line bg-brand-paper px-3 py-2 text-left font-bold;
+    @apply bg-brand-paper px-3 py-2.5 text-left text-[11px] font-extrabold uppercase tracking-wider text-brand-muted;
+    border-bottom: 1px solid var(--c-line);
   }
   .tbl td {
-    @apply border-b border-brand-line px-3 py-2 align-top;
+    border-bottom: 1px solid #f7efe6;
+    @apply px-3 py-2.5 align-top;
   }
+
   .chip {
-    @apply inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-bold;
+    @apply inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-bold;
   }
 }
 
@@ -110,6 +161,14 @@ body {
 }
 .dot-blink {
   animation: dotblink 1.6s ease-in-out infinite;
+}
+
+/* Hormati preferensi pengurangan gerak: matikan animasi tempelan */
+@media (prefers-reduced-motion: reduce) {
+  .pulse-new,
+  .dot-blink {
+    animation: none;
+  }
 }
 
 /* Peta Leaflet di modal */
