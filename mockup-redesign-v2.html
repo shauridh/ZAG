@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mockup Redesign v2 — Sabana Kasir</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        brand: {
+          red: '#E11B22', btn: '#C4151B', redtext: '#A31217', gold: '#F5A302',
+          redsoft: '#FDECEC', goldsoft: '#FEF3DD',
+          paper: '#FFF9F4', card: '#FFFFFF', ink: '#201A16', muted: '#6E6159',
+          line: '#F0E4D8', linestrong: '#E2D2C2'
+        }
+      },
+      fontFamily: { sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+      borderRadius: { card: '16px', ctl: '12px' },
+      boxShadow: {
+        soft: '0 1px 2px rgba(32,26,22,.05), 0 4px 12px rgba(32,26,22,.06)',
+        lift: '0 2px 4px rgba(32,26,22,.06), 0 10px 24px rgba(32,26,22,.10)',
+        btnred: '0 4px 12px rgba(196,21,27,.35)',
+        goldsoft: '0 4px 12px rgba(245,163,2,.30)'
+      }
+    }
+  }
+}
+</script>
+<style>
+  body { background: #FFF9F4; }
+  .strip-v2 { box-shadow: inset 0 3px 0 0 #E11B22, inset 0 4px 0 0 #F5A302; }
+  .strip-old { box-shadow: inset 0 6px 0 0 #E11B22, inset 0 7px 0 0 #F5A302; }
+  /* komponen BEFORE (v1) */
+  .b-card { border: 1.5px solid #E8D9CD; border-radius: 10px; background: #fff; }
+  .b-btn { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; padding: 0 1rem; border-radius: 8px; font-weight: 700; font-size: 14px; }
+  .b-btn-primary { background: #C4151B; color: #fff; box-shadow: 0 2px 0 0 rgba(26,21,18,.9); }
+  .b-btn-ghost { border: 1.5px solid #E8D9CD; background: #fff; color: #1A1512; }
+  .b-btn-danger { border: 1.5px solid #A31217; background: #fff; color: #A31217; }
+  .b-btn-gold { background: #F5A302; color: #1A1512; }
+  .b-input { min-height: 44px; width: 100%; border: 1.5px solid #E8D9CD; border-radius: 8px; padding: 0 .75rem; font-size: 15px; background: #fff; }
+  .b-input:focus { outline: none; border-color: #C4151B; }
+  .b-chip { display: inline-flex; align-items: center; gap: .25rem; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: 700; }
+  .b-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 1.5px solid #E8D9CD; border-radius: 8px; background: #fff; }
+  /* komponen AFTER (v2) */
+  .a-card { border-radius: 16px; background: #fff; box-shadow: 0 1px 2px rgba(32,26,22,.05), 0 4px 12px rgba(32,26,22,.06); }
+  .a-btn { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; padding: 0 1.1rem; border-radius: 12px; font-weight: 700; font-size: 14px; transition: transform .08s ease, box-shadow .15s ease; }
+  .a-btn-primary { background: #C4151B; color: #fff; box-shadow: 0 4px 12px rgba(196,21,27,.35); }
+  .a-btn-primary:active { transform: translateY(1px); box-shadow: none; }
+  .a-btn-ghost { border: 1px solid #F0E4D8; background: #fff; color: #201A16; }
+  .a-btn-ghost:hover { background: #FFF3E8; }
+  .a-btn-danger { border: 1px solid #F3C6C6; background: #fff; color: #A31217; }
+  .a-btn-gold { background: #F5A302; color: #201A16; box-shadow: 0 4px 12px rgba(245,163,2,.30); }
+  .a-input { min-height: 44px; width: 100%; border: 1px solid #F0E4D8; border-radius: 12px; padding: 0 .75rem; font-size: 15px; background: #fff; transition: box-shadow .15s ease, border-color .15s ease; }
+  .a-input:focus { outline: none; border-color: #C4151B; box-shadow: 0 0 0 4px rgba(196,21,27,.12); }
+  .a-input::placeholder { color: #B4A79C; }
+  .a-chip { display: inline-flex; align-items: center; gap: .3rem; border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 700; }
+  .a-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 1px solid #F0E4D8; border-radius: 12px; background: #fff; color: #201A16; }
+  .a-iconbtn-danger { color: #A31217; border-color: #F3C6C6; }
+  .menu-card { border-radius: 16px; background: #fff; box-shadow: 0 1px 2px rgba(32,26,22,.05), 0 4px 12px rgba(32,26,22,.06); transition: transform .12s ease, box-shadow .15s ease; }
+  .menu-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(32,26,22,.06), 0 10px 24px rgba(32,26,22,.10); }
+  .swatch { height: 56px; border-radius: 12px; }
+  .frame { border-radius: 20px; border: 1px solid #F0E4D8; background: #fff; overflow: hidden; box-shadow: 0 2px 4px rgba(32,26,22,.06), 0 12px 32px rgba(32,26,22,.08); }
+  .luc { display: inline-block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
+  .photo-slot { display: grid; place-items: center; height: 80px; background: #FDF1E3; color: #C9A889; }
+</style>
+</head>
+<body class="font-sans text-brand-ink antialiased">
+<div class="mx-auto max-w-6xl px-4 py-8">
+
+  <!-- ===== Header ===== -->
+  <header class="mb-8">
+    <div class="strip-v2 a-card mb-4 px-5 py-4">
+      <h1 class="text-2xl font-extrabold tracking-tight">Mockup Redesign v2 — Sabana Kasir</h1>
+      <p class="mt-1 text-sm text-brand-muted">Arah baru &ldquo;Hangat Modern&rdquo;: tetap merah-emas Sabana, bahasa visual diperbarui dari <b>nota keras</b> (border tebal, bayangan hitam) menjadi <b>permukaan lapang</b> (radius besar, bayangan lembut, merah presisi). File statis — aplikasi belum disentuh.</p>
+    </div>
+    <nav class="flex flex-wrap gap-2 text-sm font-bold">
+      <a href="#ds" class="a-btn a-btn-ghost !min-h-9">1 · Design System</a>
+      <a href="#kasir" class="a-btn a-btn-ghost !min-h-9">2 · Kasir v2</a>
+      <a href="#dash" class="a-btn a-btn-ghost !min-h-9">3 · Dashboard v2</a>
+      <a href="#ba" class="a-btn a-btn-ghost !min-h-9">4 · Before / After</a>
+      <a href="#bahan" class="a-btn a-btn-ghost !min-h-9">5 · Bahan &amp; HPP v2</a>
+      <a href="#riwayat" class="a-btn a-btn-ghost !min-h-9">6 · Riwayat v2</a>
+      <a href="#editbarang" class="a-btn a-btn-ghost !min-h-9">7 · Modal Edit Barang</a>
+      <a href="#tutupshift" class="a-btn a-btn-ghost !min-h-9">8 · Tutup Shift</a>
+      <a href="#qa" class="a-btn a-btn-ghost !min-h-9">9 · Checklist QA</a>
+    </nav>
+  </header>
+
+  <!-- ===== 1. Design System ===== -->
+  <section id="ds" class="mb-12">
+    <h2 class="mb-3 text-lg font-extrabold">1 · Design System v2</h2>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="a-card p-5">
+        <h3 class="mb-3 text-sm font-extrabold uppercase tracking-wider text-brand-muted">Palet — 2 core + 1 aksen + netral hangat</h3>
+        <div class="grid grid-cols-4 gap-2 text-[11px] font-bold">
+          <div><div class="swatch" style="background:#E11B22"></div>red · #E11B22</div>
+          <div><div class="swatch" style="background:#C4151B"></div>btn · #C4151B</div>
+          <div><div class="swatch" style="background:#A31217"></div>redtext · #A31217</div>
+          <div><div class="swatch" style="background:#F5A302"></div>gold · #F5A302</div>
+          <div><div class="swatch" style="background:#FDECEC"></div>red-soft ★</div>
+          <div><div class="swatch" style="background:#FEF3DD"></div>gold-soft ★</div>
+          <div><div class="swatch" style="background:#FFF9F4; border:1px solid #F0E4D8"></div>paper · #FFF9F4</div>
+          <div><div class="swatch" style="background:#201A16"></div>ink · #201A16</div>
+          <div><div class="swatch" style="background:#6E6159"></div>muted · #6E6159</div>
+          <div><div class="swatch" style="background:#F0E4D8"></div>line · #F0E4D8 ★</div>
+          <div><div class="swatch" style="background:#E2D2C2"></div>line-strong ★</div>
+          <div><div class="swatch" style="background:#fff; border:1px solid #F0E4D8"></div>card · #FFFFFF</div>
+        </div>
+        <p class="mt-3 text-xs text-brand-muted">★ = token baru. Merah dipakai lebih presisi: aksi utama, strip identitas, badge aktif — bukan dinding.</p>
+      </div>
+      <div class="flex flex-col gap-4">
+        <div class="a-card p-5">
+          <h3 class="mb-3 text-sm font-extrabold uppercase tracking-wider text-brand-muted">Radius &amp; Elevasi</h3>
+          <div class="flex flex-wrap items-center gap-3 text-xs font-bold">
+            <div class="grid h-16 w-16 place-items-center rounded-card" style="border:1px dashed #E2D2C2">card 16</div>
+            <div class="grid h-12 w-12 place-items-center rounded-ctl" style="border:1px dashed #E2D2C2">ctl 12</div>
+            <div class="grid h-9 w-9 place-items-center rounded-lg" style="border:1px dashed #E2D2C2">8</div>
+            <div class="a-card px-3 py-2 text-[11px]">soft — kartu</div>
+            <div class="a-card px-3 py-2 text-[11px]" style="box-shadow:0 2px 4px rgba(32,26,22,.06),0 10px 24px rgba(32,26,22,.10)">lift — hover</div>
+            <div class="a-btn a-btn-primary !min-h-9 text-[11px]">btn-red — aksi utama</div>
+          </div>
+        </div>
+        <div class="a-card p-5">
+          <h3 class="mb-2 text-sm font-extrabold uppercase tracking-wider text-brand-muted">Tipografi &amp; Motif</h3>
+          <p class="text-xl font-extrabold tracking-tight">Rp 1.250.000 <span class="text-sm font-bold text-brand-muted">— heading rapat, angka tabular</span></p>
+          <p class="text-sm text-brand-muted">Plus Jakarta Sans tetap. Heading tracking-tight, teks tubuh 15px.</p>
+          <div class="strip-v2 mt-3 rounded-card p-3 text-xs font-bold">Motif strip merah-emas: 3px + 1px (dulu 6px + 1px) — hadir di header/total/struk.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 2. Kasir v2 ===== -->
+  <section id="kasir" class="mb-12">
+    <h2 class="mb-3 text-lg font-extrabold">2 · Kasir v2 <span class="text-sm font-bold text-brand-muted">(tablet 1024px — statis)</span></h2>
+    <div class="frame">
+      <!-- topbar -->
+      <div class="strip-v2 flex items-center gap-3 bg-white px-4 py-2.5">
+        <div class="grid h-9 w-9 place-items-center rounded-ctl bg-brand-red text-xs font-extrabold text-white">SD</div>
+        <div class="min-w-0">
+          <p class="truncate text-sm font-extrabold leading-tight">Sabana Drieischicken</p>
+          <p class="text-[11px] font-bold text-brand-muted">Shift #12 · Kasir: Rina</p>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+          <span class="a-chip bg-brand-redsoft text-brand-redtext">● Online</span>
+          <span class="a-chip bg-brand-goldsoft text-brand-ink">DEMO</span>
+          <div class="h-9 w-9 rounded-ctl" style="background:#F5EFE8"></div>
+        </div>
+      </div>
+      <div class="flex">
+        <!-- kiri: menu -->
+        <div class="min-w-0 flex-1 p-4">
+          <div class="mb-2 flex flex-wrap items-center gap-1.5">
+            <button class="a-btn a-btn-primary !min-h-9">Semua</button>
+            <button class="a-btn a-btn-ghost !min-h-9">Ayam</button>
+            <button class="a-btn a-btn-ghost !min-h-9">Nasi &amp; Rice Box</button>
+            <button class="a-btn a-btn-ghost !min-h-9">Snack Goreng</button>
+            <button class="a-btn a-btn-ghost !min-h-9">Saos &amp; Sambal</button>
+          </div>
+          <div class="mb-3 flex items-center gap-2">
+            <input class="a-input !min-h-10 max-w-xs" placeholder="Cari menu…" />
+            <span class="a-chip bg-brand-goldsoft text-brand-ink"><svg class="luc !h-3 !w-3" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> 12/13 siap jual</span>
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <!-- kartu menu -->
+            <div class="menu-card overflow-hidden">
+              <div class="photo-slot"><svg class="luc !h-8 !w-8" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div>
+              <div class="p-2.5">
+                <p class="text-sm font-extrabold leading-tight">Ayam Dada (per potong)</p>
+                <div class="mt-1 flex items-center justify-between">
+                  <p class="text-sm font-extrabold text-brand-redtext">Rp 9.000</p>
+                  <span class="a-chip bg-brand-goldsoft text-brand-ink">sisa 18</span>
+                </div>
+              </div>
+            </div>
+            <div class="menu-card overflow-hidden">
+              <div class="photo-slot"><svg class="luc !h-8 !w-8" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div>
+              <div class="p-2.5">
+                <p class="text-sm font-extrabold leading-tight">Ayam Paha Atas</p>
+                <div class="mt-1 flex items-center justify-between">
+                  <p class="text-sm font-extrabold text-brand-redtext">Rp 10.000</p>
+                  <span class="a-chip bg-brand-goldsoft text-brand-ink">sisa 9</span>
+                </div>
+              </div>
+            </div>
+            <div class="menu-card overflow-hidden opacity-70">
+              <div class="photo-slot"><svg class="luc !h-8 !w-8" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div>
+              <div class="p-2.5">
+                <p class="text-sm font-extrabold leading-tight">Teh Botol</p>
+                <div class="mt-1 flex items-center justify-between">
+                  <p class="text-sm font-extrabold text-brand-redtext">Rp 4.000</p>
+                  <span class="a-chip bg-brand-redsoft text-brand-redtext">habis</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- kanan: keranjang -->
+        <aside class="w-[340px] shrink-0 border-l border-brand-line bg-brand-paper p-4">
+          <p class="mb-2 text-sm font-extrabold">Pesanan Baru</p>
+          <div class="mb-3 flex gap-1.5">
+            <button class="a-iconbtn !h-11 !w-11 bg-brand-red text-white" title="Makan di tempat"><svg class="luc" viewBox="0 0 24 24"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg></button>
+            <button class="a-iconbtn !h-11 !w-11" title="Bungkus"><svg class="luc" viewBox="0 0 24 24"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></button>
+            <button class="a-iconbtn !h-11 !w-11" title="GoFood"><svg viewBox="0 0 960 960" width="30" height="24" style="object-fit:contain" aria-hidden><path fill="rgba(255, 255, 255, 0)" d="M6.87,381.68h946.15v196.73H6.87v-196.73Z"/> <g> <ellipse fill="#ee2737" cx="102.62" cy="480.04" rx="92.3" ry="84.31"/> <path fill="#fff" d="M97.88,442.53c-.47-3.36-3.83-5.73-7.52-5.31-.06,0-.11.01-.17.02-3.73.73-6.14,4.03-5.46,7.44,1.28,6.59,1.9,13.27,1.85,19.96,0,2.27-2.01,4.12-4.51,4.13s-4.53-1.83-4.54-4.11l-.04-24.64c.15-3.16-2.17-5.97-5.54-6.73-3.71-.51-7.17,1.82-7.73,5.2-.06.39-.09.78-.07,1.17l.04,25c.05,2.36-2,4.32-4.6,4.39-2.57-.06-4.61-2.01-4.54-4.35,0-.03,0-.05,0-.08-.03-6.68.58-13.36,1.85-19.94.69-3.42-1.73-6.72-5.46-7.45-3.61-.56-7.03,1.65-7.64,4.93-.02.12-.04.24-.05.35-1.66,9.52-2.35,19.15-2.07,28.78.12,9.59,5.47,18.49,14.26,23.73,3.93,2.21,6.43,6.04,6.69,10.25l.73,14.73c.07,3.74,3.34,6.76,7.43,6.87,4.1-.11,7.37-3.13,7.43-6.86l.72-14.23c.28-4.21,2.87-8.02,6.87-10.13,8.48-4.84,13.75-13.2,14.06-22.3.46-10.32-.2-20.64-1.99-30.84ZM137.25,433.21c-17.58,0-26.38,24.28-26.38,40.33.12,8.29,4.68,15.98,12.21,20.6,3.49,2.09,5.68,5.57,5.95,9.37l.82,16.53c0,3.72,3.31,6.74,7.4,6.74,4.09,0,7.41-3.01,7.41-6.73h0s.84-16.53.84-16.53c.25-3.8,2.46-7.27,5.95-9.37,7.53-4.63,12.08-12.32,12.19-20.58,0-16.06-8.79-40.34-26.38-40.34Z"/> </g> <path d="M263.95,523.2c7.81,10.2,20.85,16.02,34.49,15.39,16.08,0,27.9-9.37,27.9-22.13v-6.71h-.39c-8.79,7.85-20.82,11.96-33.12,11.32-19.46.5-37.69-8.62-47.63-23.84-9.98-15.24-10.17-34.19-.5-49.59,9.64-15.38,27.67-24.8,47.13-24.63,12.54-.73,24.86,3.24,34.1,10.98h.41v-9.21h27.51v91.33c0,26.56-23.06,44.97-55.42,44.97-21.22,1.05-41.7-7.25-55.04-22.3l20.55-15.58h.01ZM325.18,466.4c0-10.64-13.17-20.37-27.9-20.37-18.61,0-31.01,10.28-31.01,25.67-.54,7.29,2.45,14.45,8.2,19.53,5.74,5.08,13.66,7.59,21.63,6.85,16.1,0,29.09-9.21,29.09-20.72v-10.97h-.01ZM425.96,422.13c33.52,0,57.95,21.78,57.95,49.56s-24.41,49.55-57.95,49.55c-20.26,1.21-39.57-7.97-50.05-23.78-10.52-15.84-10.52-35.69,0-51.53,10.48-15.82,29.79-25.01,50.05-23.8h0ZM425.96,445.15c-16.06.13-28.98,12.06-28.87,26.67.04,14.61,13.07,26.44,29.13,26.44,16.07-.06,29.04-11.94,29.01-26.56.36-7.17-2.61-14.14-8.19-19.21-5.57-5.05-13.23-7.72-21.09-7.34h.01ZM511.63,447.09h-24.61v-22.3h24.6v-9.55c0-16.46,12.6-26.56,33.72-26.56h26.94v22.49h-23.45c-5.62,0-8.52,2.47-8.52,7.25v6.37h38.36v22.3h-38.35v71.51h-28.68v-71.51h-.01ZM637.59,422.13c33.52,0,57.95,21.78,57.95,49.56s-24.42,49.55-57.95,49.55c-20.26,1.21-39.58-7.96-50.07-23.78-10.52-15.85-10.52-35.7,0-51.54,10.49-15.82,29.8-25,50.07-23.79ZM637.59,445.15c-16.06.13-28.98,12.06-28.87,26.67.04,14.61,13.07,26.44,29.13,26.44,16.07-.06,29.04-11.94,29.01-26.56.36-7.17-2.61-14.14-8.19-19.21-5.57-5.05-13.23-7.72-21.09-7.34h.01ZM764.9,422.13c33.52,0,57.95,21.78,57.95,49.56s-24.41,49.55-57.95,49.55c-20.26,1.21-39.57-7.97-50.05-23.78-10.52-15.84-10.52-35.69,0-51.53,10.48-15.82,29.79-25.01,50.05-23.8ZM764.9,445.15c-16.06.13-28.98,12.06-28.87,26.67.04,14.61,13.07,26.44,29.13,26.44,16.07-.06,29.04-11.94,29.01-26.56.36-7.17-2.61-14.14-8.19-19.21-5.57-5.05-13.23-7.72-21.09-7.34h.01ZM889.13,422.13c12.1-.51,23.97,3.08,33.32,10.08h.41v-42.81h28.67v129.23h-26.55v-9.2h-.38c-9.17,8.28-21.79,12.59-34.68,11.85-14.75.7-29.14-4.26-39.68-13.66-10.58-9.43-16.36-22.44-15.95-35.9-.22-13.29,5.5-26.09,15.87-35.46,10.33-9.35,24.42-14.45,39-14.1v-.02ZM922.84,465.51c0-11.15-13.56-20.35-29.26-20.35-8.02-.54-15.93,2.03-21.75,7.08-5.81,5.05-9.06,12.12-8.87,19.46,0,16.11,12.02,26.37,30.61,26.37,16.29,0,29.26-9.21,29.26-20.72v-11.85Z"/></svg></button>
+            <button class="a-iconbtn !h-11 !w-11 !border-brand-red !ring-2 !ring-brand-red" title="GrabFood (aktif)"><svg viewBox="0 0 960 960" width="30" height="24" style="object-fit:contain" aria-hidden><path d="m697.21,108.69l-1.13,62.21-99.07-106.84h58.7c25.51-.56,43.31,15.75,41.5,44.63h0Z"/> <path d="m228.93,108.69l1.12,62.21,99.08-106.84h-58.71c-25.51-.56-43.31,15.75-41.48,44.63h0Z"/> <path d="m695.08,183.78l-130.4-140.09h-203.22l-130.42,140.09c-4.73,4.39-3.66,9.69,0,9.76h464.04c3.68-.07,4.75-5.38,0-9.76Zm-171.04-62.73c0,.79-.07,1.55-.2,2.29h-121.54c-.14-.74-.2-1.5-.2-2.27v-16.95c0-6.26,4.44-11.41,9.87-11.41h102.18c5.45,0,9.89,5.14,9.89,11.41v16.93Z"/> <path d="m209.02,208.85v432.62h508.09V208.85H209.02Zm405.7,115.19l-63.97,83.23c-6.66,8.32-9.55,11.64-14.47,12.96-5.79,1.53-19.44,1.73-31.56.97l-25.64,29.33,78.34,91.21c5.05,5.63,7.34,11.51,3.39,17.96-.56.92-10.12,11.69-10.72,12.15-5.34,3.84-10.25,1.17-14.94-4.4l-79.11-90.52-79.87,91.39c-4.89,5.81-9.98,8.46-15.57,3.92-.81-.67-10.14-11.69-10.52-12.4-3.34-6.15-1.03-11.8,3.83-17.22l79.08-92.07-27.66-31.65c-28.13,21.31-57.57,2.4-76.43-24.63-8.25-11.84-18.7-36.16-22.43-58.7-2.13-12.81-1.99-24.98.58-35.17,3.52-13.95,7.09-18.01,19.24-22,8.79-2.87,19.24-3.03,30.23-.6,19.53,4.31,40.6,16.37,50.87,25.9,23.42,21.75,39.81,55.74,21.35,88.21l27.32,31.8,25.32-29.47c-.67-13.99-.51-29.74.83-36.42,1.14-5.68,4.02-9.02,11.22-16.71l72.11-73.83c12.67-15.27,21.82-4.6,8.32,9.85l-47.84,52.05c-5.36,5.83-8.84,11.5-2.63,18.5,6.33,7.15,10,3.14,14.98-2.63l49.59-57.24c3.95-4.87,8.93-5.77,11.22-2.54,2.82,2.67,2.02,8.39-2.2,12.96l-49.61,57.22c-4.98,5.77-8.46,10-2.29,17.29,6.1,7.16,10.99,3.16,16.04-3.03l45.1-55.22c12.52-15.57,21.76-5,8.54,9.6Z"/> <g> <path fill="#00b14f" d="m34.2,791.78c0,32,24.14,56.53,55.36,56.53s45.15-19.43,45.15-40.83v-7.66h-43.78v11.78h31.8c.2,11.58-10.4,25.13-33.17,25.13-25.13,0-42.6-18.65-42.6-44.95s18.84-44.36,44.76-44.36c16.88,0,30.23,4.12,42.6,12.76l.79-.59v-10.99c-9.23-6.48-24.93-12.76-43.78-12.76-32,0-57.12,24.73-57.12,55.95Zm-18.26,0c0,42.4,31.41,74.01,73.61,74.01,38.47,0,62.03-24.14,62.03-63.21v-20.02h-60.66v11.39h49.66v10.6c0,30.62-19.04,49.66-51.04,49.66-35.14,0-61.25-26.89-61.25-62.42s27.48-61.83,63.01-61.83c16.88,0,32.19,4.12,43.78,12.17v-11.58c-11.19-8.05-25.91-12.17-43.78-12.17-42.6,0-75.38,32.39-75.38,73.42Zm160.57,10.01v60.66h11.58v-60.46c0-13.54,8.83-23.16,21.99-23.16,3.93,0,7.46.98,11.19,2.55,1.57-3.73,3.14-6.87,5.1-9.82-4.12-2.75-10.21-4.51-16.1-4.51-19.83,0-33.76,14.33-33.76,34.75Zm-17.08,60.66h11.58v-60.66c0-23.95,16.1-40.24,39.46-40.24,7.85,0,15.9,2.55,19.43,4.71,2.16-2.55,4.51-5.3,7.66-7.85-7.26-5.1-17.08-8.05-27.68-8.05-30.82,0-50.45,20.81-50.45,51.63v60.46Zm181.58-67.92v17.08c6.87-9.23,12.76-17.27,18.26-23.95,13.94-17.08,26.11-26.5,44.95-26.5,25.52,0,44.17,19.24,44.17,46.33s-18.26,46.72-43.38,46.72c-20.42,0-38.08-13.94-42.2-32.98l-8.24,11.19c6.48,18.65,25.52,33.37,50.25,33.37,31.8,0,55.16-25.52,55.16-58.3s-23.56-58.11-55.75-58.11-48.68,24.93-63.21,45.15Zm35.92,8.64h-.39l-9.03,12.37c1.57,14.13,15.9,32.98,37.49,32.98s37.89-17.86,37.89-41.22-16.29-40.63-38.67-40.63-34.35,15.9-43.19,27.68c-4.32,5.69-11.78,14.92-20.02,26.5v18.84c7.66-11.39,18.06-24.73,25.72-33.96,12.96-15.51,20.81-27.29,37.3-27.29s27.09,12.37,27.09,28.86-10.4,29.64-26.11,29.64c-16.49,0-28.07-15.12-28.07-32v-1.77Zm-11.58-95.01v48.88c3.53-2.75,7.46-6.09,11.58-7.66v-41.22h-11.58Zm-17.27,66.74c3.53-4.52,7.46-9.42,11.58-13.54v-53.2h-11.58v66.74Zm-47.11,55.95l-.2-.2c-4.91,3.93-12.96,6.28-20.61,6.28-15.7,0-27.48-11.78-27.48-29.25s11.58-29.45,27.09-29.45c16.69,0,26.89,12.17,26.89,28.46v55.75h11.58v-56.34c0-22.77-15.9-39.46-38.28-39.46s-39.26,16.69-39.26,41.03,16.88,41.42,39.26,40.83c8.44-.2,17.08-3.34,21-6.09v-11.58Zm-77.74-23.36c0,34.16,24.14,58.3,56.73,58.3,7.26,0,15.7-2.16,21-6.28v-11.58c-3.53,2.94-12.17,6.28-21,6.28-26.7,0-44.76-18.84-44.76-46.72s19.24-46.33,44.76-46.33,43.77,18.65,43.77,44.76v56.53h11.78v-56.73c0-32.59-22.97-56.53-55.55-56.53s-56.73,25.32-56.73,58.3Z"/> <path fill="#00b14f" d="m502.36,742.15v43.42h57.57v21.22h-57.57v55.6h-22.99v-141.46h87.23v21.22h-64.25Zm185.48,65.82c0,34.38-22.4,57.37-55.21,57.37s-55.41-22.99-55.41-57.37,22.59-57.57,55.41-57.57,55.21,23.18,55.21,57.57Zm-55.21-36.15c-18.86,0-32.81,14.93-32.81,36.15s13.95,35.95,32.81,35.95,32.61-14.74,32.61-35.95-13.75-36.15-32.61-36.15Zm178.41,36.15c0,34.38-22.4,57.37-55.21,57.37s-55.41-22.99-55.41-57.37,22.59-57.57,55.41-57.57,55.21,23.18,55.21,57.57Zm-55.21-36.15c-18.86,0-32.81,14.93-32.81,36.15s13.95,35.95,32.81,35.95,32.61-14.74,32.61-35.95-13.75-36.15-32.61-36.15Zm121.63-21.42c15.72,0,29.08,9.04,33.01,18.86h.98v-60.12h22.59v97.84c0,35.56-22.79,58.35-55.01,58.35s-55.41-22.2-55.41-57.57,23.18-57.37,53.83-57.37Zm1.57,93.52c18.66,0,32.42-14.93,32.42-37.72,0-20.83-14.34-34.38-32.81-34.38s-32.42,13.36-32.42,35.17,14.15,36.94,32.81,36.94Z"/> </g></svg></button>
+            <button class="a-iconbtn !h-11 !w-11" title="ShopeeFood"><svg viewBox="0 0 960 960" width="30" height="24" style="object-fit:contain" aria-hidden><g> <path fill="#ed4d2d" d="m262.77,749.08c24.64,7.37,34.33,16.6,32.78,31.4-.96,9.12-6.41,16.53-14.96,20.33-4.71,2.09-11.03,3.28-16.06,3.03-7.75-.16-15.08-1.9-21.87-5.21-2.45-1.2-6.06-3.57-8.87-5.82h0c-1.32-1.11-1.47-1.83-.57-3.16.23-.36.66-1.01,1.64-2.49.84-1.27,1.69-2.55,1.73-2.62,1.05-1.59,2.16-1.59,3.7-.53,0,0,.15.11.54.4.31.23.51.37.54.4,6.98,5.22,15.03,8.16,23.06,8.33,10.99-.34,18.73-5.27,19.98-12.59,1.37-8.05-5.28-14.96-18.28-18.74-4.55-1.32-14.48-5.05-17.26-6.51-9.75-5.44-14.45-12.83-13.96-22.04.77-12.74,12.44-22.41,27.35-22.73,6.55-.13,13.11,1.11,19.43,3.61,2.28.9,6.27,2.97,7.71,3.99,1.67,1.18,1.67,1.99.86,3.52-.12.2-.55.83-1.67,2.44h0c-1.19,1.7-1.55,2.22-1.65,2.39-.98,1.27-1.8,1.66-3.47.65-6.58-4.21-13.25-6.2-20.79-6.22-9.29.34-16.12,5.85-16.45,13.16,0,6.58,5.22,11.36,16.55,15"/> <path fill="#ed4d2d" d="m331.18,745.39c15.03,0,27.44,12.13,27.5,27v29.05c0,1.68-.43,2.07-2.08,2.07h-6.9c-1.66,0-2.08-.39-2.08-2.07v-28.96c-.04-8.96-7.38-16.22-16.44-16.22s-16.37,7.22-16.44,16.16v29.02c0,1.44-.57,2.07-2.08,2.07h-6.92c-1.65,0-2.08-.61-2.08-2.07v-88.86c0-1.53.43-2.07,2.08-2.07h6.92c1.49,0,2.08.58,2.08,2.07v38.24c4.73-3.5,10.47-5.43,16.44-5.43"/> <path fill="#ed4d2d" d="m395.82,745.45c-16.43,0-29.75,13.05-29.75,29.16s13.32,29.16,29.75,29.16,29.75-13.05,29.75-29.16-13.32-29.16-29.75-29.16m0,47.59c-10.4,0-18.84-8.26-18.84-18.45s8.43-18.45,18.84-18.45,18.84,8.26,18.84,18.45-8.43,18.45-18.84,18.45"/> <path fill="#ed4d2d" d="m617.94,778.53s.1,0,.16,0c1.81-.08,3.25-1.63,3.25-3.5,0-.09,0-.17,0-.25,0-.03,0-.09,0-.21,0-16.1-12.62-29.16-28.21-29.16s-28.2,13.06-28.2,29.16c0,1.21.07,2.4.21,3.59l.05.38h0c.78,5.83,3.27,11.14,7.14,15.41t.03.03c4.32,4.75,10.19,8.01,16.72,9.23l.51.1v-.02c.23.04.47.08.76.12,8.94,1.07,16.46-.37,22.56-3.44,1.65-.83,3.07-1.73,4.26-2.62.42-.31.77-.61,1.07-.87.18-.16.3-.27.37-.34,1.58-1.63,1.65-2.33.71-3.8-2.19-3.48-3.41-5.18-3.41-5.18-.86-1.07-1.62-1.32-2.72-.35-.19.17-.37.28-.46.38-6.52,5.79-15.06,6.92-22.51,5.36-1.53-.41-2.96-.93-4.28-1.56-5.08-2.55-8.76-7.11-9.82-12.46h41.67s.08,0,.13,0m-41.13-10.69c2.16-7.05,8.7-11.75,16.33-11.75s14.25,5.02,16.62,11.75h-32.95Z"/> <path fill="#ed4d2d" d="m463.26,745.3c-6.84,0-13.32,2.35-18.5,6.58v-4.51c0-1.57-.43-2.07-2.07-2.07h-6.58c-1.65,0-2.08.46-2.08,2.07v83.9c0,1.52.43,2.07,2.08,2.07h6.58c1.64,0,2.07-.54,2.07-2.07v-34.24c5.18,4.23,11.66,6.58,18.5,6.58,16.14,0,29.23-13.05,29.23-29.16s-13.09-29.16-29.23-29.16m0,47.59c-10.04,0-18.24-7.99-18.49-17.98v-.95c.25-9.98,8.45-17.97,18.49-17.97s18.5,8.26,18.5,18.45-8.29,18.45-18.5,18.45"/> <path fill="#ed4d2d" d="m554.04,778.53s.1,0,.16,0c1.81-.08,3.25-1.63,3.25-3.5,0-.09,0-.17,0-.25,0-.03,0-.09,0-.21,0-16.1-12.62-29.16-28.21-29.16s-28.2,13.06-28.2,29.16c0,1.21.07,2.4.21,3.59l.05.38h0c.78,5.83,3.27,11.14,7.14,15.41,0,0,0,0,.03.03,4.32,4.75,10.19,8.01,16.72,9.23l.51.1v-.02c.23.04.47.08.76.12,8.94,1.07,16.46-.37,22.56-3.44,1.65-.83,3.07-1.73,4.26-2.62.42-.31.77-.61,1.07-.87.18-.16.3-.27.37-.34,1.58-1.63,1.65-2.33.71-3.8-2.18-3.48-3.41-5.18-3.41-5.18-.86-1.07-1.62-1.32-2.72-.35-.19.17-.37.28-.46.38-6.52,5.79-15.06,6.92-22.51,5.36-1.53-.41-2.96-.93-4.28-1.56-5.08-2.55-8.76-7.11-9.82-12.46h41.67s.08,0,.13,0m-41.13-10.69c2.16-7.05,8.7-11.75,16.33-11.75s14.26,5.02,16.62,11.75h-32.95Z"/> <polygon fill="#ed4d2d" points="636.48 803.64 653.48 803.64 653.48 767.84 697 767.84 697 750.75 653.48 750.75 653.48 729.6 698.4 729.6 698.4 712.65 636.48 712.65 636.48 803.64"/> <path fill="#ed4d2d" d="m735.69,740.15c-8.49,0-16.61,3.34-22.87,9.41-6.07,6.28-9.41,14.51-9.41,23.15s3.34,16.73,9.41,23.15h0c6.34,6.16,14.46,9.54,22.86,9.54s16.66-3.39,22.74-9.54c6.16-6.24,9.55-14.46,9.55-23.16s-3.39-16.92-9.55-23.15c-5.85-6.07-13.93-9.41-22.74-9.41m0,49.05c-8.76,0-15.89-7.4-15.89-16.5s7.13-16.49,15.89-16.49,16.02,7.4,16.02,16.49-7.19,16.5-16.02,16.5"/> <path fill="#ed4d2d" d="m805.94,740.43c-8.49,0-16.61,3.34-22.87,9.4-6.07,6.28-9.41,14.51-9.41,23.15s3.34,16.73,9.41,23.15h.01c6.34,6.16,14.46,9.54,22.86,9.54s16.66-3.39,22.74-9.53c6.16-6.24,9.55-14.46,9.55-23.16s-3.39-16.92-9.55-23.15c-5.86-6.06-13.93-9.4-22.74-9.4m0,49.05c-8.76,0-15.89-7.4-15.89-16.49s7.12-16.5,15.89-16.5,16.02,7.4,16.02,16.5-7.19,16.49-16.02,16.49"/> <path fill="#ed4d2d" d="m890.88,712.99v32.98h-.08c-4.44-4.09-10.4-5.4-16.1-5.4-8.67,0-15.91,2.69-21.9,8.76-6.07,6.28-8.72,14.41-8.72,22.96s2.64,17.43,8.71,23.72h0c6.12,6.07,14.19,8.71,22.73,8.71,4.8,0,10.36-.65,15.29-5.5l.07-.07v4.35h15.4v-90.51h-15.4Zm-15.35,75.95c-8.32,0-15.35-7.73-15.35-16.89s7.03-16.89,15.35-16.89,15.35,7.73,15.35,16.89-7.03,16.89-15.35,16.89"/> <path fill="#ed4d2d" d="m185.62,664.92h-111.8l-20.09,29.59,5.23,112.83c.34,7.4,6.45,13.23,13.85,13.23h21.01v-41.92c0-1.77-.65-3.48-1.82-4.8l-5.65-6.37c-1.37-1.54-2.13-4.24-2.13-6.3v-39.35c0-1.62,1.31-2.92,2.92-2.92h5.44v33.67c0,1.57,1.27,2.84,2.84,2.84h.4c1.57,0,2.84-1.27,2.84-2.84v-33.67h7.84v33.67c0,1.57,1.27,2.84,2.84,2.84h.4c1.57,0,2.84-1.27,2.84-2.84v-33.67h5.44c1.61,0,2.92,1.31,2.92,2.92v39.35c0,2.06-.76,4.76-2.13,6.3l-5.65,6.37c-1.17,1.32-1.82,3.03-1.82,4.8v41.92h36.63v-45.4c0-2.52-1.23-4.55-2.94-6.3-.98-.71-1.91-1.51-2.78-2.39,0,0,0,0-.02-.01h0c-4.65-4.73-7.6-11.85-7.6-20.06,0-14.8,9.61-29.79,21.46-29.79s21.47,14.99,21.47,29.79c0,8.21-2.95,15.33-7.6,20.05h0s-.01.02-.02.02c-.87.88-1.8,1.68-2.77,2.39-1.71,1.75-2.94,3.77-2.94,6.3v45.4h22.38c7.41,0,13.51-5.82,13.85-13.23l5.23-112.83-20.1-29.59Zm-23.29,30.42h-65.22v-14.46c0-1.7,1.4-3.08,3.11-3.08h58.99c1.72,0,3.11,1.38,3.11,3.08v14.46Z"/> </g> <g> <path fill="#ed4d2d" d="m314.57,98.97H81.34l-41.91,61.73,10.91,235.36c.72,15.44,13.45,27.59,28.9,27.59h43.83v-87.45c0-3.69-1.35-7.25-3.8-10.02l-11.78-13.29c-2.85-3.22-4.43-8.84-4.43-13.15v-82.08c0-3.37,2.73-6.1,6.1-6.1h11.34v70.24c0,3.27,2.65,5.93,5.93,5.93h.83c3.27,0,5.93-2.65,5.93-5.93v-70.24h16.36v70.24c0,3.27,2.65,5.93,5.93,5.93h.83c3.28,0,5.93-2.65,5.93-5.93v-70.24h11.34c3.37,0,6.1,2.72,6.1,6.1v82.08c0,4.31-1.58,9.93-4.43,13.15l-11.78,13.29c-2.45,2.76-3.8,6.33-3.8,10.02v87.45h76.41v-94.7c0-5.27-2.57-9.49-6.14-13.14-2.05-1.47-3.98-3.14-5.79-4.99-.01,0-.02-.01-.03-.03h0c-9.7-9.86-15.85-24.73-15.85-41.84,0-30.88,20.05-62.14,44.77-62.14s44.78,31.26,44.78,62.14c0,17.12-6.16,31.98-15.86,41.83h0s-.03.03-.04.04c-1.81,1.84-3.75,3.51-5.79,4.99-3.58,3.65-6.14,7.87-6.14,13.14v94.7h46.69c15.46,0,28.18-12.15,28.9-27.59l10.92-235.36-41.92-61.73Zm-48.59,63.45h-136.04v-30.16c0-3.55,2.92-6.43,6.5-6.43h123.05c3.59,0,6.5,2.88,6.5,6.43v30.16Z"/> <g> <polygon fill="#ed4d2d" points="412.91 431.99 443.15 431.99 443.15 368.3 520.57 368.3 520.57 337.91 443.15 337.91 443.15 300.27 523.07 300.27 523.07 270.11 412.91 270.11 412.91 431.99"/> <path fill="#ed4d2d" d="m589.41,319.04c-15.1,0-29.54,5.94-40.69,16.73-10.8,11.18-16.74,25.81-16.74,41.18s5.95,29.77,16.74,41.18l.02.02c11.28,10.94,25.72,16.96,40.68,16.96s29.65-6.02,40.45-16.97c10.95-11.09,16.99-25.72,16.99-41.2s-6.03-30.1-16.98-41.18c-10.41-10.79-24.78-16.73-40.45-16.73m0,87.27c-15.58,0-28.26-13.17-28.26-29.35s12.68-29.34,28.26-29.34,28.49,13.17,28.49,29.34-12.78,29.35-28.49,29.35"/> <path fill="#ed4d2d" d="m714.39,319.54c-15.1,0-29.54,5.94-40.69,16.73-10.8,11.18-16.74,25.81-16.74,41.19s5.95,29.76,16.74,41.18h.02c11.28,10.95,25.72,16.97,40.68,16.97s29.64-6.02,40.45-16.96c10.95-11.09,16.99-25.73,16.99-41.2s-6.03-30.1-16.98-41.19c-10.42-10.78-24.78-16.73-40.45-16.73m0,87.26c-15.58,0-28.26-13.16-28.26-29.34s12.68-29.35,28.26-29.35,28.49,13.17,28.49,29.35-12.78,29.34-28.49,29.34"/> <path fill="#ed4d2d" d="m865.49,270.72v58.67h-.14c-7.89-7.27-18.5-9.61-28.64-9.61-15.43,0-28.31,4.79-38.96,15.58-10.8,11.18-15.52,25.63-15.52,40.85s4.7,31.02,15.5,42.19h.01c10.88,10.8,25.24,15.49,40.44,15.49,8.54,0,18.44-1.16,27.19-9.78l.12-.12v7.74h27.39v-161.01h-27.39Zm-27.31,135.12c-14.8,0-27.31-13.76-27.31-30.04s12.51-30.04,27.31-30.04,27.31,13.76,27.31,30.04-12.51,30.04-27.31,30.04"/> </g> <g> <path fill="#ed4d2d" d="m446.63,154.55c31.21,9.34,43.49,21.03,41.53,39.79-1.21,11.56-8.12,20.95-18.95,25.76-5.97,2.65-13.97,4.16-20.35,3.84-9.82-.2-19.11-2.41-27.7-6.6-3.11-1.52-7.68-4.52-11.24-7.37h-.01c-1.67-1.41-1.86-2.32-.73-4.01.3-.46.83-1.28,2.08-3.16,1.07-1.61,2.14-3.23,2.19-3.31,1.33-2.01,2.74-2.01,4.68-.68.01.01.19.14.69.51.4.29.64.47.69.51,8.84,6.62,19.04,10.34,29.22,10.55,13.92-.43,23.74-6.68,25.31-15.96,1.74-10.2-6.69-18.95-23.15-23.75-5.76-1.68-18.35-6.4-21.86-8.25-12.35-6.89-18.31-16.26-17.68-27.92.98-16.14,15.77-28.39,34.65-28.8,8.3-.16,16.61,1.4,24.61,4.58,2.89,1.15,7.94,3.76,9.76,5.06,2.11,1.5,2.11,2.53,1.08,4.46-.15.25-.69,1.05-2.12,3.09h0c-1.51,2.16-1.96,2.81-2.09,3.03-1.24,1.6-2.28,2.1-4.4.82-8.33-5.34-16.79-7.86-26.34-7.88-11.77.44-20.42,7.41-20.84,16.67,0,8.34,6.62,14.4,20.97,19.01"/> <path fill="#ed4d2d" d="m533.3,149.88c19.04,0,34.77,15.37,34.84,34.21v36.8c0,2.13-.54,2.62-2.63,2.62h-8.75c-2.11,0-2.63-.5-2.63-2.62v-36.7c-.05-11.36-9.36-20.55-20.83-20.55s-20.74,9.15-20.83,20.47v36.77c0,1.83-.72,2.63-2.63,2.63h-8.77c-2.09,0-2.63-.77-2.63-2.63v-112.59c0-1.93.54-2.63,2.63-2.63h8.77c1.88,0,2.63.73,2.63,2.63v48.45c5.99-4.43,13.26-6.88,20.83-6.88"/> <path fill="#ed4d2d" d="m615.21,149.95c-20.82,0-37.69,16.54-37.69,36.94s16.88,36.95,37.69,36.95,37.69-16.54,37.69-36.95-16.88-36.94-37.69-36.94m0,60.3c-13.18,0-23.87-10.47-23.87-23.37s10.69-23.37,23.87-23.37,23.87,10.47,23.87,23.37-10.69,23.37-23.87,23.37"/> <path fill="#ed4d2d" d="m896.63,191.87c.06,0,.13,0,.2,0,2.3-.1,4.12-2.06,4.12-4.44,0-.11,0-.21-.01-.31,0-.04,0-.11,0-.27,0-20.4-15.99-36.94-35.74-36.94s-35.73,16.54-35.73,36.94c0,1.53.09,3.04.27,4.54l.06.48h0c.98,7.38,4.14,14.12,9.05,19.52t.04.04c5.47,6.02,12.91,10.15,21.18,11.69l.64.12v-.02c.29.05.59.1.97.15,11.33,1.36,20.85-.47,28.58-4.36,2.09-1.06,3.89-2.19,5.39-3.32.53-.4.98-.77,1.36-1.1.23-.2.39-.35.47-.43,2-2.06,2.09-2.96.89-4.81-2.77-4.41-4.32-6.56-4.32-6.56-1.08-1.36-2.06-1.67-3.44-.44-.24.21-.47.35-.58.48-8.26,7.33-19.08,8.77-28.52,6.79-1.94-.52-3.75-1.18-5.42-1.98-6.44-3.23-11.1-9-12.44-15.79h52.8s.1,0,.17,0m-52.11-13.55c2.74-8.93,11.02-14.89,20.69-14.89s18.06,6.37,21.06,14.89h-41.75Z"/> <path fill="#ed4d2d" d="m700.65,149.76c-8.67,0-16.88,2.98-23.44,8.33v-5.71c0-1.99-.54-2.62-2.63-2.62h-8.34c-2.09,0-2.63.58-2.63,2.62v106.3c0,1.93.55,2.62,2.63,2.62h8.34c2.08,0,2.63-.68,2.63-2.62v-43.38c6.56,5.35,14.77,8.34,23.44,8.34,20.45,0,37.04-16.54,37.04-36.94s-16.58-36.94-37.04-36.94m0,60.3c-12.72,0-23.11-10.12-23.43-22.78v-1.21c.32-12.64,10.71-22.77,23.43-22.77s23.44,10.47,23.44,23.37-10.5,23.38-23.44,23.38"/> <path fill="#ed4d2d" d="m815.67,191.87c.06,0,.13,0,.2,0,2.3-.1,4.12-2.06,4.12-4.44,0-.11,0-.21-.01-.31,0-.04,0-.11,0-.27,0-20.4-15.99-36.94-35.74-36.94s-35.73,16.54-35.73,36.94c0,1.53.09,3.04.27,4.54l.06.48h0c.98,7.38,4.14,14.12,9.05,19.52,0,.01.01.01.04.04,5.47,6.02,12.91,10.15,21.18,11.69l.65.12v-.02c.29.05.59.1.96.15,11.33,1.36,20.86-.47,28.58-4.36,2.09-1.06,3.89-2.19,5.39-3.32.53-.4.98-.77,1.36-1.1.23-.2.39-.35.47-.43,2-2.06,2.09-2.96.9-4.81-2.77-4.41-4.32-6.56-4.32-6.56-1.08-1.36-2.06-1.67-3.44-.44-.24.21-.47.35-.58.48-8.26,7.33-19.08,8.77-28.52,6.79-1.94-.52-3.75-1.18-5.42-1.98-6.44-3.23-11.1-9-12.44-15.79h52.8s.1,0,.17,0m-52.11-13.55c2.74-8.93,11.02-14.89,20.69-14.89s18.06,6.37,21.06,14.89h-41.75Z"/> </g> </g></svg></button>
+            <button class="a-iconbtn !h-11 !w-11" title="Delivery sendiri"><svg class="luc" viewBox="0 0 24 24"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg></button>
+          </div>
+          <div class="a-card mb-3 p-3">
+            <div class="flex items-center justify-between text-sm">
+              <p class="font-bold">2× Ayam Dada</p><p class="font-extrabold">Rp 18.000</p>
+            </div>
+            <div class="mt-1 flex items-center justify-between text-sm">
+              <p class="font-bold">1× Teh Botol <span class="a-chip ml-1 bg-brand-redsoft text-brand-redtext">habis — paksa</span></p><p class="font-extrabold">Rp 4.000</p>
+            </div>
+          </div>            <p class="mb-2 rounded-lg bg-brand-goldsoft px-3 py-2 text-xs font-bold"><svg class="luc !h-3.5 !w-3.5" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> Di keranjang: Teh Botol stok catatan HABIS. Jangan dijual bila dapur tidak sanggup.</p>
+          <div class="a-card p-3">
+            <div class="flex justify-between text-sm text-brand-muted"><span>Subtotal</span><span class="font-bold text-brand-ink">Rp 22.000</span></div>
+            <div class="mt-1 flex items-end justify-between"><span class="text-sm font-bold">Total</span><span class="text-2xl font-extrabold tracking-tight">Rp 22.000</span></div>
+            <button class="a-btn a-btn-primary mt-3 w-full justify-center text-base">Bayar · Rp 22.000</button>
+            <div class="mt-2 flex items-center gap-2">
+              <input class="a-input !min-h-10 flex-1 text-sm" placeholder="Nama bill (opsional)" />
+              <button class="a-iconbtn !h-10 !w-10" title="Simpan bill"><svg class="luc" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg></button>
+              <button class="a-iconbtn !h-10 !w-10" title="Daftar bill"><svg class="luc" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg></button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 3. Dashboard v2 ===== -->
+  <section id="dash" class="mb-12">
+    <h2 class="mb-3 text-lg font-extrabold">3 · Dashboard v2 <span class="text-sm font-bold text-brand-muted">(statis)</span></h2>
+    <div class="frame p-4">
+      <div class="mb-3 flex flex-wrap items-center gap-2">
+        <h3 class="mr-auto text-xl font-extrabold tracking-tight">Dashboard</h3>
+        <div class="flex gap-1">
+          <button class="a-btn a-btn-primary !min-h-9">Hari ini</button>
+          <button class="a-btn a-btn-ghost !min-h-9">7 hari</button>
+          <button class="a-btn a-btn-ghost !min-h-9">Bulan ini</button>
+          <button class="a-btn a-btn-ghost !min-h-9">⚙ Widget</button>
+        </div>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-3">
+        <div class="a-card strip-v2 p-4">
+          <p class="text-xs font-bold uppercase tracking-wider text-brand-muted">Omzet hari ini</p>
+          <p class="mt-1 text-3xl font-extrabold tracking-tight">Rp 1.250.000</p>
+          <p class="mt-1 text-xs font-bold text-[#16A34A]">▲ 12% vs kemarin · 57 transaksi</p>
+        </div>
+        <div class="a-card p-4">
+          <p class="text-xs font-bold uppercase tracking-wider text-brand-muted">Metode bayar</p>
+          <div class="mt-2 space-y-1.5 text-xs font-bold">
+            <div class="flex justify-between"><span>Tunai</span><span>Rp 840.000</span></div>
+            <div class="h-1.5 rounded-full" style="background:#F0E4D8"><div class="h-1.5 rounded-full" style="width:62%;background:#C4151B"></div></div>
+            <div class="flex justify-between"><span>QRIS</span><span>Rp 410.000</span></div>
+            <div class="h-1.5 rounded-full" style="background:#F0E4D8"><div class="h-1.5 rounded-full" style="width:38%;background:#F5A302"></div></div>
+          </div>
+        </div>
+        <div class="a-card p-4">
+          <p class="text-xs font-bold uppercase tracking-wider text-brand-muted">Perlu perhatian</p>
+          <div class="mt-2 space-y-2 text-sm font-bold">
+            <p class="flex items-center justify-between"><span class="a-chip bg-brand-goldsoft text-brand-ink"><svg class="luc !h-3 !w-3" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> 3 bahan</span><span class="text-xs font-bold text-brand-muted">di bawah minimum</span></p>
+            <p class="flex items-center justify-between"><span class="a-chip bg-brand-redsoft text-brand-redtext">1 fryer</span><span class="text-xs font-bold text-brand-muted">wajib ganti minyak</span></p>
+            <p class="flex items-center justify-between"><span class="a-chip bg-brand-redsoft text-brand-redtext">2 pesanan</span><span class="text-xs font-bold text-brand-muted">online menunggu</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 4. Before / After ===== -->
+  <section id="ba" class="mb-12">
+    <h2 class="mb-3 text-lg font-extrabold">4 · Before / After komponen inti</h2>
+    <div class="grid gap-4 lg:grid-cols-2">
+      <div class="b-card p-5" style="background:#FFF8F2">
+        <h3 class="mb-3 text-sm font-extrabold uppercase tracking-wider text-brand-muted">Before — v1 &ldquo;nota keras&rdquo;</h3>
+        <div class="mb-3 flex flex-wrap gap-2">
+          <button class="b-btn b-btn-primary">Bayar</button>
+          <button class="b-btn b-btn-ghost">Batal</button>
+          <button class="b-btn b-btn-danger">Hapus</button>
+          <button class="b-btn b-btn-gold">Tutup Shift</button>
+        </div>
+        <input class="b-input mb-2" placeholder="Cari menu…" />
+        <div class="mb-3 flex gap-2">
+          <span class="b-chip bg-brand-gold">⚠ 3 perlu beli</span>
+          <span class="b-chip" style="border:1.5px solid #E8D9CD">📌 24 barang</span>
+        </div>
+        <div class="mb-3 flex gap-2">
+          <span class="b-iconbtn">✏️</span>
+          <span class="b-iconbtn" style="border-color:#A31217;color:#A31217">🗑</span>
+        </div>
+        <!-- kolom Before sengaja memakai emoji/border tebal: memperlihatkan gaya LAMA yang diganti -->
+        <table class="w-full text-sm">
+          <thead><tr><th class="border-b-[1.5px] px-2 py-1.5 text-left" style="border-color:#E8D9CD;background:#fff">Bahan</th><th class="border-b-[1.5px] px-2 py-1.5 text-left" style="border-color:#E8D9CD;background:#fff">Stok</th></tr></thead>
+          <tbody>
+            <tr><td class="border-b px-2 py-1.5" style="border-color:#E8D9CD">Ayam Potong 9</td><td class="border-b px-2 py-1.5" style="border-color:#E8D9CD">12 potong</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="a-card p-5">
+        <h3 class="mb-3 text-sm font-extrabold uppercase tracking-wider text-brand-muted">After — v2 &ldquo;hangat modern&rdquo;</h3>
+        <div class="mb-3 flex flex-wrap gap-2">
+          <button class="a-btn a-btn-primary">Bayar</button>
+          <button class="a-btn a-btn-ghost">Batal</button>
+          <button class="a-btn a-btn-danger">Hapus</button>
+          <button class="a-btn a-btn-gold">Tutup Shift</button>
+        </div>
+        <input class="a-input mb-2" placeholder="Cari menu…" />
+        <div class="mb-2"><input class="a-input" placeholder="Fokus: ring merah 4px + border merah" style="border-color:#C4151B; box-shadow:0 0 0 4px rgba(196,21,27,.12)" /></div>
+        <div class="mb-3 flex gap-2">
+          <span class="a-chip bg-brand-goldsoft text-brand-ink"><svg class="luc !h-3 !w-3" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> 3 perlu beli</span>
+          <span class="a-chip" style="border:1px solid #F0E4D8"><svg class="luc !h-3 !w-3" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> 24 barang</span>
+        </div>
+        <div class="mb-3 flex gap-2">
+          <span class="a-iconbtn"><svg class="luc" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 4 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></span>
+          <span class="a-iconbtn a-iconbtn-danger"><svg class="luc" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></span>
+        </div>
+        <table class="w-full text-sm">
+          <thead><tr><th class="px-2 py-2 text-left text-xs font-extrabold uppercase tracking-wider text-brand-muted" style="border-bottom:1px solid #F0E4D8;background:#FFF9F4">Bahan</th><th class="px-2 py-2 text-left text-xs font-extrabold uppercase tracking-wider text-brand-muted" style="border-bottom:1px solid #F0E4D8;background:#FFF9F4">Stok</th></tr></thead>
+          <tbody>
+            <tr><td class="border-b px-2 py-2 font-bold" style="border-color:#F0E4D8">Ayam Potong 9</td><td class="border-b px-2 py-2" style="border-color:#F0E4D8">12 potong</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 5. Bahan & HPP v2 ===== -->
+  <section id="bahan" class="mb-12">
+    <h2 class="mb-3 text-lg font-extrabold">5 · Bahan &amp; HPP v2 <span class="text-sm font-bold text-brand-muted">(statis)</span></h2>
+    <div class="frame p-4">
+      <div class="mb-3 flex flex-wrap items-center gap-2">
+        <h3 class="mr-auto text-xl font-extrabold tracking-tight">Bahan Baku &amp; HPP</h3>
+        <div class="flex gap-1">
+          <button class="a-btn a-btn-primary !min-h-9">Bahan Baku</button>
+          <button class="a-btn a-btn-ghost !min-h-9">Pembelian &amp; Stok</button>
+          <button class="a-btn a-btn-ghost !min-h-9">Menu &amp; HPP</button>
+        </div>
+      </div>
+      <div class="mb-3 flex flex-wrap items-center gap-2">
+        <span class="a-chip" style="border:1px solid #F0E4D8">24 barang</span>
+        <span class="a-chip" style="border:1px solid #F0E4D8">Nilai stok Rp 2.418.000</span>
+        <span class="a-chip bg-brand-goldsoft text-brand-ink"><svg class="luc !h-3 !w-3" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> 3 perlu beli</span>
+        <span class="a-chip bg-brand-redsoft text-brand-redtext">1 kritis</span>
+        <input class="a-input !min-h-10 ml-auto max-w-52" placeholder="Cari nama / kode…" />
+        <div class="flex gap-1">
+          <button class="a-chip bg-brand-red text-white">Semua</button>
+          <button class="a-chip" style="border:1px solid #F0E4D8">Aktif</button>
+          <button class="a-chip" style="border:1px solid #F0E4D8">Nonaktif</button>
+        </div>
+      </div>
+      <div class="a-card overflow-x-auto">
+        <table class="w-full min-w-[680px] text-sm">
+          <thead>
+            <tr>
+              <th class="px-3 py-2.5 text-left text-[11px] font-extrabold uppercase tracking-wider text-brand-muted" style="border-bottom:1px solid #F0E4D8;background:#FFF9F4">Barang</th>
+              <th class="px-3 py-2.5 text-right text-[11px] font-extrabold uppercase tracking-wider text-brand-muted" style="border-bottom:1px solid #F0E4D8;background:#FFF9F4">Harga kemasan</th>
+              <th class="px-3 py-2.5 text-right text-[11px] font-extrabold uppercase tracking-wider text-brand-muted" style="border-bottom:1px solid #F0E4D8;background:#FFF9F4">Stok</th>
+              <th class="px-3 py-2.5 text-center text-[11px] font-extrabold uppercase tracking-wider text-brand-muted" style="border-bottom:1px solid #F0E4D8;background:#FFF9F4">Status</th>
+              <th class="px-3 py-2.5 text-center text-[11px] font-extrabold uppercase tracking-wider text-brand-muted" style="border-bottom:1px solid #F0E4D8;background:#FFF9F4">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="px-3 py-2.5 font-bold" style="border-bottom:1px solid #F7EFE6">Ayam Potong 9</td>
+              <td class="px-3 py-2.5 text-right font-bold tabular-nums underline decoration-brand-line underline-offset-4" style="border-bottom:1px solid #F7EFE6">Rp 118.800</td>
+              <td class="px-3 py-2.5 text-right tabular-nums" style="border-bottom:1px solid #F7EFE6">12 potong</td>
+              <td class="px-3 py-2.5 text-center" style="border-bottom:1px solid #F7EFE6"><span class="a-chip bg-brand-goldsoft text-brand-ink">menipis</span></td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6"><div class="flex justify-center gap-1"><span class="a-iconbtn !h-9 !w-9"><svg class="luc" viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg></span><span class="a-iconbtn !h-9 !w-9"><svg class="luc" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 4 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></span><span class="a-iconbtn a-iconbtn-danger !h-9 !w-9"><svg class="luc" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></span></div></td>
+            </tr>
+            <tr>
+              <td class="px-3 py-2.5 font-bold" style="border-bottom:1px solid #F7EFE6">Tepung Bumbu</td>
+              <td class="px-3 py-2.5 text-right font-bold tabular-nums underline decoration-brand-line underline-offset-4" style="border-bottom:1px solid #F7EFE6">Rp 36.000</td>
+              <td class="px-3 py-2.5 text-right tabular-nums" style="border-bottom:1px solid #F7EFE6">8 pack</td>
+              <td class="px-3 py-2.5 text-center" style="border-bottom:1px solid #F7EFE6"><span class="a-chip bg-brand-redsoft text-brand-redtext">kritis</span></td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6"><div class="flex justify-center gap-1"><span class="a-iconbtn !h-9 !w-9"><svg class="luc" viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg></span><span class="a-iconbtn !h-9 !w-9"><svg class="luc" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 4 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></span><span class="a-iconbtn a-iconbtn-danger !h-9 !w-9"><svg class="luc" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></span></div></td>
+            </tr>
+            <tr>
+              <td class="px-3 py-2.5 font-bold" style="border-bottom:1px solid #F7EFE6">Ayam Marinasi <span class="a-chip ml-1 bg-brand-goldsoft text-brand-ink">siap jual</span></td>
+              <td class="px-3 py-2.5 text-right text-brand-muted" style="border-bottom:1px solid #F7EFE6">≈ Rp 3.400/potong</td>
+              <td class="px-3 py-2.5 text-right tabular-nums" style="border-bottom:1px solid #F7EFE6">30 potong</td>
+              <td class="px-3 py-2.5 text-center" style="border-bottom:1px solid #F7EFE6"><span class="a-chip" style="border:1px solid #F0E4D8">aman</span></td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6"><div class="flex justify-center gap-1"><span class="a-iconbtn !h-9 !w-9"><svg class="luc" viewBox="0 0 24 24"><path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/></svg></span><span class="a-iconbtn !h-9 !w-9"><svg class="luc" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 4 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></span><span class="a-iconbtn a-iconbtn-danger !h-9 !w-9"><svg class="luc" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></span></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-3 flex flex-wrap items-center gap-2 rounded-ctl p-3" style="background:#FFF3E8">
+        <p class="mr-auto text-sm font-bold">3 harga berubah, belum disimpan.</p>
+        <button class="a-btn a-btn-ghost !min-h-9">Batalkan</button>
+        <button class="a-btn a-btn-primary !min-h-9">Simpan Semua Harga</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 6. Riwayat Transaksi v2 ===== -->
+  <section id="riwayat" class="mb-12">
+    <h2 class="mb-3 text-lg font-extrabold">6 · Riwayat Transaksi v2 <span class="text-sm font-bold text-brand-muted">(statis)</span></h2>
+    <div class="frame p-4">
+      <div class="mb-3 flex flex-wrap items-center gap-2">
+        <h3 class="text-xl font-extrabold tracking-tight">Riwayat Transaksi</h3>
+        <div class="ml-auto flex items-center gap-2">
+          <button class="a-iconbtn !h-10 !w-10" title="Hari sebelumnya"><svg class="luc" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+          <input type="date" class="a-input !min-h-10 !w-44" value="2026-09-15" />
+          <button class="a-iconbtn !h-10 !w-10" title="Hari berikutnya"><svg class="luc" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+          <button class="a-btn a-btn-ghost !min-h-10">Hari ini</button>
+        </div>
+      </div>
+      <div class="mb-3 grid max-w-2xl grid-cols-3 gap-3">
+        <div class="a-card strip-v2 p-3"><p class="text-xs font-bold uppercase tracking-wider text-brand-muted">Nota terjual</p><p class="text-xl font-extrabold tabular-nums">57</p></div>
+        <div class="a-card p-3"><p class="text-xs font-bold uppercase tracking-wider text-brand-muted">Tunai masuk-keluar</p><p class="text-xl font-extrabold tabular-nums">Rp 840.000</p></div>
+        <div class="a-card p-3"><p class="text-xs font-bold uppercase tracking-wider text-brand-muted">Total refund</p><p class="text-xl font-extrabold tabular-nums text-brand-redtext">−Rp 22.000</p></div>
+      </div>
+      <div class="a-card overflow-x-auto">
+        <table class="w-full min-w-[680px] text-sm">
+          <thead>
+            <tr>
+              <th class="px-3 py-2.5 text-left text-[11px] font-extrabold uppercase tracking-wider text-brand-muted" style="border-bottom:1px solid #F0E4D8;background:#FFF9F4">Nota</th>
+              <th class="px-3 py-2.5 text-left text-[11px] font-extrabold uppercase tracking-wider text-brand-muted" style="border-bottom:1px solid #F0E4D8;background:#FFF9F4">Jam</th>
+              <th class="px-3 py-2.5 text-left text-[11px] font-extrabold uppercase tracking-wider text-brand-muted" style="border-bottom:1px solid #F0E4D8;background:#FFF9F4">Channel</th>
+              <th class="px-3 py-2.5 text-right text-[11px] font-extrabold uppercase tracking-wider text-brand-muted" style="border-bottom:1px solid #F0E4D8;background:#FFF9F4">Total</th>
+              <th class="px-3 py-2.5 text-left text-[11px] font-extrabold uppercase tracking-wider text-brand-muted" style="border-bottom:1px solid #F0E4D8;background:#FFF9F4">Status</th>
+              <th class="px-3 py-2.5 text-center text-[11px] font-extrabold uppercase tracking-wider text-brand-muted" style="border-bottom:1px solid #F0E4D8;background:#FFF9F4">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="px-3 py-2.5 font-bold" style="border-bottom:1px solid #F7EFE6">SB260915-0113</td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6">18:42</td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6"><span class="a-chip" style="border:1px solid #F0E4D8">Bungkus</span></td>
+              <td class="px-3 py-2.5 text-right font-extrabold tabular-nums" style="border-bottom:1px solid #F7EFE6">Rp 22.000</td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6"><span class="a-chip bg-brand-redsoft text-brand-redtext">refund</span></td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6"><div class="flex justify-center gap-1"><span class="a-iconbtn !h-9 !w-9" title="Lihat"><svg class="luc" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg></span><span class="a-iconbtn a-iconbtn-danger !h-9 !w-9" title="Refund"><svg class="luc" viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg></span></div></td>
+            </tr>
+            <tr>
+              <td class="px-3 py-2.5 font-bold" style="border-bottom:1px solid #F7EFE6">SB260915-0112</td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6">18:15</td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6"><span class="a-chip" style="border:1px solid #F0E4D8">Makan di tempat</span></td>
+              <td class="px-3 py-2.5 text-right font-extrabold tabular-nums" style="border-bottom:1px solid #F7EFE6">Rp 70.000</td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6"><span class="a-chip" style="border:1px solid #F0E4D8">normal</span></td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6"><div class="flex justify-center gap-1"><span class="a-iconbtn !h-9 !w-9" title="Lihat"><svg class="luc" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg></span><span class="a-iconbtn !h-9 !w-9" title="Ubah"><svg class="luc" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 4 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></span></div></td>
+            </tr>
+            <tr>
+              <td class="px-3 py-2.5 font-bold" style="border-bottom:1px solid #F7EFE6">SB260915-0111</td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6">17:58</td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6"><span class="a-chip" style="border:1px solid #F0E4D8">GoFood</span></td>
+              <td class="px-3 py-2.5 text-right font-extrabold tabular-nums" style="border-bottom:1px solid #F7EFE6">Rp 13.000</td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6"><span class="a-chip" style="border:1px solid #F0E4D8">normal</span></td>
+              <td class="px-3 py-2.5" style="border-bottom:1px solid #F7EFE6"><div class="flex justify-center gap-1"><span class="a-iconbtn !h-9 !w-9" title="Lihat"><svg class="luc" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg></span></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 7. Modal Edit Barang v2 ===== -->
+  <section id="editbarang" class="mb-12">
+    <h2 class="mb-3 text-lg font-extrabold">7 · Modal Edit Barang v2 <span class="text-sm font-bold text-brand-muted">(statis — latar diredupkan seperti aslinya)</span></h2>
+    <div class="rounded-[20px] p-6" style="background:rgba(32,26,22,.45)">
+      <div class="mx-auto max-w-lg overflow-hidden rounded-[20px] bg-white" style="box-shadow:0 4px 12px rgba(32,26,22,.18), 0 20px 48px rgba(32,26,22,.22)">
+        <div class="flex items-center justify-between border-b px-5 py-3" style="border-color:#F0E4D8">
+          <p class="text-base font-extrabold">Edit Barang</p>
+          <button class="a-iconbtn !h-11 !w-11 !border-0" title="Tutup"><svg class="luc" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        </div>
+        <div class="p-5">
+          <div class="mb-3 grid grid-cols-2 gap-3">
+            <div><p class="lbl mb-1 text-[13px] font-semibold text-brand-muted">Kode barang</p><input class="a-input" value="200053" /></div>
+            <div><p class="lbl mb-1 text-[13px] font-semibold text-brand-muted">Nama barang</p><input class="a-input" value="Ayam Potong 9" /></div>
+          </div>
+          <div class="mb-3 grid grid-cols-2 gap-3">
+            <div>
+              <p class="lbl mb-1 text-[13px] font-semibold text-brand-muted">Satuan beli</p>
+              <select class="a-input"><option>pack</option><option>kg</option><option>Lainnya (ketik sendiri)…</option></select>
+            </div>
+            <div>
+              <p class="lbl mb-1 text-[13px] font-semibold text-brand-muted">Satuan kecil (untuk resep)</p>
+              <select class="a-input"><option>potong</option><option>— sama dgn satuan beli —</option><option>Lainnya…</option></select>
+            </div>
+          </div>
+          <div class="mb-3 grid grid-cols-2 gap-3">
+            <div><p class="lbl mb-1 text-[13px] font-semibold text-brand-muted">Isi kemasan (per pack)</p><input class="a-input text-right" value="9" /></div>
+            <div><p class="lbl mb-1 text-[13px] font-semibold text-brand-muted">Harga kemasan</p><input class="a-input text-right" value="118800" /></div>
+          </div>
+          <div class="mb-4 grid grid-cols-2 gap-3">
+            <div><p class="lbl mb-1 text-[13px] font-semibold text-brand-muted">Minimum stok</p><input class="a-input text-right" value="4" /></div>
+            <div><p class="lbl mb-1 text-[13px] font-semibold text-brand-muted">Status</p>
+              <div class="flex gap-1">
+                <button class="a-chip bg-brand-red text-white !px-4 !py-2">Aktif</button>
+                <button class="a-chip !px-4 !py-2" style="border:1px solid #F0E4D8">Nonaktif</button>
+              </div>
+            </div>
+          </div>
+          <p class="lbl mb-1.5 text-[13px] font-semibold text-brand-muted">Rincian isi kemasan per potongan (opsional)</p>
+          <div class="mb-2 rounded-ctl p-2.5" style="background:#FFF9F4">
+            <div class="mb-1.5 flex items-center gap-2"><span class="a-chip bg-brand-goldsoft text-brand-ink">2 ×</span><input class="a-input !min-h-9 flex-1 !py-1 text-sm" value="Sayap" /><span class="a-iconbtn a-iconbtn-danger !h-9 !w-9"><svg class="luc" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></span></div>
+            <div class="mb-1.5 flex items-center gap-2"><span class="a-chip bg-brand-goldsoft text-brand-ink">2 ×</span><input class="a-input !min-h-9 flex-1 !py-1 text-sm" value="Paha Atas" /><span class="a-iconbtn a-iconbtn-danger !h-9 !w-9"><svg class="luc" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></span></div>
+            <div class="flex items-center gap-2"><span class="a-chip bg-brand-goldsoft text-brand-ink">3 ×</span><input class="a-input !min-h-9 flex-1 !py-1 text-sm" value="Dada" /><span class="a-iconbtn a-iconbtn-danger !h-9 !w-9"><svg class="luc" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></span></div>
+            <p class="mt-2 text-center text-xs font-bold text-brand-muted">total 9 = isi kemasan ✓</p>
+          </div>
+          <button class="a-btn a-btn-ghost !min-h-9 mb-4 w-full justify-center text-sm">+ Potongan</button>
+          <div class="flex justify-end gap-2">
+            <button class="a-btn a-btn-ghost">Batal</button>
+            <button class="a-btn a-btn-primary">Simpan Perubahan</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 8. Tutup Shift v2 ===== -->
+  <section id="tutupshift" class="mb-12">
+    <h2 class="mb-3 text-lg font-extrabold">8 · Tutup Shift v2 <span class="text-sm font-bold text-brand-muted">(statis — selisih hidup + numpad)</span></h2>
+    <div class="rounded-[20px] p-6" style="background:rgba(32,26,22,.45)">
+      <div class="mx-auto max-w-md overflow-hidden rounded-[20px] bg-white" style="box-shadow:0 4px 12px rgba(32,26,22,.18), 0 20px 48px rgba(32,26,22,.22)">
+        <div class="flex items-center justify-between border-b px-5 py-3" style="border-color:#F0E4D8">
+          <p class="text-base font-extrabold">Tutup Shift</p>
+          <button class="a-iconbtn !h-11 !w-11 !border-0" title="Tutup"><svg class="luc" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        </div>
+        <div class="p-5">
+          <p class="mb-3 text-sm text-brand-muted">Hitung uang fisik di drawer sekarang. Wajib menyisakan float kembalian <b class="text-brand-ink">Rp 350.000</b>. Laporan otomatis ke email pemilik.</p>
+          <div class="mb-3 rounded-ctl p-3 text-center" style="background:#FEF3DD">
+            <p class="text-lg font-extrabold">Selisih Rp 0</p>
+            <p class="text-xs font-bold text-brand-muted">pas — bagus</p>
+          </div>
+          <div class="mb-2 rounded-ctl px-3 py-1.5 text-right" style="background:#FFF9F4; border:1px solid #F0E4D8">
+            <div class="text-xl font-extrabold tabular-nums">Rp 1.270.000</div>
+            <div class="text-xs font-bold text-brand-muted">uang di drawer (dihitung)</div>
+          </div>
+          <div class="mb-2 flex flex-wrap items-center gap-1.5">
+            <span class="text-[11px] font-extrabold uppercase tracking-wide text-brand-muted">Tambah cepat:</span>
+            <button class="a-btn a-btn-gold !min-h-10 !px-3 !text-[13px]">+20rb</button>
+            <button class="a-btn a-btn-gold !min-h-10 !px-3 !text-[13px]">+50rb</button>
+            <button class="a-btn a-btn-gold !min-h-10 !px-3 !text-[13px]">+100rb</button>
+          </div>
+          <div class="mb-2 grid grid-cols-3 gap-1.5">
+            <button class="a-btn a-btn-ghost justify-center !py-2 text-lg">1</button>
+            <button class="a-btn a-btn-ghost justify-center !py-2 text-lg">2</button>
+            <button class="a-btn a-btn-ghost justify-center !py-2 text-lg">3</button>
+            <button class="a-btn a-btn-ghost justify-center !py-2 text-lg">4</button>
+            <button class="a-btn a-btn-ghost justify-center !py-2 text-lg">5</button>
+            <button class="a-btn a-btn-ghost justify-center !py-2 text-lg">6</button>
+            <button class="a-btn a-btn-ghost justify-center !py-2 text-lg">7</button>
+            <button class="a-btn a-btn-ghost justify-center !py-2 text-lg">8</button>
+            <button class="a-btn a-btn-ghost justify-center !py-2 text-lg">9</button>
+            <button class="a-btn a-btn-ghost justify-center !py-2 text-sm font-extrabold">C</button>
+            <button class="a-btn a-btn-ghost justify-center !py-2 text-lg">0</button>
+            <button class="a-btn a-btn-ghost justify-center !py-2 text-lg">⌫</button>
+          </div>
+          <button class="a-btn a-btn-primary mt-2 w-full justify-center text-sm">Tutup Shift &amp; Kirim Laporan</button>
+          <div class="mt-3">
+            <p class="lbl mb-1 text-[13px] font-semibold text-brand-muted">Catatan kejadian (wajib bila kas minus)</p>
+            <textarea class="a-input !h-20 !py-2" placeholder="Contoh: ada kembalian kurang Rp5.000 karena..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 9. Checklist QA ===== -->
+  <section id="qa" class="mb-8">
+    <h2 class="mb-3 text-lg font-extrabold">9 · Checklist QA (dipakai saat eksekusi)</h2>
+    <div class="a-card p-5">
+      <ul class="grid gap-2 text-sm font-bold sm:grid-cols-2">
+        <li>☑ Kontras teks ≥ 4.5:1 (putih di #C4151B = 5.9:1 ✓)</li>
+        <li>☑ Focus state terlihat (ring merah 4px)</li>
+        <li>☑ Target sentuh ≥ 44px di kasir</li>
+        <li>☑ prefers-reduced-motion dihormati (animasi hanya pulse alert fungsional)</li>
+        <li>☑ Responsif 375 / 768 / 1024 / 1440px</li>
+        <li>☑ Tanpa emoji sebagai ikon — semua lucide / logo brand</li>
+        <li>☑ Chip &amp; badge tidak terpotong saat teks panjang</li>
+        <li>☑ Hover/press punya state jelas (lift, translateY)</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer class="pb-6 text-center text-xs text-brand-muted">Mockup statis — beri catatan (warna / radius / kepadatan / elemen yang kurang suka) → revisi → setuju → eksekusi ke aplikasi.</footer>
+</div>
+</body>
+</html>
