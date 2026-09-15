@@ -18,13 +18,13 @@ interface CartLine {
   max: number
 }
 
-const ORDER_TYPES: { key: OrderType; label: string; online: boolean }[] = [
-  { key: 'dinein', label: 'Makan di tempat', online: false },
-  { key: 'takeaway', label: 'Bungkus', online: false },
-  { key: 'gofood', label: 'GoFood', online: true },
-  { key: 'grabfood', label: 'GrabFood', online: true },
-  { key: 'shopeefood', label: 'ShopeeFood', online: true },
-  { key: 'delivery', label: 'Delivery sendiri', online: false }
+const ORDER_TYPES: { key: OrderType; label: string; icon: string; online: boolean }[] = [
+  { key: 'dinein', label: 'Makan di tempat', icon: '🍽', online: false },
+  { key: 'takeaway', label: 'Bungkus', icon: '🥡', online: false },
+  { key: 'gofood', label: 'GoFood', icon: '🟢', online: true },
+  { key: 'grabfood', label: 'GrabFood', icon: '🟩', online: true },
+  { key: 'shopeefood', label: 'ShopeeFood', icon: '🟠', online: true },
+  { key: 'delivery', label: 'Delivery sendiri', icon: '🛵', online: false }
 ]
 
 const METHOD_LABEL: Record<string, string> = { cash: 'Tunai', qris: 'QRIS', transfer: 'Transfer' }
@@ -562,18 +562,21 @@ export default function Cashier(): ReactElement {
       <aside className="flex w-full shrink-0 flex-col border-t-[1.5px] border-brand-line bg-brand-card lg:w-[340px] lg:border-l-[1.5px] lg:border-t-0 xl:w-[380px]">
         <div className="strip px-4 pb-2 pt-3">
           <h2 className="font-extrabold">Pesanan Baru</h2>
-          <div className="no-scrollbar mt-2 flex flex-wrap gap-1" role="radiogroup" aria-label="Jenis pesanan">
+          <div className="no-scrollbar mt-2 flex gap-1" role="radiogroup" aria-label="Jenis pesanan">
             {ORDER_TYPES.map((o) => (
               <button
                 key={o.key}
                 type="button"
                 role="radio"
                 aria-checked={orderType === o.key}
-                onClick={() => setOrderType(o.key)}              className={`chip h-8 px-2.5 ${orderType === o.key ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}>
-              {o.label}
-            </button>
-          ))}
-        </div>
+                title={o.label}
+                aria-label={o.label}
+                onClick={() => setOrderType(o.key)}
+                className={`icon-btn !h-8 !w-8 !min-w-0 text-base ${orderType === o.key ? 'bg-brand-btn text-white shadow' : 'border-[1.5px] border-brand-line bg-brand-card'}`}>
+                {o.icon}
+              </button>
+            ))}
+          </div>
         {/* Bill tersimpan: chip bar 1-ketuk utk recall tanpa buka modal.
             Keranjang masih isi → ketuk 2x (konfirmasi) supaya tak menimpa. */}
         {held.length > 0 && (
@@ -693,20 +696,32 @@ export default function Cashier(): ReactElement {
             />
             <button
               type="button"
-              className="btn-ghost !h-10 shrink-0 px-3 text-sm font-extrabold"
+              className="btn-ghost relative !h-10 !w-10 shrink-0 !px-0 text-lg"
               disabled={cart.length === 0 || busy || (!shift && !online)}
               onClick={() => void doSaveBill()}
-              title="Simpan pesanan untuk pembayaran nanti (stok belum dipotong)"
+              title="Simpan pesanan — tunda pembayaran (stok belum dipotong)"
+              aria-label="Simpan pesanan sebagai bill — tunda pembayaran"
             >
-              💵 Simpan
+              ⏸
+              {held.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-btn px-1 text-[10px] font-extrabold text-white">
+                  {held.length}
+                </span>
+              )}
             </button>
             <button
               type="button"
-              className="btn-ghost relative !h-10 shrink-0 px-3 text-sm font-extrabold"
+              className="btn-ghost relative !h-10 !w-10 shrink-0 !px-0 text-lg"
               onClick={() => setBillsOpen(true)}
+              title={`Daftar bill tersimpan (${held.length}) — panggil untuk dilanjutkan / dibayar`}
               aria-label={`Daftar bill tersimpan, ${held.length} bill`}
             >
-              🧾 Bill{held.length > 0 ? ` (${held.length})` : ''}
+              ▶
+              {held.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-redtext px-1 text-[10px] font-extrabold text-white">
+                  {held.length}
+                </span>
+              )}
             </button>
           </div>
           {!shift && !online && <p className="mt-1 text-center text-xs font-bold text-brand-redtext">Buka shift dulu untuk checkout.</p>}
