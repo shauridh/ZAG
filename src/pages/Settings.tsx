@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactElement } from 'react'
 import { loadSettings, saveSetting, loadZones, saveZones, resetDemoData, isDemo, resetOperationalData, clearOwnerPin } from '../lib/db'
 import { fmtRpPlain, parseNum } from '../lib/money'
+import { QtyInput } from '../components/QtyInput'
 import { normalizeSchedule, DAY_LABELS, DAY_ORDER, type DeliveryWeek } from '../lib/delivery-schedule'
 import type { Settings } from '../lib/types'
 import { MapPicker } from '../components/MapPicker'
@@ -364,12 +365,12 @@ export default function SettingsPage(): ReactElement {
                   <label className="lbl" htmlFor={`zr${i}`}>
                     ≤ radius (km)
                   </label>
-                  <input
-                    id={`zr${i}`}
+                  <QtyInput
+                    value={z.radius_km}
+                    draftKey={`zr-${i}`}
                     className="input !h-10 text-right"
-                    inputMode="decimal"
-                    value={String(z.radius_km)}
-                    onChange={(e) => setZones(zones.map((x, j) => (j === i ? { ...x, radius_km: parseNum(e.target.value) } : x)))}
+                    ariaLabel={`Radius zona ${i + 1} (km)`}
+                    onChange={(n) => setZones(zones.map((x, j) => (j === i ? { ...x, radius_km: n } : x)))}
                   />
                 </div>
                 <div>

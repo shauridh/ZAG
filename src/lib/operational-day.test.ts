@@ -163,14 +163,18 @@ async function loadHeldSafe(): Promise<unknown[]> {
 
 async function loadTransactionsToday() {
   const { loadTransactions } = await import('./db')
-  const today = new Date().toISOString().slice(0, 10)
-  return loadTransactions(`${today}T00:00:00.000Z`, `${today}T23:59:59.999Z`)
+  const dates = await import('./dates')
+  // rentang hari lokal dgn UTC ISO (dayStart/dayEnd) — sama dgn pola halaman Riwayat:
+  // string-compare created_at benar meski test jalan lewat tengah malam WIB.
+  const today = dates.todayISO()
+  return loadTransactions(dates.dayStart(today), dates.dayEnd(today))
 }
 
 describe('hari operasional: keuangan', () => {
   it('pengeluaran & pemasukan lain tercatat di laporan', async () => {
     await addExpense(2, 30000, 'token listrik')
-    const fin = await loadFinance(new Date().toISOString().slice(0, 10), new Date().toISOString().slice(0, 10))
+    const today = (await import('./dates')).todayISO()
+    const fin = await loadFinance(today, today)
     expect(fin.expenses.reduce((s, e) => s + e.amount, 0)).toBe(30000)
   })
 })

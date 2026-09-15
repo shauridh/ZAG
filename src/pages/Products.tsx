@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { loadCatalog, loadSettings, upsertProduct, upsertCategory, saveRecipe, saveTargets, saveBundle, saveBundleItems, deleteBundle, deleteProduct, uploadProductPhoto, removeProductPhoto, type Catalog } from '../lib/db'
 import { fmtHppQty, hppLines, hppTotal, ingIndex, marginPct, maxAvailableQty } from '../lib/hpp'
-import { fmtRp, fmtRpPlain, parseNum } from '../lib/money'
+import { fmtRp, fmtRpPlain } from '../lib/money'
 import type { Product } from '../lib/types'
 import { Modal } from '../components/Modal'
+import { QtyInput } from '../components/QtyInput'
 import { fileToPreviewBlob, type PreviewBlob } from '../lib/image'
 import { useToast } from '../components/Toast'
 
@@ -98,6 +99,12 @@ function ProductsTab({
   const [activeFilter, setActiveFilter] = useState<'all' | 'on' | 'off'>('all')
   // menu yang sedang di-toggle (mencegah dobel-klik saat RPC jalan)
   const [toggling, setToggling] = useState<number | null>(null)
+  // tampilan: kartu (grid) atau tabel — tersimpan per perangkat
+  const [view, setView] = useState<'grid' | 'table'>(() => (localStorage.getItem('sabana-menu-view') === 'table' ? 'table' : 'grid'))
+  const setViewPersist = (v: 'grid' | 'table'): void => {
+    setView(v)
+    localStorage.setItem('sabana-menu-view', v)
+  }
 
   const prods = catalog.products.filter(
     (p) => p.name.toLowerCase().includes(q.toLowerCase()) && (activeFilter === 'all' || (activeFilter === 'on' ? p.is_active : !p.is_active))
@@ -158,8 +165,108 @@ function ProductsTab({
         <button type="button" className="btn-ghost" onClick={() => setEditCat({ name: '', sort: 99 })}>
           + Kategori
         </button>
+        {/* tampilan: kartu / tabel */}
+        <div className="ml-auto flex gap-1" role="radiogroup" aria-label="Tampilan">
+          {(
+            [
+              ['grid', '▦ Kartu'],
+              ['table', '☰ Tabel']
+            ] as ['grid' | 'table', string][]
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              role="radio"
+              aria-checked={view === k}
+              className={`chip h-9 px-3 ${view === k ? 'bg-brand-btn text-white' : 'border-[1.5px] border-brand-line bg-brand-card'}`}
+              onClick={() => setViewPersist(k)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="grid grid-cols-2 content-start gap-2 sm:grid-cols-3 xl:grid-cols-4">
+      {view === 'table' && (
+        <div className="card overflow-x-auto">
+          <table className="tbl min-w-[760px]">
+            <thead>
+              <tr>
+                <th>Menu</th>
+                <th>Kategori</th>
+                <th className="text-right">Harga</th>
+                <th className="text-right">HPP</th>
+                <th className="text-right">Margin</th>
+                <th className="text-right">Sisa</th>
+                <th>Status</th>
+                <th className="text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {prods.map((p) => {
+                const lines = hppLines(p.id, catalog.recipeByProduct, catalog.ingRecipes, ingById)
+                const hpp = hppTotal(lines)
+                const mg = marginPct(p.price, hpp)
+                const avail = maxAvailableQty(p.id, catalog.recipeByProduct, ingById)
+                return (
+                  <tr key={p.id} className={`${p.is_active ? '' : 'opacity-70'} ${avail <= 0 ? 'bg-brand-redtext/5' : ''}`}>
+                    <td className="font-bold">
+                      {p.photo && <img src={p.photo} alt="" className="mr-1.5 inline-block h-8 w-8 rounded object-contain align-middle" loading="lazy" />}
+                      {p.name}
+                    </td>
+                    <td className="text-xs text-brand-muted">{catName(p.category_id)}</td>
+                    <td className="text-right font-extrabold tabular-nums">{fmtRp(p.price)}</td>
+                    <td className="text-right tabular-nums text-brand-muted">{hpp > 0 ? fmtRp(hpp) : '—'}</td>
+                    <td className="text-right tabular-nums">
+                      {hpp > 0 ? (
+                        <span className={`chip text-[10px] ${mg < warnPct ? 'bg-brand-redtext text-white' : 'bg-brand-gold/30'}`}>{mg.toFixed(0)}%</span>
+                      ) : (
+                        <span className="chip bg-brand-redtext text-[10px] text-white">belum</span>
+                      )}
+                    </td>
+                    <td className="text-right tabular-nums">{avail <= 0 ? <span className="chip bg-brand-redtext text-[10px] text-white">habis</span> : avail <= 10 ? <span className="chip bg-brand-gold text-[10px]">{avail}</span> : avail}</td>
+                    <td>{p.is_active ? <span className="chip bg-brand-gold/30 text-[10px]">aktif</span> : <span className="chip bg-brand-line text-[10px]">nonaktif</span>}</td>
+                    <td>
+                      <div className="flex justify-center gap-1">
+                        <button
+                          type="button"
+                          className={`icon-btn ${hpp <= 0 ? '!border-brand-redtext !text-brand-redtext' : ''}`}
+                          title={hpp > 0 ? 'Resep & HPP' : 'Atur resep (HPP belum diatur)'}
+                          aria-label={`Resep ${p.name}`}
+                          onClick={() => setRecipeFor(p)}
+                        >
+                          🧾
+                        </button>
+                        <button type="button" className="icon-btn" title="Edit menu" aria-label={`Edit ${p.name}`} onClick={() => setEditProd(p)}>
+                          ✏️
+                        </button>
+                        <button
+                          type="button"
+                          className={`icon-btn ${p.is_active ? '' : '!border-brand-gold !text-brand-btn'}`}
+                          disabled={toggling === p.id}
+                          title={p.is_active ? 'Matikan: hilang dari kasir & portal customer' : 'Nyalakan lagi: menu kembali tampil di kasir & portal'}
+                          aria-label={p.is_active ? `Matikan ${p.name}` : `Nyalakan ${p.name}`}
+                          onClick={() => void toggleActive(p)}
+                        >
+                          {p.is_active ? '⏻' : '⚡'}
+                        </button>
+                        <button type="button" className="icon-btn-danger" title="Hapus menu" aria-label={`Hapus ${p.name}`} onClick={() => setDeleting(p)}>
+                          🗑
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {prods.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-sm text-brand-muted">Tidak ada produk yang cocok.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className={view === 'grid' ? 'grid grid-cols-2 content-start gap-2 sm:grid-cols-3 xl:grid-cols-4' : 'hidden'}>
         {prods.map((p) => {
           const lines = hppLines(p.id, catalog.recipeByProduct, catalog.ingRecipes, ingById)
           const hpp = hppTotal(lines)
@@ -406,12 +513,10 @@ function RecipeEditor({
                   </option>
                 ))}
               </select>
-              <input
-                className="input !h-10 text-right"
-                value={String(l.qty)}
-                inputMode="decimal"
-                onChange={(e) => setLines((ls) => ls.map((x, j) => (j === i ? { ...x, qty: parseNum(e.target.value) } : x)))}
-                aria-label="Qty"
+              <QtyInput
+                value={l.qty}
+                draftKey={`rq-${i}`}
+                onChange={(n) => setLines((ls) => ls.map((x, j) => (j === i ? { ...x, qty: n } : x)))}
               />
               <span className="text-right text-xs font-bold tabular-nums">{line ? fmtRp(line.cost) : '—'}</span>
               <button type="button" className="icon-btn-danger" onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))} aria-label="Hapus baris">
