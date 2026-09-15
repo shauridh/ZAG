@@ -124,7 +124,10 @@ export default function ShiftPage(): ReactElement {
               type="button"
               className="btn-primary flex-1"
               onClick={() => {
-                setCloseCash(expectedOf(shift))
+                // mulai dari 0: prefill expected bikin ketikan numpad MENEMPEL
+                // (420000 + ketik 100000 = 420000100000) dan lolos guard kas.
+                // Angka seharusnya sudah tampil di selisih hidup & kartu drawer.
+                setCloseCash(0)
                 setCloseModal(true)
               }}
             >
